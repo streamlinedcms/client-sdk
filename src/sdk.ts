@@ -2,11 +2,13 @@
  * Main SDK class for StreamlinedCMS
  */
 
-import type { StreamlinedCMSConfig, ContentElement, LogLevel } from "./types.js";
+import { Logger } from "loganite";
+import type { StreamlinedCMSConfig, ContentElement } from "./types.js";
 
 export class StreamlinedCMS {
     private config: StreamlinedCMSConfig;
-    private logLevel: LogLevel;
+    private log: Logger;
+    private configuredLogLevel: string;
     private isAuthenticated: boolean = false;
     private currentUserId: string | null = null;
     private editableElements: Map<string, HTMLElement> = new Map();
@@ -15,20 +17,23 @@ export class StreamlinedCMS {
     constructor(config: StreamlinedCMSConfig) {
         this.config = config;
 
-        // Normalize log level (false/null become 'none', undefined becomes 'error')
+        // Normalize log level (false/null become 'fatal', undefined becomes 'error')
+        this.configuredLogLevel = config.logLevel || "error";
         if (config.logLevel === false || config.logLevel === null) {
-            this.logLevel = "none";
-        } else {
-            this.logLevel = config.logLevel || "error";
+            this.configuredLogLevel = "fatal";
         }
 
-        this.logDebug("StreamlinedCMS initialized", this.config);
+        // Create logger with configured level
+        // LOG_LEVEL env/localStorage override is checked at log-time by loganite
+        this.log = new Logger("StreamlinedCMS", this.configuredLogLevel);
+
+        this.log.info("StreamlinedCMS initialized", this.config);
 
         // Initialize mock auth if enabled
         if (config.mockAuth?.enabled) {
             this.isAuthenticated = true;
             this.currentUserId = config.mockAuth.userId || "mock-user-123";
-            this.logDebug("Mock authentication enabled", { userId: this.currentUserId });
+            this.log.debug("Mock authentication enabled", { userId: this.currentUserId });
         }
     }
 
@@ -43,7 +48,7 @@ export class StreamlinedCMS {
      * Initialize the SDK - scan for editable elements and set up editing
      */
     public async init(): Promise<void> {
-        this.logDebug("Initializing SDK", {
+        this.log.info("Initializing SDK", {
             appId: this.config.appId,
             domain: this.getDomain(),
         });
@@ -62,10 +67,8 @@ export class StreamlinedCMS {
             this.enableEditMode();
         }
 
-        this.logDebug("SDK initialization complete", {
+        this.log.info("SDK initialization complete", {
             editableCount: this.editableElements.size,
-            appId: this.config.appId,
-            domain: this.getDomain(),
         });
     }
 
@@ -89,7 +92,7 @@ export class StreamlinedCMS {
             const elementId = element.getAttribute("data-editable");
             if (elementId) {
                 this.editableElements.set(elementId, element);
-                this.logDebug("Found editable element", { elementId, element });
+                this.log.trace("Found editable element", { elementId });
             }
         });
     }
@@ -99,25 +102,25 @@ export class StreamlinedCMS {
      */
     private async loadContent(): Promise<void> {
         if (this.editableElements.size === 0) {
-            this.logDebug("No editable elements to load");
+            this.log.trace("No editable elements to load");
             return;
         }
 
         try {
             const url = `${this.config.apiUrl}/apps/${this.config.appId}/content`;
-            this.logDebug("Loading content from API", { url });
+            this.log.trace("Loading content from API", { url });
 
             const response = await fetch(url);
 
             if (!response.ok) {
                 // If 404, no content exists yet - that's okay for new sites
                 if (response.status === 404) {
-                    this.logDebug("No existing content found (404) - this is normal for new sites");
+                    this.log.trace("No existing content found (404)");
                     return;
                 }
                 // If 403, domain not whitelisted
                 if (response.status === 403) {
-                    this.logWarn("Domain not whitelisted for this app:", this.getDomain());
+                    this.log.warn("Domain not whitelisted for this app:", this.getDomain());
                     return;
                 }
                 throw new Error(
@@ -126,20 +129,18 @@ export class StreamlinedCMS {
             }
 
             const data = (await response.json()) as { elements: ContentElement[] };
-            this.logDebug("Content loaded", data);
+            this.log.debug("Content loaded", { count: data.elements.length });
 
             // Update DOM with loaded content
             data.elements.forEach((element) => {
                 const domElement = this.editableElements.get(element.elementId);
                 if (domElement) {
                     domElement.innerHTML = element.content;
-                    this.logDebug("Updated element from API", {
-                        elementId: element.elementId,
-                    });
+                    this.log.trace("Updated element from API", { elementId: element.elementId });
                 }
             });
         } catch (error) {
-            this.logWarn("Could not load existing content - using defaults", error);
+            this.log.warn("Could not load existing content - using defaults", error);
             // Don't throw - allow the SDK to continue with default content
         }
     }
@@ -148,7 +149,7 @@ export class StreamlinedCMS {
      * Enable edit mode - make elements editable and add visual indicators
      */
     private enableEditMode(): void {
-        this.logDebug("Enabling edit mode");
+        this.log.debug("Edit mode enabled");
 
         this.editableElements.forEach((element, elementId) => {
             // Add visual indicator class
@@ -228,11 +229,11 @@ export class StreamlinedCMS {
     private startEditing(elementId: string): void {
         const element = this.editableElements.get(elementId);
         if (!element) {
-            this.logDebug("Element not found", { elementId });
+            this.log.warn("Element not found", { elementId });
             return;
         }
 
-        this.logDebug("Starting edit", { elementId });
+        this.log.trace("Starting edit", { elementId });
 
         // Stop editing previous element if any
         if (this.editingElement) {
@@ -257,7 +258,7 @@ export class StreamlinedCMS {
             return;
         }
 
-        this.logDebug("Stopping edit");
+        this.log.trace("Stopping edit");
 
         this.editingElement.classList.remove("streamlined-editing");
         this.editingElement.setAttribute("contenteditable", "false");
@@ -306,7 +307,7 @@ export class StreamlinedCMS {
         }
 
         const content = element.innerHTML;
-        this.logDebug("Saving element", { elementId, content });
+        this.log.debug("Saving element", { elementId });
 
         // Disable button during save
         const button = document.getElementById("streamlined-save-btn") as HTMLButtonElement;
@@ -333,7 +334,7 @@ export class StreamlinedCMS {
             }
 
             const data = (await response.json()) as ContentElement;
-            this.logDebug("Content saved successfully", data);
+            this.log.info("Content saved", { elementId });
 
             // Show success feedback
             if (button) {
@@ -344,7 +345,7 @@ export class StreamlinedCMS {
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            this.logError("Failed to save content", error);
+            this.log.error("Failed to save content", error);
 
             // Show error to user
             if (button) {
@@ -358,65 +359,10 @@ export class StreamlinedCMS {
     }
 
     /**
-     * Log levels (in order of severity)
+     * Get configured log level (for testing/debugging)
+     * Returns the level name in our SDK's terminology (none, error, warn, info, debug)
      */
-    private readonly LOG_LEVELS: Record<LogLevel, number> = {
-        none: 0,
-        error: 1,
-        warn: 2,
-        info: 3,
-        debug: 4,
-    };
-
-    /**
-     * Check if a log level should be shown
-     */
-    private shouldLog(level: LogLevel): boolean {
-        return this.LOG_LEVELS[level] <= this.LOG_LEVELS[this.logLevel];
-    }
-
-    /**
-     * Log error messages
-     */
-    private logError(message: string, data?: any): void {
-        if (this.shouldLog("error")) {
-            console.error(`[StreamlinedCMS] ${message}`, data || "");
-        }
-    }
-
-    /**
-     * Log warning messages
-     */
-    private logWarn(message: string, data?: any): void {
-        if (this.shouldLog("warn")) {
-            console.warn(`[StreamlinedCMS] ${message}`, data || "");
-        }
-    }
-
-    /**
-     * Log info messages
-     * @internal Reserved for future use
-     */
-    // @ts-ignore - Reserved for future use
-    private logInfo(message: string, data?: any): void {
-        if (this.shouldLog("info")) {
-            console.log(`[StreamlinedCMS] ${message}`, data || "");
-        }
-    }
-
-    /**
-     * Get current log level (for testing/debugging)
-     */
-    public getLogLevel(): LogLevel {
-        return this.logLevel;
-    }
-
-    /**
-     * Log debug messages
-     */
-    private logDebug(message: string, data?: any): void {
-        if (this.shouldLog("debug")) {
-            console.log(`[StreamlinedCMS] ${message}`, data || "");
-        }
+    public getLogLevel(): string {
+        return this.configuredLogLevel;
     }
 }

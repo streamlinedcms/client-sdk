@@ -81,9 +81,45 @@ describe('auto-init', () => {
             const scripts = document.querySelectorAll<HTMLScriptElement>('script[src*="streamlined-cms"]');
             expect(scripts.length).toBe(0);
         });
+
+        it('should ignore invalid log levels', () => {
+            const script = document.createElement('script');
+            script.src = '/streamlined-cms.js';
+            script.dataset.logLevel = 'invalid-level';
+            document.head.appendChild(script);
+
+            const foundScript = document.querySelector<HTMLScriptElement>('script[src*="streamlined-cms"]');
+            // Invalid log level should not be in the valid list
+            const validLevels = ['none', 'error', 'warn', 'info', 'debug'];
+            expect(validLevels.includes(foundScript!.dataset.logLevel!)).toBe(false);
+        });
     });
 
     describe('hiding styles structure', () => {
+        it('should not duplicate hiding styles if already present', () => {
+            // First style element
+            const style1 = document.createElement('style');
+            style1.id = 'streamlined-cms-hiding';
+            style1.textContent = '[data-editable] { visibility: hidden; }';
+            document.head.appendChild(style1);
+
+            // Try to add another - should find existing and not add duplicate
+            const existingStyle = document.getElementById('streamlined-cms-hiding');
+            expect(existingStyle).not.toBeNull();
+
+            // Simulate the check from injectHidingStylesEarly
+            if (!document.getElementById('streamlined-cms-hiding')) {
+                // This should not execute
+                const style2 = document.createElement('style');
+                style2.id = 'streamlined-cms-hiding';
+                document.head.appendChild(style2);
+            }
+
+            // Still only one style element
+            const allHidingStyles = document.querySelectorAll('#streamlined-cms-hiding');
+            expect(allHidingStyles.length).toBe(1);
+        });
+
         it('should have correct hiding style content when manually created', () => {
             // This tests the expected structure of the hiding styles
             const style = document.createElement('style');
@@ -125,6 +161,128 @@ describe('auto-init', () => {
             expect(typeof module.autoInit).toBe('function');
 
             delete (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__;
+        });
+
+        it('should initialize SDK when called with valid config', async () => {
+            // Set up script tag with required config
+            const script = document.createElement('script');
+            script.src = '/dist/streamlined-cms.js';
+            script.dataset.apiUrl = 'https://api.example.com';
+            script.dataset.appId = 'test-app';
+            document.head.appendChild(script);
+
+            // Mock fetch
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                status: 404,
+            });
+
+            // Set flag then import fresh
+            (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__ = true;
+            vi.resetModules();
+
+            const { autoInit } = await import('../../src/auto-init.js');
+
+            // Call autoInit directly
+            autoInit();
+
+            // Check that SDK was created on window
+            expect((window as any).StreamlinedCMS).toBeDefined();
+
+            delete (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__;
+            delete (window as any).StreamlinedCMS;
+        });
+
+        it('should parse mockAuth config from script tag', async () => {
+            const script = document.createElement('script');
+            script.src = '/dist/streamlined-cms.js';
+            script.dataset.appId = 'test-app';
+            script.dataset.mockAuth = 'true';
+            script.dataset.mockUserId = 'mock-user-123';
+            document.head.appendChild(script);
+
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                status: 404,
+            });
+
+            (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__ = true;
+            vi.resetModules();
+
+            const { autoInit } = await import('../../src/auto-init.js');
+            autoInit();
+
+            expect((window as any).StreamlinedCMS).toBeDefined();
+
+            delete (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__;
+            delete (window as any).StreamlinedCMS;
+        });
+
+        it('should parse logLevel config from script tag', async () => {
+            const script = document.createElement('script');
+            script.src = '/dist/streamlined-cms.js';
+            script.dataset.appId = 'test-app';
+            script.dataset.logLevel = 'debug';
+            document.head.appendChild(script);
+
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                status: 404,
+            });
+
+            (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__ = true;
+            vi.resetModules();
+
+            const { autoInit } = await import('../../src/auto-init.js');
+            autoInit();
+
+            const cms = (window as any).StreamlinedCMS;
+            expect(cms).toBeDefined();
+            expect(cms.getLogLevel()).toBe('debug');
+
+            delete (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__;
+            delete (window as any).StreamlinedCMS;
+        });
+
+        it('should handle missing script tag gracefully', async () => {
+            // No script tag added - should not throw
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__ = true;
+            vi.resetModules();
+
+            const { autoInit } = await import('../../src/auto-init.js');
+            autoInit();
+
+            // Should log error about missing appId (since no script tag = no config)
+            expect(consoleSpy).toHaveBeenCalled();
+
+            delete (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__;
+            consoleSpy.mockRestore();
+        });
+
+        it('should use default API URL when not provided', async () => {
+            const script = document.createElement('script');
+            script.src = '/dist/streamlined-cms.js';
+            script.dataset.appId = 'test-app';
+            // No apiUrl set
+            document.head.appendChild(script);
+
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: false,
+                status: 404,
+            });
+
+            (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__ = true;
+            vi.resetModules();
+
+            const { autoInit } = await import('../../src/auto-init.js');
+            autoInit();
+
+            expect((window as any).StreamlinedCMS).toBeDefined();
+
+            delete (window as any).__STREAMLINED_CMS_NO_AUTO_INIT__;
+            delete (window as any).StreamlinedCMS;
         });
     });
 

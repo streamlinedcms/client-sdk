@@ -1,11 +1,11 @@
 /**
- * Log level options
- * Internal type uses string values for the severity hierarchy
+ * Log level options (matches loganite levels)
+ * fatal = silent, error, warn, normal, info, debug, trace
  */
-export type LogLevel = 'none' | 'error' | 'warn' | 'info' | 'debug';
+export type LogLevel = 'fatal' | 'error' | 'warn' | 'normal' | 'info' | 'debug' | 'trace';
 
 /**
- * Log level input options (accepts false/null which normalize to 'none')
+ * Log level input options (accepts false/null which normalize to 'fatal')
  */
 export type LogLevelInput = LogLevel | false | null;
 
@@ -24,8 +24,8 @@ export interface StreamlinedCMSConfig {
     appId: string;
 
     /**
-     * Logging level: 'none' | 'error' | 'warn' | 'info' | 'debug' | false | null
-     * Defaults to 'error'. Use false/null or 'none' to disable all logging.
+     * Logging level: 'fatal' | 'error' | 'warn' | 'normal' | 'info' | 'debug' | 'trace' | false | null
+     * Defaults to 'error'. Use false/null or 'fatal' to disable all logging.
      */
     logLevel?: LogLevelInput;
 
