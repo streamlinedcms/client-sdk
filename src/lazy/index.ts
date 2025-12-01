@@ -26,6 +26,8 @@ class EditorController {
     private currentMode: EditorMode = "viewer";
     private editableElements: Map<string, HTMLElement> = new Map();
     private editingElement: HTMLElement | null = null;
+    private customSignInTrigger: Element | null = null;
+    private customSignInOriginalText: string | null = null;
 
     constructor(config: ViewerConfig) {
         this.config = config;
@@ -81,6 +83,16 @@ class EditorController {
 
         if (storedKey) {
             this.apiKey = storedKey;
+
+            // Set up custom trigger as sign-out if present
+            const customTrigger = document.querySelector("[data-scms-signin]");
+            if (customTrigger) {
+                this.customSignInTrigger = customTrigger;
+                this.customSignInOriginalText = customTrigger.textContent;
+                customTrigger.textContent = "Sign Out";
+                customTrigger.addEventListener("click", this.handleSignOutClick);
+            }
+
             const storedMode = this.auth.getStoredMode();
             this.setMode(storedMode === "author" ? "author" : "viewer");
             this.log.debug("Restored auth state", { mode: this.currentMode });
@@ -96,10 +108,15 @@ class EditorController {
         // Check for custom trigger
         const customTrigger = document.querySelector("[data-scms-signin]");
         if (customTrigger) {
-            customTrigger.addEventListener("click", (e) => {
-                e.preventDefault();
-                this.handleSignIn();
-            });
+            this.customSignInTrigger = customTrigger;
+            this.customSignInOriginalText = customTrigger.textContent;
+
+            // Restore original text if it was changed
+            if (this.customSignInOriginalText) {
+                customTrigger.textContent = this.customSignInOriginalText;
+            }
+
+            customTrigger.addEventListener("click", this.handleSignInClick);
             return;
         }
 
@@ -112,6 +129,16 @@ class EditorController {
         document.body.appendChild(signInLink);
     }
 
+    private handleSignInClick = (e: Event): void => {
+        e.preventDefault();
+        this.handleSignIn();
+    };
+
+    private handleSignOutClick = (e: Event): void => {
+        e.preventDefault();
+        this.signOut();
+    };
+
     private async handleSignIn(): Promise<void> {
         this.log.debug("Opening login popup");
 
@@ -119,9 +146,16 @@ class EditorController {
         if (key) {
             this.apiKey = key;
 
-            // Remove sign-in link
+            // Remove default sign-in link if present
             const signInLink = document.getElementById("scms-signin-link");
             if (signInLink) signInLink.remove();
+
+            // Convert custom trigger to sign-out
+            if (this.customSignInTrigger) {
+                this.customSignInTrigger.removeEventListener("click", this.handleSignInClick);
+                this.customSignInTrigger.textContent = "Sign Out";
+                this.customSignInTrigger.addEventListener("click", this.handleSignOutClick);
+            }
 
             this.setMode("author");
             this.log.info("User authenticated via popup, entering author mode");
@@ -217,8 +251,21 @@ class EditorController {
         this.hideSaveButton();
         this.editingElement = null;
 
+        // Convert custom trigger back to sign-in
+        if (this.customSignInTrigger) {
+            this.customSignInTrigger.removeEventListener("click", this.handleSignOutClick);
+            if (this.customSignInOriginalText) {
+                this.customSignInTrigger.textContent = this.customSignInOriginalText;
+            }
+            this.customSignInTrigger.addEventListener("click", this.handleSignInClick);
+        }
+
         this.removeModeToggle();
-        this.showSignInLink();
+
+        // Only show default sign-in link if no custom trigger
+        if (!this.customSignInTrigger) {
+            this.showSignInLink();
+        }
     }
 
     private injectEditStyles(): void {

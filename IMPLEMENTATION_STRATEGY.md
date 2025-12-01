@@ -345,17 +345,21 @@ Iframe → SDK: { type: 'result', requestId: '123', payload: {...} }
 
 **Postponed:** Using [penpal](https://github.com/Aaronius/penpal) (v7.0.4) for now. It provides promise-based postMessage communication for iframes and popups with origin validation. May revisit building `@whi/comb` as a replacement later if needed.
 
-### Phase 3: Hosted Login Page + SDK Auth Flow
+### Phase 3: Hosted Login Page + SDK Auth Flow ✓
 - Build login page on `app.streamlinedcms.com` (Vue 3 + Tailwind)
 - Password hashing (Web Crypto API)
 - Uses messaging library for returning token to SDK
 - SDK: popup handler, token storage (localStorage), session validation
 
-### Phase 4: Viewer Bundle Refactor
+**Completed:** Login and signup pages in app-gui with SHA-512 client-side password hashing. Penpal-based popup flow returns API key to SDK. Session checking on mount redirects to dashboard if already logged in.
+
+### Phase 4: Viewer Bundle Refactor ✓
 - Split current SDK into viewer-only core
 - Critical path: ≤8KB, no dependencies
 - Implement lazy session check
 - Inject sign-in button
+
+**Completed:** Two-phase loader architecture. Phase 1 loader (~2KB) handles FOUC prevention, config parsing, and content fetching. Phase 2 dynamically imports full SDK only when needed for auth/editing. SDK bridge iframe for cross-origin session checks via penpal.
 
 ### Phase 5: Author Bundle
 - Editing toolbar component
