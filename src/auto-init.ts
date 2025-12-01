@@ -57,6 +57,7 @@ function getConfigFromScriptTag(): Partial<StreamlinedCMSConfig> {
 
     const config: Partial<StreamlinedCMSConfig> = {
         apiUrl: scriptTag.dataset.apiUrl,
+        appUrl: scriptTag.dataset.appUrl,
         appId: scriptTag.dataset.appId,
         mockAuth:
             scriptTag.dataset.mockAuth === "true"
@@ -82,8 +83,9 @@ function getConfigFromScriptTag(): Partial<StreamlinedCMSConfig> {
 function autoInit(): void {
     const config = getConfigFromScriptTag();
 
-    // Default API URL if not provided
+    // Default URLs if not provided
     const apiUrl = config.apiUrl || "https://streamlined-cms-api-worker-staging.whi.workers.dev";
+    const appUrl = config.appUrl || "https://streamlined-cms-app-gui-staging.whi.workers.dev";
 
     // App ID is required
     if (!config.appId) {
@@ -93,6 +95,7 @@ function autoInit(): void {
 
     const sdkConfig: StreamlinedCMSConfig = {
         apiUrl,
+        appUrl,
         appId: config.appId,
         logLevel: config.logLevel,
         mockAuth: config.mockAuth,

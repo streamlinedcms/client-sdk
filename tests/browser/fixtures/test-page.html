@@ -5,10 +5,11 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Streamlined CMS - Test Page</title>
 
-        <!-- Load the SDK -->
+        <!-- SDK Script - data-api-url is templated by test server -->
         <script
+            id="scms-script"
             src="/dist/streamlined-cms.js"
-            data-api-url="https://streamlined-cms-api-worker-staging.whi.workers.dev"
+            data-api-url="{{API_URL}}"
             data-app-id="test-app"
             data-log-level="none"
             data-mock-auth="true"

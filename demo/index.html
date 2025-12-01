@@ -5,23 +5,13 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>Streamlined CMS - Demo</title>
 
-        <!--
-    Load the SDK - Two integration methods:
-
-    Method 1 (Simple - Recommended): Blocking script prevents FOUC automatically
-    Just load the script in the head without 'defer' (shown below)
-
-    Method 2 (Advanced): Non-blocking with manual FOUC prevention
-    Add 'defer' to the script tag AND include this inline CSS before it:
-    <style id="streamlined-cms-hiding">[data-editable]{visibility:hidden}</style>
-  -->
+        <!-- Load the SDK - just one script tag, no FOUC -->
         <script
             src="/dist/streamlined-cms.js"
             data-api-url="https://streamlined-cms-api-worker-staging.whi.workers.dev"
+            data-app-url="http://localhost:3001"
             data-app-id="localhost"
             data-log-level="debug"
-            data-mock-auth="true"
-            data-mock-user-id="demo-user"
         ></script>
 
         <style>
@@ -132,16 +122,16 @@
     <body>
         <div class="container">
             <div class="info-box">
-                <h3>Demo Mode Active</h3>
+                <h3>Live Demo</h3>
                 <p>
-                    Click on any text with a blue dashed outline to edit it. Changes are saved to
-                    the API in real-time.
+                    Click the <strong>Edit</strong> button in the bottom-right to sign in, then
+                    click any text with a blue dashed outline to edit it.
                 </p>
                 <p>
                     <strong>Integration:</strong> Just one <code>&lt;script&gt;</code> tag with data
                     attributes!
                 </p>
-                <p><strong>App ID:</strong> Auto-detected from domain (localhost)</p>
+                <p><strong>App ID:</strong> localhost</p>
             </div>
 
             <header>
@@ -190,9 +180,8 @@
             <div class="content-section">
                 <h2 data-editable="cta-heading">Ready to Get Started?</h2>
                 <p data-editable="cta-text">
-                    Try editing any text on this page to see how easy it is. In production, you'll
-                    authenticate with your account, but this demo uses mock authentication so you
-                    can try it right away.
+                    Try editing any text on this page to see how easy it is. Sign in with your
+                    account to enable editing mode.
                 </p>
             </div>
         </div>

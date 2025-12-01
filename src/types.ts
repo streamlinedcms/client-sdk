@@ -19,6 +19,12 @@ export interface StreamlinedCMSConfig {
     apiUrl: string;
 
     /**
+     * App GUI URL (e.g., 'https://app.streamlinedcms.com')
+     * Used for login popup and SDK bridge iframe
+     */
+    appUrl: string;
+
+    /**
      * Application ID (required)
      */
     appId: string;

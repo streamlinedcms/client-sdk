@@ -23,7 +23,7 @@ describe('auto-init', () => {
     describe('script tag config parsing', () => {
         it('should find script tag with streamlined-cms in src', () => {
             const script = document.createElement('script');
-            script.src = '/dist/streamlined-cms.js';
+            script.src = '/dist/streamlined-cms.esm.js';
             script.dataset.apiUrl = 'https://api.example.com';
             script.dataset.appId = 'my-app';
             script.dataset.logLevel = 'debug';
@@ -45,13 +45,13 @@ describe('auto-init', () => {
         it('should get last script tag when multiple exist', () => {
             // First script
             const script1 = document.createElement('script');
-            script1.src = '/dist/streamlined-cms.js';
+            script1.src = '/dist/streamlined-cms.esm.js';
             script1.dataset.appId = 'first-app';
             document.head.appendChild(script1);
 
             // Second script (should be selected)
             const script2 = document.createElement('script');
-            script2.src = '/dist/streamlined-cms.js';
+            script2.src = '/dist/streamlined-cms.esm.js';
             script2.dataset.appId = 'second-app';
             document.head.appendChild(script2);
 
@@ -66,7 +66,7 @@ describe('auto-init', () => {
 
             validLevels.forEach(level => {
                 const script = document.createElement('script');
-                script.src = '/streamlined-cms.js';
+                script.src = '/streamlined-cms.esm.js';
                 script.dataset.logLevel = level;
                 document.head.appendChild(script);
 
@@ -84,7 +84,7 @@ describe('auto-init', () => {
 
         it('should ignore invalid log levels', () => {
             const script = document.createElement('script');
-            script.src = '/streamlined-cms.js';
+            script.src = '/streamlined-cms.esm.js';
             script.dataset.logLevel = 'invalid-level';
             document.head.appendChild(script);
 
@@ -166,7 +166,7 @@ describe('auto-init', () => {
         it('should initialize SDK when called with valid config', async () => {
             // Set up script tag with required config
             const script = document.createElement('script');
-            script.src = '/dist/streamlined-cms.js';
+            script.src = '/dist/streamlined-cms.esm.js';
             script.dataset.apiUrl = 'https://api.example.com';
             script.dataset.appId = 'test-app';
             document.head.appendChild(script);
@@ -195,7 +195,7 @@ describe('auto-init', () => {
 
         it('should parse mockAuth config from script tag', async () => {
             const script = document.createElement('script');
-            script.src = '/dist/streamlined-cms.js';
+            script.src = '/dist/streamlined-cms.esm.js';
             script.dataset.appId = 'test-app';
             script.dataset.mockAuth = 'true';
             script.dataset.mockUserId = 'mock-user-123';
@@ -220,7 +220,7 @@ describe('auto-init', () => {
 
         it('should parse logLevel config from script tag', async () => {
             const script = document.createElement('script');
-            script.src = '/dist/streamlined-cms.js';
+            script.src = '/dist/streamlined-cms.esm.js';
             script.dataset.appId = 'test-app';
             script.dataset.logLevel = 'debug';
             document.head.appendChild(script);
@@ -263,7 +263,7 @@ describe('auto-init', () => {
 
         it('should use default API URL when not provided', async () => {
             const script = document.createElement('script');
-            script.src = '/dist/streamlined-cms.js';
+            script.src = '/dist/streamlined-cms.esm.js';
             script.dataset.appId = 'test-app';
             // No apiUrl set
             document.head.appendChild(script);
@@ -292,7 +292,7 @@ describe('auto-init', () => {
 
             // Create script tag without appId
             const script = document.createElement('script');
-            script.src = '/dist/streamlined-cms.js';
+            script.src = '/dist/streamlined-cms.esm.js';
             script.dataset.apiUrl = 'https://api.example.com';
             // No appId
             document.head.appendChild(script);
