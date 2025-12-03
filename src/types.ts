@@ -132,6 +132,104 @@ export interface LinkContentData extends BaseContentData {
 export type ContentData = TextContentData | HtmlContentData | ImageContentData | LinkContentData;
 
 /**
+ * Template instance info for repeating content blocks
+ */
+export interface TemplateInfo {
+    /** The template ID from data-scms-template attribute */
+    templateId: string;
+    /** The container element with data-scms-template */
+    container: HTMLElement;
+    /** The template definition (first child structure, cloned for each instance) */
+    templateElement: HTMLElement;
+    /** Number of instances currently in the DOM */
+    instanceCount: number;
+}
+
+/**
+ * Parsed template element key
+ * Format: {templateId}.{instanceId}.{elementId}
+ * instanceId is a stable 5-character alphanumeric ID (not a numeric index)
+ */
+export interface ParsedTemplateKey {
+    templateId: string;
+    instanceId: string;
+    elementId: string;
+}
+
+/**
+ * Parse a template element key into its components
+ * Returns null if the key is not a valid template key
+ */
+export function parseTemplateKey(key: string): ParsedTemplateKey | null {
+    // Template keys have format: templateId.instanceId.elementId
+    // Need at least 3 parts separated by dots
+    const firstDot = key.indexOf('.');
+    if (firstDot === -1) return null;
+
+    const secondDot = key.indexOf('.', firstDot + 1);
+    if (secondDot === -1) return null;
+
+    const templateId = key.slice(0, firstDot);
+    const instanceId = key.slice(firstDot + 1, secondDot);
+    const elementId = key.slice(secondDot + 1);
+
+    if (!templateId || !instanceId || !elementId) return null;
+
+    return { templateId, instanceId, elementId };
+}
+
+/**
+ * Build a template element key from components
+ */
+export function buildTemplateKey(templateId: string, instanceId: string, elementId: string): string {
+    return `${templateId}.${instanceId}.${elementId}`;
+}
+
+/**
+ * Generate a stable instance ID (5 alphanumeric characters)
+ * Uses crypto.getRandomValues for better randomness
+ */
+export function generateInstanceId(): string {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const array = new Uint8Array(5);
+    crypto.getRandomValues(array);
+    return Array.from(array, (byte) => chars[byte % chars.length]).join('');
+}
+
+/**
+ * Order array key for a template
+ * Stored as: {templateId}._order
+ */
+export function getOrderKey(templateId: string): string {
+    return `${templateId}._order`;
+}
+
+/**
+ * Parse an order array from stored content
+ */
+export function parseOrderArray(content: string): string[] {
+    try {
+        const data = JSON.parse(content);
+        if (Array.isArray(data)) {
+            return data.filter((id): id is string => typeof id === 'string');
+        }
+        if (data.type === 'order' && Array.isArray(data.value)) {
+            return (data.value as unknown[]).filter((id): id is string => typeof id === 'string');
+        }
+    } catch {
+        // Invalid JSON
+    }
+    return [];
+}
+
+/**
+ * Serialize an order array for storage
+ */
+export function serializeOrderArray(instanceIds: string[]): string {
+    return JSON.stringify({ type: 'order', value: instanceIds });
+}
+
+/**
  * Known SEO attribute names
  */
 export const SEO_ATTRIBUTES = ['alt', 'title', 'rel'] as const;

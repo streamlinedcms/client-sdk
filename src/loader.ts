@@ -70,30 +70,231 @@
     type EditableType = "text" | "html" | "image" | "link";
 
     /**
-     * Element info including optional group and type
+     * Element info including optional group, template context, and type
      */
     interface EditableElementInfo {
         element: HTMLElement;
         groupId: string | null;
+        templateId: string | null;
+        instanceId: string | null;
         type: EditableType;
     }
 
     /**
-     * Get group ID for an element by checking data-scms-group on self or ancestors
+     * Template info for repeating content blocks
+     */
+    interface TemplateInfo {
+        templateId: string;
+        container: HTMLElement;
+        templateElement: HTMLElement;
+        instanceCount: number;
+    }
+
+    /**
+     * Parsed template key components
+     */
+    interface ParsedTemplateKey {
+        templateId: string;
+        instanceId: string;
+        elementId: string;
+    }
+
+    /**
+     * Parse a template element key into its components
+     * Format: {templateId}.{instanceId}.{elementId}
+     * instanceId is a stable 5-char alphanumeric string
+     */
+    function parseTemplateKey(key: string): ParsedTemplateKey | null {
+        const firstDot = key.indexOf(".");
+        if (firstDot === -1) return null;
+
+        const secondDot = key.indexOf(".", firstDot + 1);
+        if (secondDot === -1) return null;
+
+        const templateId = key.slice(0, firstDot);
+        const instanceId = key.slice(firstDot + 1, secondDot);
+        const elementId = key.slice(secondDot + 1);
+
+        if (!templateId || !instanceId || !elementId) return null;
+
+        return { templateId, instanceId, elementId };
+    }
+
+    /**
+     * Build a template element key from components
+     */
+    function buildTemplateKey(templateId: string, instanceId: string, elementId: string): string {
+        return `${templateId}.${instanceId}.${elementId}`;
+    }
+
+    /**
+     * Generate a stable instance ID (5 alphanumeric characters)
+     */
+    function generateInstanceId(): string {
+        const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        const array = new Uint8Array(5);
+        crypto.getRandomValues(array);
+        return Array.from(array, (byte) => chars[byte % chars.length]).join("");
+    }
+
+    /**
+     * Get order key for a template
+     */
+    function getOrderKey(templateId: string): string {
+        return `${templateId}._order`;
+    }
+
+    /**
+     * Parse order array from stored content
+     */
+    function parseOrderArray(content: string): string[] {
+        try {
+            const data = JSON.parse(content) as { type?: string; value?: unknown };
+            if (Array.isArray(data)) {
+                return data.filter((id): id is string => typeof id === "string");
+            }
+            if (data.type === "order" && Array.isArray(data.value)) {
+                return (data.value as unknown[]).filter((id): id is string => typeof id === "string");
+            }
+        } catch {
+            // Invalid JSON
+        }
+        return [];
+    }
+
+    /**
+     * Storage context for an element - determines how its key is built
+     */
+    interface StorageContext {
+        groupId: string | null;
+        templateId: string | null;
+        instanceId: string | null;
+    }
+
+    /**
+     * Get storage context for an element by walking up the DOM.
+     *
+     * Key rules:
+     * - Group inside template: group takes precedence, template ignored → groupId:elementId
+     * - Template inside group: both apply → groupId:templateId.instanceId.elementId
+     * - Template only: templateId.instanceId.elementId
+     * - Group only: groupId:elementId
+     * - Neither: elementId
+     *
+     * The key insight: if we encounter a group BEFORE a template (walking up),
+     * we're in "shared group" mode and template context is ignored.
+     */
+    function getStorageContext(element: HTMLElement): StorageContext {
+        let groupId: string | null = null;
+        let templateId: string | null = null;
+        let instanceId: string | null = null;
+        let foundGroupBeforeTemplate = false;
+
+        let current = element.parentElement;
+        while (current) {
+            // Check for group
+            const gid = current.getAttribute("data-scms-group");
+            if (gid && groupId === null) {
+                groupId = gid;
+                if (templateId === null) {
+                    // Found group before any template - we're in shared mode
+                    foundGroupBeforeTemplate = true;
+                }
+            }
+
+            // Only look for template context if we haven't found a group first
+            if (!foundGroupBeforeTemplate) {
+                // Check for instance marker (set by cloneTemplateInstances)
+                const instanceAttr = current.getAttribute("data-scms-instance");
+                if (instanceAttr !== null && instanceId === null) {
+                    instanceId = instanceAttr;
+                }
+
+                // Check for template container
+                const tid = current.getAttribute("data-scms-template");
+                if (tid && templateId === null) {
+                    templateId = tid;
+                }
+            }
+
+            current = current.parentElement;
+        }
+
+        // If we found group before template, clear template context
+        if (foundGroupBeforeTemplate) {
+            templateId = null;
+            instanceId = null;
+        }
+
+        return { groupId, templateId, instanceId };
+    }
+
+    /**
+     * Get group ID for an element (convenience wrapper)
      */
     function getGroupId(element: HTMLElement): string | null {
-        // First check the element itself
-        const selfGroup = element.getAttribute("data-scms-group");
-        if (selfGroup) return selfGroup;
+        return getStorageContext(element).groupId;
+    }
 
-        // Walk up to find nearest ancestor with data-scms-group
-        let parent = element.parentElement;
-        while (parent) {
-            const parentGroup = parent.getAttribute("data-scms-group");
-            if (parentGroup) return parentGroup;
-            parent = parent.parentElement;
+    /**
+     * Check if an element is inside a nested template (template inside another template)
+     * Warn and return true if nested templates are detected
+     */
+    function isInsideNestedTemplate(element: HTMLElement): boolean {
+        let templateCount = 0;
+        let current: HTMLElement | null = element;
+        while (current) {
+            if (current.hasAttribute("data-scms-template")) {
+                templateCount++;
+                if (templateCount > 1) {
+                    console.warn(
+                        `[StreamlinedCMS] Nested templates detected. Inner template "${current.getAttribute("data-scms-template")}" will be ignored.`
+                    );
+                    return true;
+                }
+            }
+            current = current.parentElement;
         }
-        return null;
+        return false;
+    }
+
+    /**
+     * Scan for template containers and store their definitions
+     */
+    function scanTemplates(): Map<string, TemplateInfo> {
+        const templates = new Map<string, TemplateInfo>();
+        document.querySelectorAll<HTMLElement>("[data-scms-template]").forEach((container) => {
+            const templateId = container.getAttribute("data-scms-template");
+            if (!templateId) return;
+
+            // Check for nested templates
+            if (isInsideNestedTemplate(container)) return;
+
+            // Warn if templateId contains a dot
+            if (templateId.includes(".")) {
+                console.warn(
+                    `[StreamlinedCMS] Template ID "${templateId}" contains a dot. Dots are reserved for template instance separators.`
+                );
+            }
+
+            // Get the first child element as the template definition
+            const templateElement = container.firstElementChild as HTMLElement | null;
+            if (!templateElement) {
+                console.warn(`[StreamlinedCMS] Template "${templateId}" has no child elements to use as template.`);
+                return;
+            }
+
+            // Store original HTML before content population (for adding new instances later)
+            container.setAttribute("data-scms-template-html", templateElement.outerHTML);
+
+            templates.set(templateId, {
+                templateId,
+                container,
+                templateElement,
+                instanceCount: 1, // Initially just the template definition
+            });
+        });
+        return templates;
     }
 
     /**
@@ -109,50 +310,187 @@
     }
 
     /**
-     * Scan DOM for editable elements, including group info
+     * Warn if an element ID contains a dot (reserved for templates)
      */
-    function scanEditableElements(): Map<string, EditableElementInfo> {
-        const elements = new Map<string, EditableElementInfo>();
+    function warnIfDotInElementId(elementId: string): void {
+        if (elementId.includes(".")) {
+            console.warn(
+                `[StreamlinedCMS] Element ID "${elementId}" contains a dot. Dots are reserved for template instance separators.`
+            );
+        }
+    }
+
+    /**
+     * Build storage key from context and element ID
+     */
+    function buildStorageKey(context: StorageContext, elementId: string): string {
+        let key: string;
+        if (context.templateId !== null && context.instanceId !== null) {
+            // Template element: {templateId}.{instanceId}.{elementId}
+            // If also grouped (template inside group): {groupId}:{templateId}.{instanceId}.{elementId}
+            const templateKey = buildTemplateKey(context.templateId, context.instanceId, elementId);
+            key = context.groupId ? `${context.groupId}:${templateKey}` : templateKey;
+        } else {
+            // Non-template element (or group inside template - template ignored)
+            // groupId:elementId or just elementId
+            key = context.groupId ? `${context.groupId}:${elementId}` : elementId;
+        }
+        return key;
+    }
+
+    /**
+     * Scan DOM for editable elements, including group and template info.
+     * Returns a map where multiple elements can share the same key (for groups inside templates).
+     */
+    function scanEditableElements(): Map<string, EditableElementInfo[]> {
+        const elements = new Map<string, EditableElementInfo[]>();
         const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
         document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
             const info = getEditableInfo(element);
             if (info) {
-                const groupId = getGroupId(element);
-                // Use composite key for grouped elements: groupId:elementId
-                const key = groupId ? `${groupId}:${info.id}` : info.id;
-                elements.set(key, { element, groupId, type: info.type });
+                // Warn about dots in element IDs
+                warnIfDotInElementId(info.id);
+
+                const context = getStorageContext(element);
+                const key = buildStorageKey(context, info.id);
+
+                const elementInfo: EditableElementInfo = {
+                    element,
+                    groupId: context.groupId,
+                    templateId: context.templateId,
+                    instanceId: context.instanceId,
+                    type: info.type,
+                };
+
+                // Multiple elements can share the same key (groups inside templates)
+                const existing = elements.get(key);
+                if (existing) {
+                    existing.push(elementInfo);
+                } else {
+                    elements.set(key, [elementInfo]);
+                }
             }
         });
         return elements;
     }
 
     /**
-     * Update a single element with content
-     * Handles typed JSON format: { type: "text"|"html"|"image"|"link", ... }
+     * Get ordered list of instance IDs for a template from content data.
+     * Looks for {templateId}._order key, falls back to discovering IDs from element keys.
      */
-    function updateElement(
-        elements: Map<string, EditableElementInfo>,
-        key: string,
-        content: string
+    function getTemplateInstanceIds(
+        data: ContentResponse,
+        templateId: string,
+        groupId?: string
+    ): string[] {
+        // First, try to get order from the _order key
+        const orderKey = getOrderKey(templateId);
+
+        // Check in appropriate location (grouped or ungrouped)
+        let orderContent: string | undefined;
+        if (groupId) {
+            orderContent = data.groups[groupId]?.elements[orderKey]?.content;
+        } else {
+            orderContent = data.elements[orderKey]?.content;
+        }
+
+        if (orderContent) {
+            const order = parseOrderArray(orderContent);
+            if (order.length > 0) {
+                return order;
+            }
+        }
+
+        // Fallback: discover instance IDs from element keys
+        const discoveredIds = new Set<string>();
+
+        const checkKey = (elementId: string): void => {
+            const parsed = parseTemplateKey(elementId);
+            if (parsed && parsed.templateId === templateId) {
+                discoveredIds.add(parsed.instanceId);
+            }
+        };
+
+        if (groupId) {
+            const group = data.groups[groupId];
+            if (group) {
+                Object.keys(group.elements).forEach(checkKey);
+            }
+        } else {
+            Object.keys(data.elements).forEach(checkKey);
+            // Also check all groups for templates inside them
+            Object.values(data.groups).forEach((group) => {
+                Object.keys(group.elements).forEach(checkKey);
+            });
+        }
+
+        // Convert to array (order not guaranteed without _order key)
+        return Array.from(discoveredIds);
+    }
+
+    /**
+     * Clone template instances based on content data
+     * Creates DOM nodes for each instance ID in the order array
+     */
+    function cloneTemplateInstances(
+        templates: Map<string, TemplateInfo>,
+        data: ContentResponse
     ): void {
-        const info = elements.get(key);
-        if (!info) return;
+        templates.forEach((templateInfo) => {
+            const { templateId, container, templateElement } = templateInfo;
 
-        const element = info.element;
+            // Check if this template is inside a group
+            const groupId = getGroupId(container);
 
-        // Try to parse as typed JSON content
+            // Get ordered list of instance IDs
+            const instanceIds = getTemplateInstanceIds(data, templateId, groupId ?? undefined);
+
+            if (instanceIds.length === 0) {
+                // No stored instances - generate an ID for the default instance
+                const defaultId = generateInstanceId();
+                templateElement.setAttribute("data-scms-instance", defaultId);
+                templateInfo.instanceCount = 1;
+                return;
+            }
+
+            // Mark the original template element with the first instance ID
+            templateElement.setAttribute("data-scms-instance", instanceIds[0]);
+
+            // Clone for additional instances
+            for (let i = 1; i < instanceIds.length; i++) {
+                const clone = templateElement.cloneNode(true) as HTMLElement;
+                clone.setAttribute("data-scms-instance", instanceIds[i]);
+
+                // Remove data-scms-template from clone (it's not a template container)
+                clone.removeAttribute("data-scms-template");
+
+                container.appendChild(clone);
+            }
+
+            templateInfo.instanceCount = instanceIds.length;
+        });
+    }
+
+    /**
+     * Apply content to a single DOM element.
+     * Returns the element (may be a new element if image was replaced).
+     */
+    function applyContentToElement(
+        element: HTMLElement,
+        type: EditableType,
+        content: string
+    ): HTMLElement {
         try {
             const data = JSON.parse(content) as { type?: string };
 
             if (data.type === "text") {
                 element.textContent = (data as { type: "text"; value: string }).value;
-                return;
+                return element;
             } else if (data.type === "html") {
                 element.innerHTML = (data as { type: "html"; value: string }).value;
-                return;
+                return element;
             } else if (data.type === "image" && element instanceof HTMLImageElement) {
                 const src = (data as { type: "image"; src: string }).src;
-                // Create new image and swap immediately to avoid placeholder flash
                 const newImg = document.createElement("img");
                 for (let i = 0; i < element.attributes.length; i++) {
                     const attr = element.attributes[i];
@@ -160,28 +498,27 @@
                 }
                 newImg.src = src;
                 element.replaceWith(newImg);
-                elements.set(key, { element: newImg, groupId: info.groupId, type: info.type });
-                return;
+                return newImg;
             } else if (data.type === "link" && element instanceof HTMLAnchorElement) {
                 const linkData = data as { type: "link"; href: string; target: string; text: string };
                 element.href = linkData.href;
                 element.target = linkData.target;
                 element.textContent = linkData.text;
-                return;
+                return element;
             } else if (data.type) {
                 // Unknown type with type field - don't process
-                return;
+                return element;
             }
+
             // No type field in JSON - use element's declared type
-            if (info.type === "link" && element instanceof HTMLAnchorElement) {
+            if (type === "link" && element instanceof HTMLAnchorElement) {
                 const linkData = data as { href?: string; target?: string; text?: string };
                 if (linkData.href !== undefined) {
                     element.href = linkData.href;
                     element.target = linkData.target || "";
                     element.textContent = linkData.text || "";
-                    return;
                 }
-            } else if (info.type === "image" && element instanceof HTMLImageElement) {
+            } else if (type === "image" && element instanceof HTMLImageElement) {
                 const imageData = data as { src?: string };
                 if (imageData.src !== undefined) {
                     const newImg = document.createElement("img");
@@ -191,24 +528,43 @@
                     }
                     newImg.src = imageData.src;
                     element.replaceWith(newImg);
-                    elements.set(key, { element: newImg, groupId: info.groupId, type: info.type });
-                    return;
+                    return newImg;
                 }
-            } else if (info.type === "text") {
+            } else if (type === "text") {
                 const textData = data as { value?: string };
                 if (textData.value !== undefined) {
                     element.textContent = textData.value;
-                    return;
                 }
-            } else if (info.type === "html") {
+            } else if (type === "html") {
                 const htmlData = data as { value?: string };
                 if (htmlData.value !== undefined) {
                     element.innerHTML = htmlData.value;
-                    return;
                 }
             }
         } catch {
             // Not JSON - ignore, content should always be JSON
+        }
+        return element;
+    }
+
+    /**
+     * Update all elements for a key with content
+     */
+    function updateElements(
+        elements: Map<string, EditableElementInfo[]>,
+        key: string,
+        content: string
+    ): void {
+        const infos = elements.get(key);
+        if (!infos) return;
+
+        for (let i = 0; i < infos.length; i++) {
+            const info = infos[i];
+            const newElement = applyContentToElement(info.element, info.type, content);
+            if (newElement !== info.element) {
+                // Element was replaced (image), update the reference
+                info.element = newElement;
+            }
         }
     }
 
@@ -217,7 +573,7 @@
      * Response uses key-value format: { elements: { [elementId]: { content } }, groups: { [groupId]: { elements: { [elementId]: { content } } } } }
      */
     function populateContent(
-        elements: Map<string, EditableElementInfo>,
+        elements: Map<string, EditableElementInfo[]>,
         data: {
             elements: Record<string, { content: string }>;
             groups: Record<string, { elements: Record<string, { content: string }> }>;
@@ -225,14 +581,14 @@
     ): void {
         // Populate ungrouped elements
         Object.entries(data.elements).forEach(([elementId, element]) => {
-            updateElement(elements, elementId, element.content);
+            updateElements(elements, elementId, element.content);
         });
 
         // Populate grouped elements
         Object.entries(data.groups).forEach(([groupId, group]) => {
             Object.entries(group.elements).forEach(([elementId, element]) => {
                 // Use composite key: groupId:elementId
-                updateElement(elements, `${groupId}:${elementId}`, element.content);
+                updateElements(elements, `${groupId}:${elementId}`, element.content);
             });
         });
     }
@@ -294,9 +650,18 @@
             });
         }
 
-        // Scan DOM and populate with fetched content
-        const elements = scanEditableElements();
+        // Get fetched content
         const content = await contentPromise;
+
+        // Scan for templates and clone instances based on content data
+        // This must happen BEFORE scanning editable elements so clones are included
+        const templates = scanTemplates();
+        if (content && templates.size > 0) {
+            cloneTemplateInstances(templates, content);
+        }
+
+        // Now scan DOM for editable elements (includes cloned template instances)
+        const elements = scanEditableElements();
 
         if (content && elements.size > 0) {
             populateContent(elements, content);

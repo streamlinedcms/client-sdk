@@ -42,5 +42,43 @@
         <div class="test-section">
             <a href="https://example.com" data-scms-link="test-link">Default Link Text</a>
         </div>
+
+        <!-- Template test section -->
+        <div class="test-section">
+            <h2>Team Members (Template Test)</h2>
+            <div data-scms-template="team" class="team-container">
+                <div class="team-member">
+                    <h3 data-scms-text="name">Default Name</h3>
+                    <p data-scms-text="role">Default Role</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template inside a group -->
+        <div class="test-section" data-scms-group="sidebar">
+            <h2>Testimonials (Template in Group)</h2>
+            <div data-scms-template="testimonials">
+                <blockquote class="testimonial">
+                    <p data-scms-text="quote">Default quote text</p>
+                    <cite data-scms-text="author">Default Author</cite>
+                </blockquote>
+            </div>
+        </div>
+
+        <!-- Group inside template (shared content across instances) -->
+        <div class="test-section">
+            <h2>Products with Shared Company Info (Group in Template)</h2>
+            <div data-scms-template="products" class="products-container">
+                <div class="product-card">
+                    <h3 data-scms-text="product-name">Default Product</h3>
+                    <p data-scms-text="product-desc">Default description</p>
+                    <!-- This group is shared across all product instances -->
+                    <div class="company-info" data-scms-group="company">
+                        <span data-scms-text="name">Company Name</span>
+                        <span data-scms-text="tagline">Company Tagline</span>
+                    </div>
+                </div>
+            </div>
+        </div>
     </body>
 </html>
