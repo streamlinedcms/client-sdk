@@ -17,6 +17,11 @@ export interface PopupConfig {
     appUrl: string; // e.g., 'https://app.streamlinedcms.com'
 }
 
+export interface UserRef {
+    id: string;
+    name: string | null;
+}
+
 export interface MediaFile {
     fileId: string;
     filename: string;
@@ -24,7 +29,7 @@ export interface MediaFile {
     contentType: string;
     size: number;
     uploadedAt: string;
-    uploadedBy?: string;
+    uploadedBy?: UserRef;
     publicUrl: string;
 }
 
