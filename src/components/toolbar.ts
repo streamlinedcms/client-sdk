@@ -185,6 +185,33 @@ export class Toolbar extends LitElement {
         );
     }
 
+    private handleEditSeo() {
+        this.dispatchEvent(
+            new CustomEvent("edit-seo", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
+    private handleEditAccessibility() {
+        this.dispatchEvent(
+            new CustomEvent("edit-accessibility", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
+    private handleEditAttributes() {
+        this.dispatchEvent(
+            new CustomEvent("edit-attributes", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
     private renderModeToggle() {
         return html`
             <scms-mode-toggle
@@ -257,6 +284,42 @@ export class Toolbar extends LitElement {
         `;
     }
 
+    private renderSeoButton() {
+        if (!this.activeElement) return nothing;
+        return html`
+            <button
+                class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                @click=${this.handleEditSeo}
+            >
+                SEO
+            </button>
+        `;
+    }
+
+    private renderAccessibilityButton() {
+        if (!this.activeElement) return nothing;
+        return html`
+            <button
+                class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                @click=${this.handleEditAccessibility}
+            >
+                A11y
+            </button>
+        `;
+    }
+
+    private renderAttributesButton() {
+        if (!this.activeElement) return nothing;
+        return html`
+            <button
+                class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                @click=${this.handleEditAttributes}
+            >
+                Attrs
+            </button>
+        `;
+    }
+
     private renderSignOutButton() {
         return html`
             <button
@@ -324,6 +387,9 @@ export class Toolbar extends LitElement {
                         ${this.renderChangeImageButton()}
                         ${this.renderEditLinkButton()}
                         ${this.renderGoToLinkButton()}
+                        ${this.renderSeoButton()}
+                        ${this.renderAccessibilityButton()}
+                        ${this.renderAttributesButton()}
                     </div>
 
                     <!-- Right: Save + Sign Out + Admin (separated) -->
@@ -340,12 +406,156 @@ export class Toolbar extends LitElement {
         `;
     }
 
+    private renderMobileSectionHeader(title: string) {
+        return html`
+            <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">${title}</div>
+        `;
+    }
+
+    private renderMobileElementSection() {
+        // Type-specific layouts
+        if (this.activeElementType === "link") {
+            return html`
+                <div class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3">
+                    ${this.renderMobileSectionHeader("Element")}
+                    <div class="flex gap-2">
+                        <button
+                            class="flex-1 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
+                            @click=${this.handleEditLink}
+                        >
+                            Edit Link
+                        </button>
+                        <button
+                            class="flex-1 px-3 py-2 text-sm font-medium text-blue-600 hover:text-blue-800 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors inline-flex items-center justify-center gap-1"
+                            @click=${this.handleGoToLink}
+                        >
+                            Go to Link
+                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (this.activeElementType === "image") {
+            return html`
+                <div class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3">
+                    ${this.renderMobileSectionHeader("Element")}
+                    <button
+                        class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
+                        @click=${this.handleChangeImage}
+                    >
+                        Change Image
+                    </button>
+                </div>
+            `;
+        }
+
+        // Text/HTML types
+        return html`
+            <div class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3">
+                ${this.renderMobileSectionHeader("Element")}
+                <button
+                    class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
+                    @click=${this.handleEditHtml}
+                >
+                    Edit HTML
+                </button>
+            </div>
+        `;
+    }
+
+    private renderMobileMetadataSection() {
+        return html`
+            <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
+                ${this.renderMobileSectionHeader("Metadata")}
+                <div class="flex flex-col gap-2">
+                    <button
+                        class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                        @click=${this.handleEditSeo}
+                    >
+                        SEO (Search Engine Optimization)
+                    </button>
+                    <button
+                        class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                        @click=${this.handleEditAccessibility}
+                    >
+                        Accessibility
+                    </button>
+                    <button
+                        class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                        @click=${this.handleEditAttributes}
+                    >
+                        Attributes
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    private renderMobileActionsSection() {
+        return html`
+            <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
+                ${this.renderMobileSectionHeader("Actions")}
+                <scms-hold-button
+                    label="Hold to reset element"
+                    hold-duration="800"
+                    @hold-complete=${this.handleReset}
+                    class="w-full"
+                ></scms-hold-button>
+            </div>
+        `;
+    }
+
+    private renderMobileSettingsSection() {
+        return html`
+            <div class="mobile-section">
+                ${this.renderMobileSectionHeader("Settings")}
+                <div class="flex items-center justify-between">
+                    <button
+                        class="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors"
+                        @click=${this.handleSignOut}
+                    >
+                        Sign Out
+                    </button>
+                    ${this.renderModeToggle()}
+                    ${this.appUrl && this.appId
+                        ? html`
+                            <a
+                                href="${this.appUrl}/apps/${encodeURIComponent(this.appId)}"
+                                target="_blank"
+                                class="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors inline-flex items-center gap-1"
+                            >
+                                Admin
+                                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </a>
+                        `
+                        : html`<div></div>`}
+                </div>
+            </div>
+        `;
+    }
+
     private renderMobile() {
         return html`
             <div class="bg-white border-t border-gray-200 shadow-lg">
-                <!-- Primary bar (always visible) - minimal: menu, element badge, save -->
+                <!-- Primary bar (always visible) - minimal: save, element badge, menu -->
                 <div class="h-14 px-4 flex items-center justify-between">
-                    <!-- Menu toggle (left) -->
+                    <!-- Save (left) -->
+                    <div class="flex items-center">
+                        ${this.hasChanges ? this.renderSaveButton() : html`<div class="w-10"></div>`}
+                    </div>
+
+                    <!-- Center: Element badge only -->
+                    <div class="flex items-center justify-center">
+                        ${this.renderActiveElement()}
+                    </div>
+
+                    <!-- Menu toggle (right) - gear icon -->
                     <button
                         class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
                         @click=${this.toggleExpanded}
@@ -359,55 +569,30 @@ export class Toolbar extends LitElement {
                             `
                             : html`
                                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                 </svg>
                             `}
                     </button>
-
-                    <!-- Center: Element badge only -->
-                    <div class="flex items-center justify-center">
-                        ${this.renderActiveElement()}
-                    </div>
-
-                    <!-- Save (right) -->
-                    <div class="flex items-center">
-                        ${this.hasChanges ? this.renderSaveButton() : html`<div class="w-10"></div>`}
-                    </div>
                 </div>
 
                 <!-- Expandable drawer -->
                 <div
                     class="overflow-hidden transition-all duration-200 ease-out"
-                    style="max-height: ${this.expanded ? "400px" : "0"}"
+                    style="max-height: ${this.expanded ? "500px" : "0"}"
                 >
                     <div class="px-4 py-3 border-t border-gray-100">
-                        <!-- Element-specific actions (only when element selected) -->
-                        ${this.activeElement
-                            ? html`
-                                <div class="mobile-actions mb-3 pb-3 border-b border-gray-100">
-                                    ${this.renderEditLinkButton()}
-                                    ${this.renderGoToLinkButton()}
-                                    ${this.renderChangeImageButton()}
-                                    ${this.renderEditHtmlButton()}
-                                    ${this.renderResetButton()}
-                                </div>
-                            `
-                            : nothing}
-                        <!-- Mode toggle -->
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-sm font-medium text-gray-700">Mode</span>
-                            ${this.renderModeToggle()}
-                        </div>
-                        <!-- Sign Out + Admin -->
-                        <div class="pt-2 border-t border-gray-200 flex justify-center items-center">
-                            ${this.renderSignOutButton()}
-                            ${this.appUrl && this.appId
-                                ? html`
-                                    <span class="mx-2 text-gray-300">|</span>
-                                    ${this.renderAdminLink()}
-                                `
-                                : nothing}
-                        </div>
+                        <!-- Element section (only when element selected) -->
+                        ${this.activeElement ? this.renderMobileElementSection() : nothing}
+
+                        <!-- Metadata section (only when element selected) -->
+                        ${this.activeElement ? this.renderMobileMetadataSection() : nothing}
+
+                        <!-- Actions section (only when element selected) -->
+                        ${this.activeElement ? this.renderMobileActionsSection() : nothing}
+
+                        <!-- Settings section -->
+                        ${this.renderMobileSettingsSection()}
                     </div>
                 </div>
             </div>

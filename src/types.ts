@@ -92,24 +92,37 @@ export interface SaveResponse {
 export type EditableType = 'text' | 'html' | 'image' | 'link';
 
 /**
+ * Element attributes (applied as HTML attributes)
+ * Keys are attribute names (lowercase, e.g., 'aria-label', 'data-custom')
+ */
+export type ElementAttributes = Record<string, string>;
+
+/**
+ * Base content data with optional attributes
+ */
+interface BaseContentData {
+    attributes?: ElementAttributes;
+}
+
+/**
  * Content data structures (stored as JSON in content field)
  */
-export interface TextContentData {
+export interface TextContentData extends BaseContentData {
     type: 'text';
     value: string;
 }
 
-export interface HtmlContentData {
+export interface HtmlContentData extends BaseContentData {
     type: 'html';
     value: string;
 }
 
-export interface ImageContentData {
+export interface ImageContentData extends BaseContentData {
     type: 'image';
     src: string;
 }
 
-export interface LinkContentData {
+export interface LinkContentData extends BaseContentData {
     type: 'link';
     href: string;
     target: string;
@@ -117,3 +130,34 @@ export interface LinkContentData {
 }
 
 export type ContentData = TextContentData | HtmlContentData | ImageContentData | LinkContentData;
+
+/**
+ * Known SEO attribute names
+ */
+export const SEO_ATTRIBUTES = ['alt', 'title', 'rel'] as const;
+export type SeoAttribute = typeof SEO_ATTRIBUTES[number];
+
+/**
+ * Known accessibility attribute names
+ */
+export const ACCESSIBILITY_ATTRIBUTES = ['aria-label', 'aria-describedby', 'role', 'tabindex'] as const;
+export type AccessibilityAttribute = typeof ACCESSIBILITY_ATTRIBUTES[number];
+
+/**
+ * All known attribute names (SEO + Accessibility)
+ */
+export const KNOWN_ATTRIBUTES = [...SEO_ATTRIBUTES, ...ACCESSIBILITY_ATTRIBUTES] as const;
+export type KnownAttribute = typeof KNOWN_ATTRIBUTES[number];
+
+/**
+ * Attribute field configuration for modals
+ */
+export type AttributePriority = 'primary' | 'secondary' | 'not-applicable';
+
+export interface AttributeFieldConfig {
+    name: string;
+    label: string;
+    priority: Record<EditableType, AttributePriority>;
+    placeholder?: string;
+    tips: Record<EditableType, string>;
+}

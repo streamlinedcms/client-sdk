@@ -61,9 +61,16 @@ import "../components/toolbar.js";
 import "../components/sign-in-link.js";
 import "../components/html-editor-modal.js";
 import "../components/link-editor-modal.js";
+import "../components/seo-modal.js";
+import "../components/accessibility-modal.js";
+import "../components/attributes-modal.js";
 import type { Toolbar } from "../components/toolbar.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
 import type { LinkEditorModal, LinkData } from "../components/link-editor-modal.js";
+import type { SeoModal } from "../components/seo-modal.js";
+import type { AccessibilityModal } from "../components/accessibility-modal.js";
+import type { AttributesModal } from "../components/attributes-modal.js";
+import type { ElementAttributes } from "../types.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -91,7 +98,12 @@ class EditorController {
     private toolbar: Toolbar | null = null;
     private htmlEditorModal: HtmlEditorModal | null = null;
     private linkEditorModal: LinkEditorModal | null = null;
+    private seoModal: SeoModal | null = null;
+    private accessibilityModal: AccessibilityModal | null = null;
+    private attributesModal: AttributesModal | null = null;
     private saving = false;
+    // Store attributes per element (keyed by composite key)
+    private elementAttributes: Map<string, ElementAttributes> = new Map();
     // Double-tap tracking for mobile
     private lastTapTime = 0;
     private lastTapKey: string | null = null;
@@ -439,6 +451,18 @@ class EditorController {
             this.signOut();
         });
 
+        toolbar.addEventListener("edit-seo", () => {
+            this.handleEditSeo();
+        });
+
+        toolbar.addEventListener("edit-accessibility", () => {
+            this.handleEditAccessibility();
+        });
+
+        toolbar.addEventListener("edit-attributes", () => {
+            this.handleEditAttributes();
+        });
+
         document.body.appendChild(toolbar);
         this.toolbar = toolbar;
 
@@ -588,14 +612,17 @@ class EditorController {
     /**
      * Get the current content value for an element based on its type
      * Returns JSON string with type field for all element types
+     * Includes attributes if any have been set
      */
     private getElementContent(key: string, info: EditableElementInfo): string {
         const elementType = this.getEditableType(key);
+        const attributes = this.elementAttributes.get(key);
 
         if (elementType === "image" && info.element instanceof HTMLImageElement) {
             const data: ImageContentData = {
                 type: "image",
                 src: info.element.src,
+                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
         } else if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
@@ -604,12 +631,14 @@ class EditorController {
                 href: info.element.href,
                 target: info.element.target,
                 text: info.element.textContent || "",
+                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
         } else if (elementType === "text") {
             const data: TextContentData = {
                 type: "text",
                 value: info.element.textContent || "",
+                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
         } else {
@@ -617,6 +646,7 @@ class EditorController {
             const data: HtmlContentData = {
                 type: "html",
                 value: info.element.innerHTML,
+                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
         }
@@ -625,10 +655,17 @@ class EditorController {
     /**
      * Apply content to an element based on stored type
      * Handles backwards compatibility for content without type field
+     * Also extracts and applies attributes if present
      */
     private applyElementContent(key: string, info: EditableElementInfo, content: string): void {
         try {
-            const data = JSON.parse(content) as ContentData | { type?: undefined };
+            const data = JSON.parse(content) as (ContentData & { attributes?: ElementAttributes }) | { type?: undefined; attributes?: ElementAttributes };
+
+            // Extract and store attributes if present
+            if (data.attributes && Object.keys(data.attributes).length > 0) {
+                this.elementAttributes.set(key, data.attributes);
+                this.applyAttributesToElement(info.element, data.attributes);
+            }
 
             if (data.type === "text") {
                 info.element.textContent = (data as TextContentData).value;
@@ -952,6 +989,201 @@ class EditorController {
             window.open(href, "_blank");
         } else {
             window.location.href = href;
+        }
+    }
+
+    private getElementAttributes(key: string): ElementAttributes {
+        return this.elementAttributes.get(key) || {};
+    }
+
+    /**
+     * Element attributes are core attributes that define what the element is
+     * (e.g., src for images, href/target for links)
+     */
+    private static readonly ELEMENT_ATTRIBUTES = ['src', 'href', 'target'];
+
+    /**
+     * Get attributes from the DOM element, split into element attrs and other attrs.
+     * Element attrs are core attributes (src, href, target).
+     * Other attrs are everything else (dynamic, extensions, etc).
+     */
+    private getDomAttributes(element: HTMLElement): { elementAttrs: ElementAttributes; otherAttrs: ElementAttributes } {
+        const elementAttrs: ElementAttributes = {};
+        const otherAttrs: ElementAttributes = {};
+        const excludePatterns = [
+            /^data-editable/,
+            /^data-group$/,
+            /^data-scms-/,
+            /^class$/,
+            /^id$/,
+            /^style$/,
+            /^contenteditable$/,
+        ];
+
+        for (let i = 0; i < element.attributes.length; i++) {
+            const attr = element.attributes[i];
+            // Skip excluded attributes
+            if (excludePatterns.some((p) => p.test(attr.name))) {
+                continue;
+            }
+            // Separate element attributes from other attributes
+            if (EditorController.ELEMENT_ATTRIBUTES.includes(attr.name)) {
+                elementAttrs[attr.name] = attr.value;
+            } else {
+                otherAttrs[attr.name] = attr.value;
+            }
+        }
+
+        return { elementAttrs, otherAttrs };
+    }
+
+    private handleEditSeo(): void {
+        if (!this.editingKey) {
+            this.log.debug("No element selected for SEO editing");
+            return;
+        }
+
+        if (this.seoModal) {
+            this.log.debug("SEO modal already open");
+            return;
+        }
+
+        const key = this.editingKey;
+        const info = this.editableElements.get(key);
+        if (!info) return;
+
+        const elementType = this.getEditableType(key);
+        this.log.debug("Opening SEO modal", { key, elementId: info.elementId, elementType });
+
+        const modal = document.createElement("scms-seo-modal") as SeoModal;
+        modal.elementId = info.elementId;
+        modal.elementType = elementType;
+        modal.elementAttrs = this.getElementAttributes(key);
+
+        modal.addEventListener("click", (e: Event) => e.stopPropagation());
+
+        modal.addEventListener("apply", ((e: CustomEvent<{ attributes: ElementAttributes }>) => {
+            this.elementAttributes.set(key, e.detail.attributes);
+            this.applyAttributesToElement(info.element, e.detail.attributes);
+            this.closeSeoModal();
+            this.updateToolbarHasChanges();
+            this.log.debug("SEO attributes applied", { key, attributes: e.detail.attributes });
+        }) as EventListener);
+
+        modal.addEventListener("cancel", () => this.closeSeoModal());
+
+        document.body.appendChild(modal);
+        this.seoModal = modal;
+    }
+
+    private closeSeoModal(): void {
+        if (this.seoModal) {
+            this.seoModal.remove();
+            this.seoModal = null;
+        }
+    }
+
+    private handleEditAccessibility(): void {
+        if (!this.editingKey) {
+            this.log.debug("No element selected for accessibility editing");
+            return;
+        }
+
+        if (this.accessibilityModal) {
+            this.log.debug("Accessibility modal already open");
+            return;
+        }
+
+        const key = this.editingKey;
+        const info = this.editableElements.get(key);
+        if (!info) return;
+
+        const elementType = this.getEditableType(key);
+        this.log.debug("Opening accessibility modal", { key, elementId: info.elementId, elementType });
+
+        const modal = document.createElement("scms-accessibility-modal") as AccessibilityModal;
+        modal.elementId = info.elementId;
+        modal.elementType = elementType;
+        modal.elementAttrs = this.getElementAttributes(key);
+
+        modal.addEventListener("click", (e: Event) => e.stopPropagation());
+
+        modal.addEventListener("apply", ((e: CustomEvent<{ attributes: ElementAttributes }>) => {
+            this.elementAttributes.set(key, e.detail.attributes);
+            this.applyAttributesToElement(info.element, e.detail.attributes);
+            this.closeAccessibilityModal();
+            this.updateToolbarHasChanges();
+            this.log.debug("Accessibility attributes applied", { key, attributes: e.detail.attributes });
+        }) as EventListener);
+
+        modal.addEventListener("cancel", () => this.closeAccessibilityModal());
+
+        document.body.appendChild(modal);
+        this.accessibilityModal = modal;
+    }
+
+    private closeAccessibilityModal(): void {
+        if (this.accessibilityModal) {
+            this.accessibilityModal.remove();
+            this.accessibilityModal = null;
+        }
+    }
+
+    private handleEditAttributes(): void {
+        if (!this.editingKey) {
+            this.log.debug("No element selected for attributes editing");
+            return;
+        }
+
+        if (this.attributesModal) {
+            this.log.debug("Attributes modal already open");
+            return;
+        }
+
+        const key = this.editingKey;
+        const info = this.editableElements.get(key);
+        if (!info) return;
+
+        this.log.debug("Opening attributes modal", { key, elementId: info.elementId });
+
+        const modal = document.createElement("scms-attributes-modal") as AttributesModal;
+        modal.elementId = info.elementId;
+        modal.elementAttrs = this.getElementAttributes(key);
+        const { elementAttrs: elementDefinedAttrs, otherAttrs } = this.getDomAttributes(info.element);
+        modal.elementDefinedAttrs = elementDefinedAttrs;
+        modal.otherAttrs = otherAttrs;
+
+        modal.addEventListener("click", (e: Event) => e.stopPropagation());
+
+        modal.addEventListener("apply", ((e: CustomEvent<{ attributes: ElementAttributes }>) => {
+            this.elementAttributes.set(key, e.detail.attributes);
+            this.applyAttributesToElement(info.element, e.detail.attributes);
+            this.closeAttributesModal();
+            this.updateToolbarHasChanges();
+            this.log.debug("Custom attributes applied", { key, attributes: e.detail.attributes });
+        }) as EventListener);
+
+        modal.addEventListener("cancel", () => this.closeAttributesModal());
+
+        document.body.appendChild(modal);
+        this.attributesModal = modal;
+    }
+
+    private closeAttributesModal(): void {
+        if (this.attributesModal) {
+            this.attributesModal.remove();
+            this.attributesModal = null;
+        }
+    }
+
+    private applyAttributesToElement(element: HTMLElement, attributes: ElementAttributes): void {
+        // Apply each attribute to the element
+        for (const [name, value] of Object.entries(attributes)) {
+            if (value) {
+                element.setAttribute(name, value);
+            } else {
+                element.removeAttribute(name);
+            }
         }
     }
 
