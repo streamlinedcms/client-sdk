@@ -58,8 +58,30 @@ export class Toolbar extends LitElement {
                 bottom: 0;
                 left: 0;
                 right: 0;
-                z-index: 2147483647;
+                z-index: 2147483646;
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            }
+
+            button {
+                cursor: pointer;
+            }
+
+            /* Mobile drawer button overrides */
+            .mobile-actions {
+                display: flex;
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .mobile-actions button,
+            .mobile-actions scms-hold-button {
+                width: 100%;
+            }
+
+            .mobile-actions button {
+                padding: 0.5rem 0.75rem;
+                font-size: 0.875rem;
+                justify-content: space-between;
             }
         `,
     ];
@@ -145,6 +167,24 @@ export class Toolbar extends LitElement {
         );
     }
 
+    private handleEditLink() {
+        this.dispatchEvent(
+            new CustomEvent("edit-link", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
+    private handleGoToLink() {
+        this.dispatchEvent(
+            new CustomEvent("go-to-link", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
     private renderModeToggle() {
         return html`
             <scms-mode-toggle
@@ -155,7 +195,8 @@ export class Toolbar extends LitElement {
     }
 
     private renderEditHtmlButton() {
-        if (!this.activeElement || this.activeElementType === "image") return nothing;
+        // Show for html and text types (not for image or link)
+        if (!this.activeElement || this.activeElementType === "image" || this.activeElementType === "link") return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
@@ -174,6 +215,33 @@ export class Toolbar extends LitElement {
                 @click=${this.handleChangeImage}
             >
                 Change Image
+            </button>
+        `;
+    }
+
+    private renderEditLinkButton() {
+        if (!this.activeElement || this.activeElementType !== "link") return nothing;
+        return html`
+            <button
+                class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
+                @click=${this.handleEditLink}
+            >
+                Edit Link
+            </button>
+        `;
+    }
+
+    private renderGoToLinkButton() {
+        if (!this.activeElement || this.activeElementType !== "link") return nothing;
+        return html`
+            <button
+                class="px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors inline-flex items-center gap-1"
+                @click=${this.handleGoToLink}
+            >
+                Go to Link
+                <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
             </button>
         `;
     }
@@ -248,12 +316,14 @@ export class Toolbar extends LitElement {
                         ${this.renderModeToggle()}
                     </div>
 
-                    <!-- Center: Reset + Active element + Edit HTML/Change Image -->
+                    <!-- Center: Reset + Active element + Element-specific buttons -->
                     <div class="flex items-center gap-3">
                         ${this.renderResetButton()}
                         ${this.renderActiveElement()}
                         ${this.renderEditHtmlButton()}
                         ${this.renderChangeImageButton()}
+                        ${this.renderEditLinkButton()}
+                        ${this.renderGoToLinkButton()}
                     </div>
 
                     <!-- Right: Save + Sign Out + Admin (separated) -->
@@ -273,8 +343,8 @@ export class Toolbar extends LitElement {
     private renderMobile() {
         return html`
             <div class="bg-white border-t border-gray-200 shadow-lg">
-                <!-- Primary bar (always visible, at top) -->
-                <div class="h-14 px-4 flex items-center justify-between border-b border-gray-100">
+                <!-- Primary bar (always visible) - minimal: menu, element badge, save -->
+                <div class="h-14 px-4 flex items-center justify-between">
                     <!-- Menu toggle (left) -->
                     <button
                         class="w-10 h-10 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg"
@@ -294,60 +364,47 @@ export class Toolbar extends LitElement {
                             `}
                     </button>
 
-                    <!-- Center: Element badge + Edit HTML/Change Image -->
-                    <div class="flex-1 flex items-center justify-center gap-2">
+                    <!-- Center: Element badge only -->
+                    <div class="flex items-center justify-center">
                         ${this.renderActiveElement()}
-                        ${this.renderEditHtmlButton()}
-                        ${this.renderChangeImageButton()}
                     </div>
 
                     <!-- Save (right) -->
                     <div class="flex items-center">
-                        ${this.renderSaveButton()}
+                        ${this.hasChanges ? this.renderSaveButton() : html`<div class="w-10"></div>`}
                     </div>
                 </div>
 
-                <!-- Expandable drawer (secondary actions + sign out) -->
+                <!-- Expandable drawer -->
                 <div
                     class="overflow-hidden transition-all duration-200 ease-out"
-                    style="max-height: ${this.expanded ? "200px" : "0"}"
+                    style="max-height: ${this.expanded ? "400px" : "0"}"
                 >
-                    <div class="px-4 py-3 space-y-3">
-                        <!-- Reset (only when element selected) -->
+                    <div class="px-4 py-3 border-t border-gray-100">
+                        <!-- Element-specific actions (only when element selected) -->
                         ${this.activeElement
                             ? html`
-                                <div class="flex items-center justify-between">
-                                    <span class="text-xs font-medium text-gray-700">Reset element</span>
+                                <div class="mobile-actions mb-3 pb-3 border-b border-gray-100">
+                                    ${this.renderEditLinkButton()}
+                                    ${this.renderGoToLinkButton()}
+                                    ${this.renderChangeImageButton()}
+                                    ${this.renderEditHtmlButton()}
                                     ${this.renderResetButton()}
                                 </div>
                             `
                             : nothing}
                         <!-- Mode toggle -->
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-medium text-gray-700">Mode</span>
+                        <div class="flex items-center justify-between mb-3">
+                            <span class="text-sm font-medium text-gray-700">Mode</span>
                             ${this.renderModeToggle()}
                         </div>
-                        <!-- Sign Out + Admin (separated at bottom, centered) -->
-                        <div class="pt-2 mt-2 border-t border-gray-200 flex justify-center items-center">
-                            <button
-                                class="px-3 py-2 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors"
-                                @click=${this.handleSignOut}
-                            >
-                                Sign Out
-                            </button>
+                        <!-- Sign Out + Admin -->
+                        <div class="pt-2 border-t border-gray-200 flex justify-center items-center">
+                            ${this.renderSignOutButton()}
                             ${this.appUrl && this.appId
                                 ? html`
                                     <span class="mx-2 text-gray-300">|</span>
-                                    <a
-                                        href="${this.appUrl}/apps/${encodeURIComponent(this.appId)}"
-                                        target="_blank"
-                                        class="px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1"
-                                    >
-                                        Admin
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                        </svg>
-                                    </a>
+                                    ${this.renderAdminLink()}
                                 `
                                 : nothing}
                         </div>

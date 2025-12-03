@@ -65,48 +65,176 @@
     }
 
     /**
-     * Scan DOM for editable elements
+     * Element info including optional group
      */
-    function scanEditableElements(): Map<string, HTMLElement> {
-        const elements = new Map<string, HTMLElement>();
+    interface EditableElementInfo {
+        element: HTMLElement;
+        groupId: string | null;
+    }
+
+    /**
+     * Get group ID for an element by checking data-group on self or ancestors
+     */
+    function getGroupId(element: HTMLElement): string | null {
+        // First check the element itself
+        const selfGroup = element.getAttribute("data-group");
+        if (selfGroup) return selfGroup;
+
+        // Walk up to find nearest ancestor with data-group
+        let parent = element.parentElement;
+        while (parent) {
+            const parentGroup = parent.getAttribute("data-group");
+            if (parentGroup) return parentGroup;
+            parent = parent.parentElement;
+        }
+        return null;
+    }
+
+    /**
+     * Scan DOM for editable elements, including group info
+     */
+    function scanEditableElements(): Map<string, EditableElementInfo> {
+        const elements = new Map<string, EditableElementInfo>();
         document.querySelectorAll<HTMLElement>("[data-editable]").forEach((element) => {
             const elementId = element.getAttribute("data-editable");
             if (elementId) {
-                elements.set(elementId, element);
+                const groupId = getGroupId(element);
+                // Use composite key for grouped elements: groupId:elementId
+                const key = groupId ? `${groupId}:${elementId}` : elementId;
+                elements.set(key, { element, groupId });
             }
         });
         return elements;
     }
 
     /**
-     * Populate DOM elements with fetched content
+     * Update a single element with content
+     * Handles typed JSON format: { type: "text"|"html"|"image"|"link", ... }
+     * Falls back to innerHTML for legacy content without type field
      */
-    function populateContent(
-        elements: Map<string, HTMLElement>,
-        contentData: Array<{ elementId: string; content: string }>
+    function updateElement(
+        elements: Map<string, EditableElementInfo>,
+        key: string,
+        content: string
     ): void {
-        contentData.forEach((item) => {
-            const element = elements.get(item.elementId);
-            if (element) {
-                // Check if this is an image element (by tag or explicit type attribute)
-                const isImage =
-                    element.tagName === "IMG" ||
-                    element.getAttribute("data-editable-type") === "image";
-                if (isImage && element instanceof HTMLImageElement) {
-                    // Create new image and swap immediately to avoid placeholder flash
+        const info = elements.get(key);
+        if (!info) return;
+
+        const element = info.element;
+
+        // Try to parse as typed JSON content
+        try {
+            const data = JSON.parse(content) as { type?: string };
+
+            if (data.type === "text") {
+                element.textContent = (data as { type: "text"; value: string }).value;
+                return;
+            } else if (data.type === "html") {
+                element.innerHTML = (data as { type: "html"; value: string }).value;
+                return;
+            } else if (data.type === "image" && element instanceof HTMLImageElement) {
+                const src = (data as { type: "image"; src: string }).src;
+                // Create new image and swap immediately to avoid placeholder flash
+                const newImg = document.createElement("img");
+                for (let i = 0; i < element.attributes.length; i++) {
+                    const attr = element.attributes[i];
+                    newImg.setAttribute(attr.name, attr.value);
+                }
+                newImg.src = src;
+                element.replaceWith(newImg);
+                elements.set(key, { element: newImg, groupId: info.groupId });
+                return;
+            } else if (data.type === "link" && element instanceof HTMLAnchorElement) {
+                const linkData = data as { type: "link"; href: string; target: string; text: string };
+                element.href = linkData.href;
+                element.target = linkData.target;
+                element.textContent = linkData.text;
+                return;
+            } else if (data.type) {
+                // Unknown type with type field - don't process
+                return;
+            }
+            // No type field - infer type from element attribute and re-process
+            const attrType = element.getAttribute("data-editable-type");
+            if (attrType === "link" && element instanceof HTMLAnchorElement) {
+                const linkData = data as { href?: string; target?: string; text?: string };
+                if (linkData.href !== undefined) {
+                    element.href = linkData.href;
+                    element.target = linkData.target || "";
+                    element.textContent = linkData.text || "";
+                    return;
+                }
+            } else if (attrType === "image" && element instanceof HTMLImageElement) {
+                const imageData = data as { src?: string };
+                if (imageData.src !== undefined) {
                     const newImg = document.createElement("img");
-                    // Copy all attributes from original
                     for (let i = 0; i < element.attributes.length; i++) {
                         const attr = element.attributes[i];
                         newImg.setAttribute(attr.name, attr.value);
                     }
-                    newImg.src = item.content;
+                    newImg.src = imageData.src;
                     element.replaceWith(newImg);
-                    elements.set(item.elementId, newImg);
-                } else {
-                    element.innerHTML = item.content;
+                    elements.set(key, { element: newImg, groupId: info.groupId });
+                    return;
+                }
+            } else if (attrType === "text") {
+                const textData = data as { value?: string };
+                if (textData.value !== undefined) {
+                    element.textContent = textData.value;
+                    return;
+                }
+            } else if (attrType === "html") {
+                const htmlData = data as { value?: string };
+                if (htmlData.value !== undefined) {
+                    element.innerHTML = htmlData.value;
+                    return;
                 }
             }
+            // Unrecognized JSON structure - fall through to legacy handling
+        } catch {
+            // Not JSON - fall through to legacy handling
+        }
+
+        // Legacy content handling (plain string, not JSON)
+        const isImage =
+            element.tagName === "IMG" ||
+            element.getAttribute("data-editable-type") === "image";
+        if (isImage && element instanceof HTMLImageElement) {
+            const newImg = document.createElement("img");
+            for (let i = 0; i < element.attributes.length; i++) {
+                const attr = element.attributes[i];
+                newImg.setAttribute(attr.name, attr.value);
+            }
+            newImg.src = content;
+            element.replaceWith(newImg);
+            elements.set(key, { element: newImg, groupId: info.groupId });
+        } else {
+            element.innerHTML = content;
+        }
+    }
+
+    /**
+     * Populate DOM elements with fetched content (handles grouped response)
+     * Response uses key-value format: { elements: { [elementId]: { content } }, groups: { [groupId]: { elements: { [elementId]: { content } } } } }
+     */
+    function populateContent(
+        elements: Map<string, EditableElementInfo>,
+        data: {
+            elements: Record<string, { content: string }>;
+            groups: Record<string, { elements: Record<string, { content: string }> }>;
+        }
+    ): void {
+        // Populate ungrouped elements
+        Object.entries(data.elements).forEach(([elementId, element]) => {
+            updateElement(elements, elementId, element.content);
+        });
+
+        // Populate grouped elements
+        Object.entries(data.groups).forEach(([groupId, group]) => {
+            Object.entries(group.elements).forEach(([elementId, element]) => {
+                // Use composite key: groupId:elementId
+                updateElement(elements, `${groupId}:${elementId}`, element.content);
+            });
         });
     }
 
@@ -118,10 +246,18 @@
     }
 
     /**
+     * Content response type (key-value format)
+     */
+    interface ContentResponse {
+        elements: Record<string, { content: string }>;
+        groups: Record<string, { elements: Record<string, { content: string }> }>;
+    }
+
+    /**
      * Fetch content from API
      * Returns null on any error (page will show default content)
      */
-    async function fetchContent(): Promise<Array<{ elementId: string; content: string }> | null> {
+    async function fetchContent(): Promise<ContentResponse | null> {
         try {
             const url = `${apiUrl}/apps/${appId}/content`;
             const response = await fetch(url);
@@ -138,8 +274,7 @@
                 throw new Error(`Failed to load content: ${response.status}`);
             }
 
-            const data = await response.json() as { elements: Array<{ elementId: string; content: string }> };
-            return data.elements;
+            return await response.json() as ContentResponse;
         } catch (error) {
             console.warn("[StreamlinedCMS] Could not load content:", error);
             return null;

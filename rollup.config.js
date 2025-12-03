@@ -47,6 +47,7 @@ const terserPlugin = terser({
 });
 
 // PostCSS plugin config - processes Tailwind CSS and injects as string
+// Note: shadowDomFix plugin is configured in postcss.config.cjs to run after Tailwind
 const postcssPlugin = postcss({
   inject: false,  // Don't inject into DOM, we handle it manually
   minimize: true, // Minify the output

@@ -10,37 +10,92 @@
  */
 
 import { Logger } from "loganite";
-import { Auth, type EditorMode, type MediaFile } from "../auth.js";
-import { getConfigFromScriptTag, type ViewerConfig } from "../viewer/config.js";
+import { KeyStorage, type EditorMode } from "../key-storage.js";
+import { PopupManager, type MediaFile } from "../popup-manager.js";
+import type { EditableType, ContentData, TextContentData, HtmlContentData, ImageContentData, LinkContentData } from "../types.js";
+
+/**
+ * Configuration for StreamlinedCMS
+ */
+interface ViewerConfig {
+    apiUrl: string;
+    appUrl: string;
+    appId: string;
+    logLevel?: string;
+    mockAuth?: {
+        enabled: boolean;
+        userId?: string;
+    };
+}
+
+/**
+ * Get configuration from script tag data attributes
+ */
+function getConfigFromScriptTag(): ViewerConfig | null {
+    const scripts = document.querySelectorAll<HTMLScriptElement>('script[src*="streamlined-cms"]');
+    const scriptTag = scripts[scripts.length - 1];
+
+    if (!scriptTag) {
+        return null;
+    }
+
+    const appId = scriptTag.dataset.appId;
+    if (!appId) {
+        console.error("[StreamlinedCMS] App ID is required. Add data-app-id to your script tag.");
+        return null;
+    }
+
+    return {
+        apiUrl: scriptTag.dataset.apiUrl || __SDK_API_URL__,
+        appUrl: scriptTag.dataset.appUrl || __SDK_APP_URL__,
+        appId,
+        logLevel: scriptTag.dataset.logLevel,
+        mockAuth: scriptTag.dataset.mockAuth === "true"
+            ? { enabled: true, userId: scriptTag.dataset.mockUserId }
+            : undefined,
+    };
+}
 
 // Import Lit components to register them
 import "../components/toolbar.js";
 import "../components/sign-in-link.js";
 import "../components/html-editor-modal.js";
+import "../components/link-editor-modal.js";
 import type { Toolbar } from "../components/toolbar.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
+import type { LinkEditorModal, LinkData } from "../components/link-editor-modal.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
 const TOOLBAR_HEIGHT_MOBILE = 56;
 
-type EditableType = "text" | "image";
+interface EditableElementInfo {
+    element: HTMLElement;
+    elementId: string;
+    groupId: string | null;
+}
 
 class EditorController {
     private config: ViewerConfig;
     private log: Logger;
-    private auth: Auth;
+    private keyStorage: KeyStorage;
+    private popupManager: PopupManager;
     private apiKey: string | null = null;
     private currentMode: EditorMode = "viewer";
-    private editableElements: Map<string, HTMLElement> = new Map();
+    // Map key is composite: groupId:elementId for grouped, just elementId for ungrouped
+    private editableElements: Map<string, EditableElementInfo> = new Map();
     private editableTypes: Map<string, EditableType> = new Map();
     private originalContent: Map<string, string> = new Map();
-    private editingElementId: string | null = null;
-    private customSignInTrigger: Element | null = null;
-    private customSignInOriginalText: string | null = null;
+    private editingKey: string | null = null;
+    private customSignInTriggers: Map<Element, string> = new Map(); // element -> original text
     private toolbar: Toolbar | null = null;
     private htmlEditorModal: HtmlEditorModal | null = null;
+    private linkEditorModal: LinkEditorModal | null = null;
     private saving = false;
+    // Double-tap tracking for mobile
+    private lastTapTime = 0;
+    private lastTapKey: string | null = null;
+    private readonly doubleTapDelay = 400; // ms
 
     constructor(config: ViewerConfig) {
         this.config = config;
@@ -49,8 +104,9 @@ class EditorController {
         const logLevel = config.logLevel || "error";
         this.log = new Logger("StreamlinedCMS", logLevel);
 
-        // Initialize auth module
-        this.auth = new Auth({
+        // Initialize key storage and popup manager
+        this.keyStorage = new KeyStorage(config.appId);
+        this.popupManager = new PopupManager({
             appId: config.appId,
             appUrl: config.appUrl,
         });
@@ -82,44 +138,69 @@ class EditorController {
         });
     }
 
+    /**
+     * Get group ID for an element by checking data-group on self or ancestors
+     */
+    private getGroupId(element: HTMLElement): string | null {
+        // First check the element itself
+        const selfGroup = element.getAttribute("data-group");
+        if (selfGroup) return selfGroup;
+
+        // Walk up to find nearest ancestor with data-group
+        let parent = element.parentElement;
+        while (parent) {
+            const parentGroup = parent.getAttribute("data-group");
+            if (parentGroup) return parentGroup;
+            parent = parent.parentElement;
+        }
+        return null;
+    }
+
     private scanEditableElements(): void {
         document.querySelectorAll<HTMLElement>("[data-editable]").forEach((element) => {
             const elementId = element.getAttribute("data-editable");
             if (elementId) {
-                this.editableElements.set(elementId, element);
+                const groupId = this.getGroupId(element);
+                // Use composite key for grouped elements: groupId:elementId
+                const key = groupId ? `${groupId}:${elementId}` : elementId;
+                this.editableElements.set(key, { element, elementId, groupId });
                 // Check for explicit type or infer from element tag
-                const explicitType = element.getAttribute("data-editable-type");
+                const explicitType = element.getAttribute("data-editable-type") as EditableType | null;
                 if (explicitType === "image" || (!explicitType && element.tagName === "IMG")) {
-                    this.editableTypes.set(elementId, "image");
+                    this.editableTypes.set(key, "image");
+                } else if (explicitType === "link") {
+                    this.editableTypes.set(key, "link");
+                } else if (explicitType === "text") {
+                    this.editableTypes.set(key, "text");
                 } else {
-                    this.editableTypes.set(elementId, "text");
+                    // Default to html for backwards compatibility
+                    this.editableTypes.set(key, "html");
                 }
             }
         });
     }
 
-    private getEditableType(elementId: string): EditableType {
-        return this.editableTypes.get(elementId) || "text";
+    private getEditableType(key: string): EditableType {
+        return this.editableTypes.get(key) || "html";
     }
 
     private setupAuthUI(): void {
-        const storedKey = this.auth.getStoredKey();
+        const storedKey = this.keyStorage.getStoredKey();
 
         if (storedKey) {
             this.apiKey = storedKey;
 
-            // Set up custom trigger as sign-out if present
-            const customTrigger = document.querySelector("[data-scms-signin]");
-            if (customTrigger) {
-                this.customSignInTrigger = customTrigger;
-                this.customSignInOriginalText = customTrigger.textContent;
-                customTrigger.textContent = "Sign Out";
-                customTrigger.addEventListener("click", this.handleSignOutClick);
-            }
+            // Set up all custom triggers as sign-out
+            const customTriggers = document.querySelectorAll("[data-scms-signin]");
+            customTriggers.forEach((trigger) => {
+                this.customSignInTriggers.set(trigger, trigger.textContent || "");
+                trigger.textContent = "Sign Out";
+                trigger.addEventListener("click", this.handleSignOutClick);
+            });
 
-            const storedMode = this.auth.getStoredMode();
+            const storedMode = this.keyStorage.getStoredMode();
             this.setMode(storedMode === "author" ? "author" : "viewer");
-            this.log.debug("Restored auth state", { mode: this.currentMode });
+            this.log.debug("Restored auth state", { mode: this.currentMode, triggerCount: customTriggers.length });
         } else {
             this.showSignInLink();
             this.log.debug("No valid API key, showing sign-in link");
@@ -129,22 +210,25 @@ class EditorController {
     private showSignInLink(): void {
         this.removeToolbar();
 
-        // Check for custom trigger
-        const customTrigger = document.querySelector("[data-scms-signin]");
-        if (customTrigger) {
-            this.customSignInTrigger = customTrigger;
-            this.customSignInOriginalText = customTrigger.textContent;
-
-            // Restore original text if it was changed
-            if (this.customSignInOriginalText) {
-                customTrigger.textContent = this.customSignInOriginalText;
-            }
-
-            customTrigger.addEventListener("click", this.handleSignInClick);
+        // Check for custom triggers
+        const customTriggers = document.querySelectorAll("[data-scms-signin]");
+        if (customTriggers.length > 0) {
+            customTriggers.forEach((trigger) => {
+                // Store original text if not already stored
+                if (!this.customSignInTriggers.has(trigger)) {
+                    this.customSignInTriggers.set(trigger, trigger.textContent || "");
+                }
+                // Restore original text
+                const originalText = this.customSignInTriggers.get(trigger);
+                if (originalText) {
+                    trigger.textContent = originalText;
+                }
+                trigger.addEventListener("click", this.handleSignInClick);
+            });
             return;
         }
 
-        // Use Lit component
+        // Use Lit component (fallback when no custom triggers)
         const signInLink = document.createElement("scms-sign-in-link");
         signInLink.id = "scms-signin-link";
         signInLink.addEventListener("sign-in-click", () => {
@@ -164,13 +248,13 @@ class EditorController {
     };
 
     private handleDocumentClick = (e: Event): void => {
-        if (!this.editingElementId) return;
+        if (!this.editingKey) return;
 
         const target = e.target as Node;
 
         // Don't deselect if clicking inside an editable element
-        for (const element of this.editableElements.values()) {
-            if (element.contains(target)) {
+        for (const info of this.editableElements.values()) {
+            if (info.element.contains(target)) {
                 return;
             }
         }
@@ -186,20 +270,21 @@ class EditorController {
     private async handleSignIn(): Promise<void> {
         this.log.debug("Opening login popup");
 
-        const key = await this.auth.openLoginPopup();
+        const key = await this.popupManager.openLoginPopup();
         if (key) {
             this.apiKey = key;
+            this.keyStorage.storeKey(key);
 
             // Remove default sign-in link if present
             const signInLink = document.getElementById("scms-signin-link");
             if (signInLink) signInLink.remove();
 
-            // Convert custom trigger to sign-out
-            if (this.customSignInTrigger) {
-                this.customSignInTrigger.removeEventListener("click", this.handleSignInClick);
-                this.customSignInTrigger.textContent = "Sign Out";
-                this.customSignInTrigger.addEventListener("click", this.handleSignOutClick);
-            }
+            // Convert all custom triggers to sign-out
+            this.customSignInTriggers.forEach((_, trigger) => {
+                trigger.removeEventListener("click", this.handleSignInClick);
+                trigger.textContent = "Sign Out";
+                trigger.addEventListener("click", this.handleSignOutClick);
+            });
 
             this.setMode("author");
             this.log.info("User authenticated via popup, entering author mode");
@@ -210,7 +295,7 @@ class EditorController {
 
     private setMode(mode: EditorMode): void {
         this.currentMode = mode;
-        this.auth.storeMode(mode);
+        this.keyStorage.storeMode(mode);
 
         if (mode === "author") {
             this.enableAuthorMode();
@@ -227,31 +312,60 @@ class EditorController {
     private enableAuthorMode(): void {
         this.log.debug("Entering author mode");
 
-        this.editableElements.forEach((element, elementId) => {
-            element.classList.add("streamlined-editable");
-            const elementType = this.getEditableType(elementId);
+        this.editableElements.forEach((info, key) => {
+            info.element.classList.add("streamlined-editable");
+            const elementType = this.getEditableType(key);
 
-            if (!element.dataset.scmsClickHandler) {
-                element.addEventListener("click", (e) => {
+            if (!info.element.dataset.scmsClickHandler) {
+                info.element.addEventListener("click", (e) => {
                     if (this.currentMode === "author") {
                         e.preventDefault();
                         e.stopPropagation();
-                        this.startEditing(elementId);
+
+                        // Check for double-tap (mobile) on images and links
+                        const now = Date.now();
+                        const isDoubleTap = this.lastTapKey === key && (now - this.lastTapTime) < this.doubleTapDelay;
+
+                        if (isDoubleTap) {
+                            if (elementType === "image") {
+                                this.handleChangeImage();
+                            } else if (elementType === "link") {
+                                this.handleGoToLink();
+                            }
+                            this.lastTapKey = null;
+                            this.lastTapTime = 0;
+                        } else {
+                            this.startEditing(key);
+                            this.lastTapKey = key;
+                            this.lastTapTime = now;
+                        }
                     }
                 });
-                element.dataset.scmsClickHandler = "true";
+                info.element.dataset.scmsClickHandler = "true";
             }
 
-            // Add double-click handler for images to open media manager
-            if (elementType === "image" && !element.dataset.scmsDblClickHandler) {
-                element.addEventListener("dblclick", (e) => {
+            // Add double-click handler for images to open media manager (desktop)
+            if (elementType === "image" && !info.element.dataset.scmsDblClickHandler) {
+                info.element.addEventListener("dblclick", (e) => {
                     if (this.currentMode === "author") {
                         e.preventDefault();
                         e.stopPropagation();
                         this.handleChangeImage();
                     }
                 });
-                element.dataset.scmsDblClickHandler = "true";
+                info.element.dataset.scmsDblClickHandler = "true";
+            }
+
+            // Add double-click handler for links to navigate (desktop)
+            if (elementType === "link" && !info.element.dataset.scmsDblClickHandler) {
+                info.element.addEventListener("dblclick", (e) => {
+                    if (this.currentMode === "author") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.handleGoToLink();
+                    }
+                });
+                info.element.dataset.scmsDblClickHandler = "true";
             }
         });
 
@@ -265,9 +379,9 @@ class EditorController {
     private enableViewerMode(): void {
         this.log.debug("Entering viewer mode");
 
-        this.editableElements.forEach((element) => {
-            element.classList.remove("streamlined-editable", "streamlined-editing");
-            element.removeAttribute("contenteditable");
+        this.editableElements.forEach((info) => {
+            info.element.classList.remove("streamlined-editable", "streamlined-editing");
+            info.element.removeAttribute("contenteditable");
         });
 
         // Remove click-outside handler
@@ -281,7 +395,7 @@ class EditorController {
         // Update existing toolbar if present
         if (this.toolbar) {
             this.toolbar.mode = this.currentMode;
-            this.toolbar.activeElement = this.editingElementId;
+            this.toolbar.activeElement = this.editingKey;
             return;
         }
 
@@ -289,7 +403,7 @@ class EditorController {
         const toolbar = document.createElement("scms-toolbar") as Toolbar;
         toolbar.id = "scms-toolbar";
         toolbar.mode = this.currentMode;
-        toolbar.activeElement = this.editingElementId;
+        toolbar.activeElement = this.editingKey;
         toolbar.appUrl = this.config.appUrl;
         toolbar.appId = this.config.appId;
 
@@ -311,6 +425,14 @@ class EditorController {
 
         toolbar.addEventListener("change-image", () => {
             this.handleChangeImage();
+        });
+
+        toolbar.addEventListener("edit-link", () => {
+            this.handleEditLink();
+        });
+
+        toolbar.addEventListener("go-to-link", () => {
+            this.handleGoToLink();
         });
 
         toolbar.addEventListener("sign-out", () => {
@@ -343,28 +465,26 @@ class EditorController {
     private signOut(): void {
         this.log.info("Signing out");
 
-        this.auth.clearStoredKey();
+        this.keyStorage.clearStoredKey();
         this.apiKey = null;
 
-        this.editableElements.forEach((element) => {
-            element.classList.remove("streamlined-editable", "streamlined-editing");
-            element.removeAttribute("contenteditable");
+        this.editableElements.forEach((info) => {
+            info.element.classList.remove("streamlined-editable", "streamlined-editing");
+            info.element.removeAttribute("contenteditable");
         });
         this.stopEditing();
 
-        // Convert custom trigger back to sign-in
-        if (this.customSignInTrigger) {
-            this.customSignInTrigger.removeEventListener("click", this.handleSignOutClick);
-            if (this.customSignInOriginalText) {
-                this.customSignInTrigger.textContent = this.customSignInOriginalText;
-            }
-            this.customSignInTrigger.addEventListener("click", this.handleSignInClick);
-        }
+        // Convert all custom triggers back to sign-in
+        this.customSignInTriggers.forEach((originalText, trigger) => {
+            trigger.removeEventListener("click", this.handleSignOutClick);
+            trigger.textContent = originalText;
+            trigger.addEventListener("click", this.handleSignInClick);
+        });
 
         this.removeToolbar();
 
-        // Only show default sign-in link if no custom trigger
-        if (!this.customSignInTrigger) {
+        // Only show default sign-in link if no custom triggers
+        if (this.customSignInTriggers.size === 0) {
             this.showSignInLink();
         }
     }
@@ -397,70 +517,66 @@ class EditorController {
         document.head.appendChild(style);
     }
 
-    private startEditing(elementId: string): void {
-        const element = this.editableElements.get(elementId);
-        if (!element) {
-            this.log.warn("Element not found", { elementId });
+    private startEditing(key: string): void {
+        const info = this.editableElements.get(key);
+        if (!info) {
+            this.log.warn("Element not found", { key });
             return;
         }
 
-        const elementType = this.getEditableType(elementId);
-        this.log.trace("Starting edit", { elementId, elementType });
+        const elementType = this.getEditableType(key);
+        this.log.trace("Starting edit", { key, elementId: info.elementId, groupId: info.groupId, elementType });
 
         // Stop editing previous element if any
-        if (this.editingElementId) {
-            const prevElement = this.editableElements.get(this.editingElementId);
-            if (prevElement) {
-                prevElement.classList.remove("streamlined-editing");
-                prevElement.setAttribute("contenteditable", "false");
+        if (this.editingKey) {
+            const prevInfo = this.editableElements.get(this.editingKey);
+            if (prevInfo) {
+                prevInfo.element.classList.remove("streamlined-editing");
+                prevInfo.element.setAttribute("contenteditable", "false");
             }
         }
 
-        // Store original content for reset (src for images, innerHTML for text)
-        if (!this.originalContent.has(elementId)) {
-            if (elementType === "image" && element instanceof HTMLImageElement) {
-                this.originalContent.set(elementId, element.src);
-            } else {
-                this.originalContent.set(elementId, element.innerHTML);
-            }
+        // Store original content for reset
+        if (!this.originalContent.has(key)) {
+            this.originalContent.set(key, this.getElementContent(key, info));
         }
 
-        // Add input listener to track changes (only for text elements)
-        if (elementType !== "image" && !element.dataset.scmsInputHandler) {
-            element.addEventListener("input", () => this.updateToolbarHasChanges());
-            element.dataset.scmsInputHandler = "true";
+        // Add input listener to track changes (for text and html elements)
+        if ((elementType === "text" || elementType === "html") && !info.element.dataset.scmsInputHandler) {
+            info.element.addEventListener("input", () => this.updateToolbarHasChanges());
+            info.element.dataset.scmsInputHandler = "true";
         }
 
-        this.editingElementId = elementId;
-        element.classList.add("streamlined-editing");
+        this.editingKey = key;
+        info.element.classList.add("streamlined-editing");
 
-        // Only make text elements contenteditable
-        if (elementType !== "image") {
-            element.setAttribute("contenteditable", "true");
-            element.focus();
+        // Make text and html elements contenteditable (not images or links)
+        if (elementType === "text" || elementType === "html") {
+            info.element.setAttribute("contenteditable", "true");
+            info.element.focus();
         }
 
         // Update toolbar
         if (this.toolbar) {
-            this.toolbar.activeElement = elementId;
+            this.toolbar.activeElement = key;
             this.toolbar.activeElementType = elementType;
         }
     }
 
     private stopEditing(): void {
-        if (!this.editingElementId) {
+        if (!this.editingKey) {
             return;
         }
 
         this.log.trace("Stopping edit");
 
-        const element = this.editableElements.get(this.editingElementId);
-        if (element) {
-            element.classList.remove("streamlined-editing");
-            element.setAttribute("contenteditable", "false");
+        const info = this.editableElements.get(this.editingKey);
+        if (info) {
+            info.element.classList.remove("streamlined-editing");
+            info.element.setAttribute("contenteditable", "false");
         }
 
-        this.editingElementId = null;
+        this.editingKey = null;
 
         // Update toolbar
         if (this.toolbar) {
@@ -469,17 +585,108 @@ class EditorController {
         }
     }
 
-    private getDirtyElements(): Map<string, string> {
-        const dirty = new Map<string, string>();
-        this.editableElements.forEach((element, elementId) => {
-            const original = this.originalContent.get(elementId);
-            const elementType = this.getEditableType(elementId);
-            const current =
-                elementType === "image" && element instanceof HTMLImageElement
-                    ? element.src
-                    : element.innerHTML;
+    /**
+     * Get the current content value for an element based on its type
+     * Returns JSON string with type field for all element types
+     */
+    private getElementContent(key: string, info: EditableElementInfo): string {
+        const elementType = this.getEditableType(key);
+
+        if (elementType === "image" && info.element instanceof HTMLImageElement) {
+            const data: ImageContentData = {
+                type: "image",
+                src: info.element.src,
+            };
+            return JSON.stringify(data);
+        } else if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
+            const data: LinkContentData = {
+                type: "link",
+                href: info.element.href,
+                target: info.element.target,
+                text: info.element.textContent || "",
+            };
+            return JSON.stringify(data);
+        } else if (elementType === "text") {
+            const data: TextContentData = {
+                type: "text",
+                value: info.element.textContent || "",
+            };
+            return JSON.stringify(data);
+        } else {
+            // html (default)
+            const data: HtmlContentData = {
+                type: "html",
+                value: info.element.innerHTML,
+            };
+            return JSON.stringify(data);
+        }
+    }
+
+    /**
+     * Apply content to an element based on stored type
+     * Handles backwards compatibility for content without type field
+     */
+    private applyElementContent(key: string, info: EditableElementInfo, content: string): void {
+        try {
+            const data = JSON.parse(content) as ContentData | { type?: undefined };
+
+            if (data.type === "text") {
+                info.element.textContent = (data as TextContentData).value;
+            } else if (data.type === "html") {
+                info.element.innerHTML = (data as HtmlContentData).value;
+            } else if (data.type === "image" && info.element instanceof HTMLImageElement) {
+                info.element.src = (data as ImageContentData).src;
+            } else if (data.type === "link" && info.element instanceof HTMLAnchorElement) {
+                const linkData = data as LinkContentData;
+                info.element.href = linkData.href;
+                info.element.target = linkData.target;
+                info.element.textContent = linkData.text;
+            } else if (!data.type) {
+                // No type field - infer from element's data-editable-type attribute
+                const attrType = info.element.getAttribute("data-editable-type");
+                if (attrType === "link" && info.element instanceof HTMLAnchorElement) {
+                    const linkData = data as { href?: string; target?: string; text?: string };
+                    if (linkData.href !== undefined) {
+                        info.element.href = linkData.href;
+                        info.element.target = linkData.target || "";
+                        info.element.textContent = linkData.text || "";
+                        return;
+                    }
+                } else if (attrType === "image" && info.element instanceof HTMLImageElement) {
+                    const imageData = data as { src?: string };
+                    if (imageData.src !== undefined) {
+                        info.element.src = imageData.src;
+                        return;
+                    }
+                } else if (attrType === "text") {
+                    const textData = data as { value?: string };
+                    if (textData.value !== undefined) {
+                        info.element.textContent = textData.value;
+                        return;
+                    }
+                } else if (attrType === "html") {
+                    const htmlData = data as { value?: string };
+                    if (htmlData.value !== undefined) {
+                        info.element.innerHTML = htmlData.value;
+                        return;
+                    }
+                }
+                // Unrecognized JSON - treat as html
+                info.element.innerHTML = content;
+            }
+        } catch {
+            // Not JSON - treat as legacy html content
+            info.element.innerHTML = content;
+        }
+    }
+
+    private getDirtyElements(): Map<string, { content: string; info: EditableElementInfo }> {
+        const dirty = new Map<string, { content: string; info: EditableElementInfo }>();
+        this.editableElements.forEach((info, key) => {
+            const original = this.originalContent.get(key);
+            const current = this.getElementContent(key, info);
             if (original !== undefined && current !== original) {
-                dirty.set(elementId, current);
+                dirty.set(key, { content: current, info });
             }
         });
         return dirty;
@@ -517,8 +724,11 @@ class EditorController {
         try {
             // Save all dirty elements in parallel
             const savePromises = Array.from(dirtyElements.entries()).map(
-                async ([elementId, content]) => {
-                    const url = `${this.config.apiUrl}/apps/${this.config.appId}/content/${elementId}`;
+                async ([key, { content, info }]) => {
+                    // Build URL based on whether element is grouped
+                    const url = info.groupId
+                        ? `${this.config.apiUrl}/apps/${this.config.appId}/content/groups/${info.groupId}/elements/${info.elementId}`
+                        : `${this.config.apiUrl}/apps/${this.config.appId}/content/elements/${info.elementId}`;
                     const response = await fetch(url, {
                         method: "PUT",
                         headers,
@@ -526,14 +736,14 @@ class EditorController {
                     });
 
                     if (!response.ok) {
-                        throw new Error(`${elementId}: ${response.status} ${response.statusText}`);
+                        throw new Error(`${key}: ${response.status} ${response.statusText}`);
                     }
 
                     await response.json();
 
                     // Update original content to saved version
-                    this.originalContent.set(elementId, content);
-                    saved.push(elementId);
+                    this.originalContent.set(key, content);
+                    saved.push(key);
                 }
             );
 
@@ -544,8 +754,6 @@ class EditorController {
                     errors.push(result.reason?.message || "Unknown error");
                 }
             });
-
-            this.auth.refreshKeyExpiry();
 
             if (errors.length > 0) {
                 this.log.error("Some elements failed to save", { errors });
@@ -571,51 +779,47 @@ class EditorController {
     }
 
     private handleReset(): void {
-        if (!this.editingElementId) {
+        if (!this.editingKey) {
             return;
         }
 
-        const elementId = this.editingElementId;
-        const element = this.editableElements.get(elementId);
-        const originalContent = this.originalContent.get(elementId);
-        const elementType = this.getEditableType(elementId);
+        const key = this.editingKey;
+        const info = this.editableElements.get(key);
+        const originalContent = this.originalContent.get(key);
+        const elementType = this.getEditableType(key);
 
-        if (element && originalContent !== undefined) {
-            this.log.debug("Resetting element", { elementId, elementType });
-            if (elementType === "image" && element instanceof HTMLImageElement) {
-                element.src = originalContent;
-            } else {
-                element.innerHTML = originalContent;
-            }
+        if (info && originalContent !== undefined) {
+            this.log.debug("Resetting element", { key, elementId: info.elementId, groupId: info.groupId, elementType });
+            this.applyElementContent(key, info, originalContent);
             this.updateToolbarHasChanges();
         }
     }
 
     private async handleChangeImage(): Promise<void> {
-        if (!this.editingElementId) {
+        if (!this.editingKey) {
             this.log.debug("No element selected for image change");
             return;
         }
 
-        const elementId = this.editingElementId;
-        const element = this.editableElements.get(elementId);
-        if (!element || !(element instanceof HTMLImageElement)) {
+        const key = this.editingKey;
+        const info = this.editableElements.get(key);
+        if (!info || !(info.element instanceof HTMLImageElement)) {
             this.log.warn("Selected element is not an image");
             return;
         }
 
-        this.log.debug("Opening media manager for image change", { elementId });
+        this.log.debug("Opening media manager for image change", { key, elementId: info.elementId });
 
         const file = await this.openMediaManager();
         if (file) {
-            element.src = file.publicUrl;
+            info.element.src = file.publicUrl;
             this.updateToolbarHasChanges();
-            this.log.debug("Image changed", { elementId, newUrl: file.publicUrl });
+            this.log.debug("Image changed", { key, elementId: info.elementId, newUrl: file.publicUrl });
         }
     }
 
     private handleEditHtml(): void {
-        if (!this.editingElementId) {
+        if (!this.editingKey) {
             this.log.debug("No element selected for HTML editing");
             return;
         }
@@ -626,17 +830,18 @@ class EditorController {
             return;
         }
 
-        const element = this.editableElements.get(this.editingElementId);
-        if (!element) {
+        const key = this.editingKey;
+        const info = this.editableElements.get(key);
+        if (!info) {
             return;
         }
 
-        this.log.debug("Opening HTML editor", { elementId: this.editingElementId });
+        this.log.debug("Opening HTML editor", { key, elementId: info.elementId });
 
         // Create and show modal
         const modal = document.createElement("scms-html-editor-modal") as HtmlEditorModal;
-        modal.elementId = this.editingElementId;
-        modal.content = element.innerHTML;
+        modal.elementId = info.elementId;
+        modal.content = info.element.innerHTML;
 
         // Prevent clicks inside modal from deselecting the element
         modal.addEventListener("click", (e: Event) => {
@@ -644,10 +849,10 @@ class EditorController {
         });
 
         modal.addEventListener("apply", ((e: CustomEvent<{ content: string }>) => {
-            element.innerHTML = e.detail.content;
+            info.element.innerHTML = e.detail.content;
             this.closeHtmlEditor();
             this.updateToolbarHasChanges();
-            this.log.debug("HTML applied", { elementId: this.editingElementId });
+            this.log.debug("HTML applied", { key, elementId: info.elementId });
         }) as EventListener);
 
         modal.addEventListener("cancel", () => {
@@ -665,13 +870,98 @@ class EditorController {
         }
     }
 
+    private handleEditLink(): void {
+        if (!this.editingKey) {
+            this.log.debug("No element selected for link editing");
+            return;
+        }
+
+        // Prevent opening multiple modals
+        if (this.linkEditorModal) {
+            this.log.debug("Link editor already open");
+            return;
+        }
+
+        const key = this.editingKey;
+        const info = this.editableElements.get(key);
+        if (!info || !(info.element instanceof HTMLAnchorElement)) {
+            this.log.warn("Selected element is not a link");
+            return;
+        }
+
+        this.log.debug("Opening link editor", { key, elementId: info.elementId });
+
+        // Create and show modal
+        const modal = document.createElement("scms-link-editor-modal") as LinkEditorModal;
+        modal.elementId = info.elementId;
+        modal.linkData = {
+            href: info.element.href,
+            target: info.element.target,
+            text: info.element.textContent || "",
+        };
+
+        // Prevent clicks inside modal from deselecting the element
+        modal.addEventListener("click", (e: Event) => {
+            e.stopPropagation();
+        });
+
+        modal.addEventListener("apply", ((e: CustomEvent<{ linkData: LinkData }>) => {
+            const anchor = info.element as HTMLAnchorElement;
+            anchor.href = e.detail.linkData.href;
+            anchor.target = e.detail.linkData.target;
+            anchor.textContent = e.detail.linkData.text;
+            this.closeLinkEditor();
+            this.updateToolbarHasChanges();
+            this.log.debug("Link updated", { key, elementId: info.elementId, linkData: e.detail.linkData });
+        }) as EventListener);
+
+        modal.addEventListener("cancel", () => {
+            this.closeLinkEditor();
+        });
+
+        document.body.appendChild(modal);
+        this.linkEditorModal = modal;
+    }
+
+    private closeLinkEditor(): void {
+        if (this.linkEditorModal) {
+            this.linkEditorModal.remove();
+            this.linkEditorModal = null;
+        }
+    }
+
+    private handleGoToLink(): void {
+        if (!this.editingKey) {
+            this.log.debug("No element selected for go to link");
+            return;
+        }
+
+        const key = this.editingKey;
+        const info = this.editableElements.get(key);
+        if (!info || !(info.element instanceof HTMLAnchorElement)) {
+            this.log.warn("Selected element is not a link");
+            return;
+        }
+
+        const href = info.element.href;
+        const target = info.element.target;
+
+        this.log.debug("Navigating to link", { key, elementId: info.elementId, href, target });
+
+        if (target === "_blank") {
+            window.open(href, "_blank");
+        } else {
+            window.location.href = href;
+        }
+    }
+
     /**
      * Open media manager popup for file selection
      * Returns selected file on success, null if user cancels or closes popup
      */
     public async openMediaManager(): Promise<MediaFile | null> {
         this.log.debug("Opening media manager popup");
-        const file = await this.auth.openMediaManager();
+        const file = await this.popupManager.openMediaManager();
         if (file) {
             this.log.debug("Media file selected", { fileId: file.fileId, filename: file.filename });
         } else {

@@ -8,8 +8,8 @@
         <!-- Load the SDK - just one script tag, no FOUC -->
         <script
             src="/dist/streamlined-cms.js"
-            data-api-url="https://streamlined-cms-api-worker-staging.whi.workers.dev"
-            data-app-url="http://localhost:3001"
+            data-api-url="https://api.staging.streamlinedcms.com"
+            data-app-url="https://app.staging.streamlinedcms.com"
             data-app-id="localhost"
             data-log-level="debug"
         ></script>
@@ -21,37 +21,158 @@
                 box-sizing: border-box;
             }
 
+            html {
+                overflow-x: hidden;
+            }
+
             body {
+                overflow-x: hidden;
                 font-family:
                     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
                     sans-serif;
                 line-height: 1.6;
                 color: #333;
                 background: #f5f5f5;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
             }
 
             .container {
                 max-width: 900px;
                 margin: 0 auto;
-                padding: 40px 20px;
+                padding: 20px;
+                flex: 1;
             }
 
+            /* Header styles */
             header {
+                background: #1a1a2e;
+                color: white;
+                padding: 0;
+            }
+
+            .header-inner {
+                max-width: 900px;
+                margin: 0 auto;
+                padding: 15px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .logo {
+                font-size: 1.5em;
+                font-weight: bold;
+            }
+
+            .nav-links {
+                display: flex;
+                gap: 15px;
+                flex-wrap: wrap;
+            }
+
+            @media (max-width: 480px) {
+                .header-inner {
+                    flex-direction: column;
+                    align-items: flex-start;
+                }
+
+                .nav-links {
+                    width: 100%;
+                    justify-content: flex-start;
+                    gap: 12px;
+                }
+
+                .logo {
+                    font-size: 1.3em;
+                }
+            }
+
+            .nav-links a {
+                color: rgba(255, 255, 255, 0.8);
+                text-decoration: none;
+                transition: color 0.2s;
+            }
+
+            .nav-links a:hover,
+            .nav-links a.active {
+                color: white;
+            }
+
+            /* Page navigation tabs */
+            .page-tabs {
                 background: white;
-                padding: 40px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                border-bottom: 1px solid #e5e7eb;
                 margin-bottom: 30px;
             }
 
-            h1 {
+            .page-tabs-inner {
+                max-width: 900px;
+                margin: 0 auto;
+                padding: 0 20px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0;
+            }
+
+            .page-tab {
+                padding: 15px 20px;
+                border: none;
+                background: none;
+                cursor: pointer;
+                font-size: 1em;
+                color: #666;
+                border-bottom: 3px solid transparent;
+                transition: all 0.2s;
+                white-space: nowrap;
+            }
+
+            @media (max-width: 480px) {
+                .page-tab {
+                    padding: 12px 15px;
+                    font-size: 0.9em;
+                }
+            }
+
+            .page-tab:hover {
+                color: #333;
+                background: #f9fafb;
+            }
+
+            .page-tab.active {
+                color: #3b82f6;
+                border-bottom-color: #3b82f6;
+            }
+
+            /* Page content */
+            .page {
+                display: none;
+            }
+
+            .page.active {
+                display: block;
+            }
+
+            .hero {
+                background: white;
+                padding: 60px 40px;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                margin-bottom: 30px;
+                text-align: center;
+            }
+
+            .hero h1 {
                 font-size: 2.5em;
-                margin-bottom: 10px;
+                margin-bottom: 15px;
                 color: #1a1a1a;
             }
 
-            .tagline {
-                font-size: 1.2em;
+            .hero .tagline {
+                font-size: 1.3em;
                 color: #666;
             }
 
@@ -63,9 +184,41 @@
                 margin-bottom: 30px;
             }
 
+            @media (max-width: 480px) {
+                .container {
+                    padding: 15px;
+                }
+
+                .hero {
+                    padding: 30px 20px;
+                }
+
+                .hero h1 {
+                    font-size: 1.8em;
+                }
+
+                .hero .tagline {
+                    font-size: 1.1em;
+                }
+
+                .content-section {
+                    padding: 20px;
+                }
+
+                h2 {
+                    font-size: 1.4em;
+                }
+            }
+
             h2 {
                 font-size: 1.8em;
                 margin-bottom: 15px;
+                color: #1a1a1a;
+            }
+
+            h3 {
+                font-size: 1.3em;
+                margin-bottom: 10px;
                 color: #1a1a1a;
             }
 
@@ -75,22 +228,26 @@
 
             .features {
                 display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
                 gap: 20px;
                 margin-top: 20px;
             }
 
             .feature-card {
                 background: #f9fafb;
-                padding: 20px;
+                padding: 25px;
                 border-radius: 6px;
                 border: 1px solid #e5e7eb;
             }
 
             .feature-card h3 {
-                font-size: 1.2em;
-                margin-bottom: 10px;
-                color: #1a1a1a;
+                color: #3b82f6;
+            }
+
+            @media (max-width: 480px) {
+                .feature-card {
+                    padding: 20px;
+                }
             }
 
             .info-box {
@@ -108,6 +265,10 @@
 
             .info-box p {
                 color: #1e40af;
+                margin-bottom: 8px;
+            }
+
+            .info-box p:last-child {
                 margin-bottom: 0;
             }
 
@@ -116,111 +277,336 @@
                 padding: 2px 6px;
                 border-radius: 3px;
                 font-family: "Courier New", monospace;
+                word-break: break-word;
             }
 
-            footer {
+            @media (max-width: 480px) {
+                .info-box {
+                    padding: 15px;
+                }
+
+                .info-box code {
+                    font-size: 0.85em;
+                }
+            }
+
+            /* Team grid */
+            .team-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+                gap: 25px;
+                margin-top: 20px;
+            }
+
+            .team-member {
                 text-align: center;
-                padding: 30px 20px;
+                padding: 20px;
+                background: #f9fafb;
+                border-radius: 8px;
+            }
+
+            .team-member img {
+                width: 120px;
+                height: 120px;
+                border-radius: 50%;
+                margin-bottom: 15px;
+                object-fit: cover;
+            }
+
+            .team-member h4 {
+                margin-bottom: 5px;
+            }
+
+            .team-member .role {
                 color: #666;
                 font-size: 0.9em;
             }
 
-            footer a {
-                color: #666;
+            /* Footer styles */
+            footer {
+                background: #1a1a2e;
+                color: rgba(255, 255, 255, 0.8);
+                padding: 40px 20px 20px;
+                margin-top: auto;
+            }
+
+            .footer-inner {
+                max-width: 900px;
+                margin: 0 auto;
+            }
+
+            .footer-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
+                gap: 30px;
+                margin-bottom: 30px;
+            }
+
+            .footer-section h4 {
+                color: white;
+                margin-bottom: 15px;
+                font-size: 1.1em;
+            }
+
+            .footer-section p {
+                margin-bottom: 10px;
+                font-size: 0.95em;
+            }
+
+            .footer-bottom {
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                padding-top: 20px;
+                text-align: center;
+                font-size: 0.9em;
+            }
+
+            .footer-bottom a {
+                color: rgba(255, 255, 255, 0.8);
                 text-decoration: none;
             }
 
-            footer a:hover {
+            .footer-bottom a:hover {
+                color: white;
                 text-decoration: underline;
+            }
+
+            /* Media demo */
+            .media-demo {
+                text-align: center;
+                margin-top: 20px;
+            }
+
+            .media-demo img {
+                max-width: 100%;
+                border-radius: 8px;
             }
         </style>
     </head>
     <body>
+        <!-- Shared Header - uses data-group="header" -->
+        <header data-group="header">
+            <div class="header-inner">
+                <div class="logo" data-editable="logo">StreamlinedCMS</div>
+                <nav class="nav-links">
+                    <a href="https://example.com/products" data-editable="nav-link-1" data-editable-type="link">Products</a>
+                    <a href="https://example.com/pricing" data-editable="nav-link-2" data-editable-type="link">Pricing</a>
+                    <a href="https://example.com/contact" data-editable="nav-link-3" data-editable-type="link">Contact</a>
+                </nav>
+            </div>
+        </header>
+
+        <!-- Page tabs for demo navigation -->
+        <div class="page-tabs">
+            <div class="page-tabs-inner">
+                <button class="page-tab active" data-page="home">Home</button>
+                <button class="page-tab" data-page="about">About</button>
+                <button class="page-tab" data-page="features">Features</button>
+            </div>
+        </div>
+
         <div class="container">
             <div class="info-box">
-                <h3 data-editable="info-title">Live Demo</h3>
-                <p data-editable="info-text1">
-                    Click the <strong>Sign In</strong> link in the footer to authenticate, then
-                    click any text with a red dashed outline to edit it.
+                <h3>Content Groups &amp; Link Editing Demo</h3>
+                <p>
+                    This demo shows <strong>content groups</strong> and <strong>link editing</strong> in action.
+                    The header and footer are shared across all pages using <code>data-group</code>.
                 </p>
-                <p data-editable="info-text2">
-                    <strong>Integration:</strong> Just one <code>&lt;script&gt;</code> tag with data
-                    attributes!
+                <p>
+                    <strong>Links:</strong> The nav links use <code>data-editable-type="link"</code>.
+                    Click to select, then use "Edit Link" to change URL/target, or double-click to navigate.
                 </p>
-                <p data-editable="info-text3"><strong>App ID:</strong> localhost</p>
-            </div>
-
-            <header>
-                <h1 data-editable="hero-title">Welcome to Streamlined CMS</h1>
-                <p class="tagline" data-editable="hero-tagline">
-                    Edit your website content inline, right where you see it.
-                </p>
-            </header>
-
-            <div class="content-section">
-                <h2 data-editable="about-heading">About Our Product</h2>
-                <p data-editable="about-text">
-                    Streamlined CMS makes website editing as simple as clicking and typing. No
-                    complex dashboards, no confusing admin panels. Just click on any text, edit it,
-                    and save. It's that easy.
+                <p>
+                    <a href="#" data-scms-signin>Sign In</a> to enable editing mode.
                 </p>
             </div>
 
-            <div class="content-section">
-                <h2 data-editable="features-heading">Key Features</h2>
-                <div class="features">
-                    <div class="feature-card">
-                        <h3 data-editable="feature1-title">Inline Editing</h3>
-                        <p data-editable="feature1-desc">
-                            Edit content directly on your live website. No switching between preview
-                            and edit modes.
-                        </p>
-                    </div>
-                    <div class="feature-card">
-                        <h3 data-editable="feature2-title">Lightning Fast</h3>
-                        <p data-editable="feature2-desc">
-                            Built on edge technology for instant updates worldwide. Changes appear
-                            in milliseconds.
-                        </p>
-                    </div>
-                    <div class="feature-card">
-                        <h3 data-editable="feature3-title">Simple Integration</h3>
-                        <p data-editable="feature3-desc">
-                            Add one script tag to your website and you're ready to go. Works with
-                            any site.
-                        </p>
+            <!-- HOME PAGE -->
+            <div class="page active" id="page-home" data-group="home">
+                <div class="hero">
+                    <h1 data-editable="hero-title">Welcome to Streamlined CMS</h1>
+                    <p class="tagline" data-editable="hero-tagline">
+                        Edit your website content inline, right where you see it.
+                    </p>
+                </div>
+
+                <div class="content-section">
+                    <h2 data-editable="intro-heading">Simple, Fast, Powerful</h2>
+                    <p data-editable="intro-text">
+                        Streamlined CMS makes website editing as simple as clicking and typing. No
+                        complex dashboards, no confusing admin panels. Just click on any text, edit it,
+                        and save. Your changes go live instantly.
+                    </p>
+                </div>
+
+                <div class="content-section">
+                    <h2 data-editable="cta-heading">Ready to Get Started?</h2>
+                    <p data-editable="cta-text">
+                        Try editing any text on this page to see how easy it is. Sign in with your
+                        account to enable editing mode. Changes you make are saved to the cloud and
+                        appear for all visitors.
+                    </p>
+                </div>
+            </div>
+
+            <!-- ABOUT PAGE -->
+            <div class="page" id="page-about" data-group="about">
+                <div class="content-section">
+                    <h2 data-editable="about-heading">About Our Company</h2>
+                    <p data-editable="about-text-1">
+                        We believe content management should be simple. That's why we built
+                        Streamlined CMS - a tool that lets you edit your website content directly
+                        on the page, without complex admin interfaces.
+                    </p>
+                    <p data-editable="about-text-2">
+                        Founded in 2025, our mission is to make website editing accessible to
+                        everyone, from small business owners to enterprise teams.
+                    </p>
+                </div>
+
+                <div class="content-section">
+                    <h2 data-editable="team-heading">Our Team</h2>
+                    <p data-editable="team-intro">
+                        Meet the people behind Streamlined CMS.
+                    </p>
+                    <div class="team-grid">
+                        <div class="team-member">
+                            <img
+                                data-editable="team-photo-1"
+                                data-editable-type="image"
+                                src="https://placehold.co/120x120?text=CEO"
+                                alt="Team member"
+                            />
+                            <h4 data-editable="team-name-1">Alex Chen</h4>
+                            <p class="role" data-editable="team-role-1">CEO & Founder</p>
+                        </div>
+                        <div class="team-member">
+                            <img
+                                data-editable="team-photo-2"
+                                data-editable-type="image"
+                                src="https://placehold.co/120x120?text=CTO"
+                                alt="Team member"
+                            />
+                            <h4 data-editable="team-name-2">Sam Rivera</h4>
+                            <p class="role" data-editable="team-role-2">CTO</p>
+                        </div>
+                        <div class="team-member">
+                            <img
+                                data-editable="team-photo-3"
+                                data-editable-type="image"
+                                src="https://placehold.co/120x120?text=Design"
+                                alt="Team member"
+                            />
+                            <h4 data-editable="team-name-3">Jordan Lee</h4>
+                            <p class="role" data-editable="team-role-3">Head of Design</p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="content-section">
-                <h2 data-editable="cta-heading">Ready to Get Started?</h2>
-                <p data-editable="cta-text">
-                    Try editing any text on this page to see how easy it is. Sign in with your
-                    account to enable editing mode.
-                </p>
-            </div>
+            <!-- FEATURES PAGE -->
+            <div class="page" id="page-features" data-group="features">
+                <div class="content-section">
+                    <h2 data-editable="features-heading">Platform Features</h2>
+                    <p data-editable="features-intro">
+                        Everything you need to manage your website content effectively.
+                    </p>
+                    <div class="features">
+                        <div class="feature-card">
+                            <h3 data-editable="feature1-title">Inline Editing</h3>
+                            <p data-editable="feature1-desc">
+                                Edit content directly on your live website. No switching between
+                                preview and edit modes. What you see is what you get.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <h3 data-editable="feature2-title">Lightning Fast</h3>
+                            <p data-editable="feature2-desc">
+                                Built on edge technology for instant updates worldwide. Changes
+                                appear in milliseconds, not minutes.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <h3 data-editable="feature3-title">Simple Integration</h3>
+                            <p data-editable="feature3-desc">
+                                Add one script tag to your website and you're ready to go. Works
+                                with any static site, CMS, or framework.
+                            </p>
+                        </div>
+                        <div class="feature-card">
+                            <h3 data-editable="feature4-title">Content Groups</h3>
+                            <p data-editable="feature4-desc">
+                                Organize content into logical groups like headers and footers.
+                                Edit once, update everywhere across your site.
+                            </p>
+                        </div>
+                    </div>
+                </div>
 
-            <div class="content-section">
-                <h2 data-editable="media-heading">Media Demo</h2>
-                <p data-editable="media-text">
-                    Click the image to select it, then use the "Change Image" button in the
-                    toolbar or double-click to open the media manager:
-                </p>
-                <div style="margin-top: 20px; text-align: center;">
-                    <img
-                        data-editable="hero-image"
-                        data-editable-type="image"
-                        src="https://placehold.co/400x300?text=Editable+Image"
-                        alt="Demo image"
-                        style="max-width: 100%; border-radius: 8px;"
-                    />
+                <div class="content-section">
+                    <h2 data-editable="media-heading">Media Management</h2>
+                    <p data-editable="media-text">
+                        Upload and manage images directly from the editor. Click the image below
+                        to see it in action:
+                    </p>
+                    <div class="media-demo">
+                        <img
+                            data-editable="demo-image"
+                            data-editable-type="image"
+                            src="https://placehold.co/500x300?text=Click+to+Edit"
+                            alt="Demo image"
+                        />
+                    </div>
                 </div>
             </div>
         </div>
 
-        <footer>
-            <p><span data-editable="copyright">&copy; 2025 Demo Site Inc.</span> | <a href="#" data-scms-signin>Sign In</a></p>
+        <!-- Shared Footer - uses data-group="footer" -->
+        <footer data-group="footer">
+            <div class="footer-inner">
+                <div class="footer-grid">
+                    <div class="footer-section">
+                        <h4 data-editable="footer-col1-title">Company</h4>
+                        <p data-editable="footer-col1-text">
+                            Streamlined CMS helps teams manage website content with ease.
+                            No complex dashboards, just click and edit.
+                        </p>
+                    </div>
+                    <div class="footer-section">
+                        <h4 data-editable="footer-col2-title">Resources</h4>
+                        <p data-editable="footer-col2-link1">Documentation</p>
+                        <p data-editable="footer-col2-link2">API Reference</p>
+                        <p data-editable="footer-col2-link3">Support Center</p>
+                    </div>
+                    <div class="footer-section">
+                        <h4 data-editable="footer-col3-title">Contact</h4>
+                        <p data-editable="footer-col3-email">hello@example.com</p>
+                        <p data-editable="footer-col3-phone">+1 (555) 123-4567</p>
+                    </div>
+                </div>
+                <div class="footer-bottom">
+                    <p>
+                        <span data-editable="copyright">&copy; 2025 Streamlined CMS</span>
+                        &nbsp;|&nbsp;
+                        <a href="#" data-scms-signin>Sign In</a>
+                    </p>
+                </div>
+            </div>
         </footer>
+
+        <!-- Simple tab switching script -->
+        <script>
+            document.querySelectorAll('.page-tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Update active tab
+                    document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+
+                    // Show corresponding page
+                    const pageId = tab.getAttribute('data-page');
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    document.getElementById('page-' + pageId).classList.add('active');
+                });
+            });
+        </script>
     </body>
 </html>

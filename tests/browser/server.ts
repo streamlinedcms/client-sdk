@@ -4,8 +4,6 @@ import { join, extname } from "path";
 import getPort from "get-port";
 
 interface ContentElement {
-    appId: string;
-    elementId: string;
     content: string;
     updatedAt: string;
 }
@@ -24,43 +22,82 @@ export class TestServer {
         // Preferred port is ignored - we always use getPort()
     }
 
+    /**
+     * Set content directly for testing (bypasses API)
+     * @param appId - The app ID
+     * @param elementId - The element ID (use "groupId:elementId" for grouped elements)
+     * @param content - The content string (can be JSON for typed content)
+     */
+    setContent(appId: string, elementId: string, content: string): void {
+        const key = `${appId}:${elementId}`;
+        this.contentStore.set(key, {
+            content,
+            updatedAt: new Date().toISOString(),
+        });
+    }
+
+    /**
+     * Clear all stored content
+     */
+    clearContent(): void {
+        this.contentStore.clear();
+    }
+
     private async handleApiRequest(
         req: IncomingMessage,
         res: ServerResponse,
         pathname: string,
     ): Promise<boolean> {
-        // Match: /apps/{appId}/content
+        // Handle CORS preflight for all API routes
+        if (req.method === "OPTIONS") {
+            res.writeHead(204, {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization",
+            });
+            res.end();
+            return true;
+        }
+
+        // Match: /apps/{appId}/content (GET all content)
         const contentListMatch = pathname.match(/^\/apps\/([^/]+)\/content$/);
         if (contentListMatch && req.method === "GET") {
             const appId = contentListMatch[1];
-            const elements = Array.from(this.contentStore.values()).filter(
-                (e) => e.appId === appId,
-            );
+            // Build key-value response format: { elements: {...}, groups: {...} }
+            const elements: Record<string, ContentElement> = {};
+            const groups: Record<string, { elements: Record<string, ContentElement> }> = {};
+
+            for (const [key, element] of this.contentStore.entries()) {
+                if (!key.startsWith(`${appId}:`)) continue;
+
+                const rest = key.slice(appId.length + 1); // Remove "appId:"
+                if (rest.includes(":")) {
+                    // Grouped: appId:groupId:elementId
+                    const [groupId, elementId] = rest.split(":");
+                    if (!groups[groupId]) {
+                        groups[groupId] = { elements: {} };
+                    }
+                    groups[groupId].elements[elementId] = element;
+                } else {
+                    // Ungrouped: appId:elementId
+                    elements[rest] = element;
+                }
+            }
+
             res.writeHead(200, {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*",
             });
-            res.end(JSON.stringify({ elements }));
+            res.end(JSON.stringify({ elements, groups }));
             return true;
         }
 
-        // Match: /apps/{appId}/content/{elementId}
-        const contentMatch = pathname.match(/^\/apps\/([^/]+)\/content\/([^/]+)$/);
-        if (contentMatch) {
-            const appId = contentMatch[1];
-            const elementId = contentMatch[2];
+        // Match: /apps/{appId}/content/elements/{elementId} (ungrouped)
+        const ungroupedMatch = pathname.match(/^\/apps\/([^/]+)\/content\/elements\/([^/]+)$/);
+        if (ungroupedMatch) {
+            const appId = ungroupedMatch[1];
+            const elementId = ungroupedMatch[2];
             const key = `${appId}:${elementId}`;
-
-            // Handle CORS preflight
-            if (req.method === "OPTIONS") {
-                res.writeHead(204, {
-                    "Access-Control-Allow-Origin": "*",
-                    "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
-                    "Access-Control-Allow-Headers": "Content-Type, Authorization",
-                });
-                res.end();
-                return true;
-            }
 
             // GET content
             if (req.method === "GET") {
@@ -70,7 +107,7 @@ export class TestServer {
                         "Content-Type": "application/json",
                         "Access-Control-Allow-Origin": "*",
                     });
-                    res.end(JSON.stringify(element));
+                    res.end(JSON.stringify({ elementId, ...element }));
                 } else {
                     res.writeHead(404, {
                         "Content-Type": "application/json",
@@ -86,17 +123,60 @@ export class TestServer {
                 const body = await this.readBody(req);
                 const data = JSON.parse(body);
                 const element: ContentElement = {
-                    appId,
-                    elementId,
                     content: data.content,
                     updatedAt: new Date().toISOString(),
                 };
                 this.contentStore.set(key, element);
-                res.writeHead(200, {
+                res.writeHead(201, {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*",
                 });
-                res.end(JSON.stringify(element));
+                res.end(JSON.stringify({ elementId, ...element }));
+                return true;
+            }
+        }
+
+        // Match: /apps/{appId}/content/groups/{groupId}/elements/{elementId} (grouped)
+        const groupedMatch = pathname.match(/^\/apps\/([^/]+)\/content\/groups\/([^/]+)\/elements\/([^/]+)$/);
+        if (groupedMatch) {
+            const appId = groupedMatch[1];
+            const groupId = groupedMatch[2];
+            const elementId = groupedMatch[3];
+            const key = `${appId}:${groupId}:${elementId}`;
+
+            // GET content
+            if (req.method === "GET") {
+                const element = this.contentStore.get(key);
+                if (element) {
+                    res.writeHead(200, {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    });
+                    res.end(JSON.stringify({ elementId, ...element }));
+                } else {
+                    res.writeHead(404, {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    });
+                    res.end(JSON.stringify({ error: "Not found" }));
+                }
+                return true;
+            }
+
+            // PUT content
+            if (req.method === "PUT") {
+                const body = await this.readBody(req);
+                const data = JSON.parse(body);
+                const element: ContentElement = {
+                    content: data.content,
+                    updatedAt: new Date().toISOString(),
+                };
+                this.contentStore.set(key, element);
+                res.writeHead(201, {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*",
+                });
+                res.end(JSON.stringify({ elementId, ...element }));
                 return true;
             }
         }

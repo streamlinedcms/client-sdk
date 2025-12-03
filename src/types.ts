@@ -45,14 +45,36 @@ export interface StreamlinedCMSConfig {
 }
 
 /**
- * Content element data structure
+ * Content element data structure (stored/response format)
+ * Note: appId, groupId, and elementId are derived from context/keys, not stored in the value
  */
 export interface ContentElement {
-    appId: string;
-    elementId: string;
     content: string;
     updatedAt: string;
     updatedBy?: string;
+}
+
+/**
+ * Content element with elementId (for individual element responses)
+ */
+export interface ContentElementResponse extends ContentElement {
+    elementId: string;
+}
+
+/**
+ * Grouped content response structure (key-value format)
+ */
+export interface ContentGroup {
+    elements: Record<string, ContentElement>;
+}
+
+/**
+ * All content response from API (key-value format)
+ * Elements are keyed by elementId, groups are keyed by groupId
+ */
+export interface AllContentResponse {
+    elements: Record<string, ContentElement>;
+    groups: Record<string, ContentGroup>;
 }
 
 /**
@@ -63,3 +85,35 @@ export interface SaveResponse {
     element?: ContentElement;
     error?: string;
 }
+
+/**
+ * Editable element types
+ */
+export type EditableType = 'text' | 'html' | 'image' | 'link';
+
+/**
+ * Content data structures (stored as JSON in content field)
+ */
+export interface TextContentData {
+    type: 'text';
+    value: string;
+}
+
+export interface HtmlContentData {
+    type: 'html';
+    value: string;
+}
+
+export interface ImageContentData {
+    type: 'image';
+    src: string;
+}
+
+export interface LinkContentData {
+    type: 'link';
+    href: string;
+    target: string;
+    text: string;
+}
+
+export type ContentData = TextContentData | HtmlContentData | ImageContentData | LinkContentData;

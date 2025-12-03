@@ -1,6 +1,11 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // Define build-time constants for tests (same as rollup.config.js)
+  define: {
+    __SDK_API_URL__: JSON.stringify('https://api.streamlinedcms.com'),
+    __SDK_APP_URL__: JSON.stringify('https://app.streamlinedcms.com'),
+  },
   test: {
     environment: 'jsdom',
     globals: true,

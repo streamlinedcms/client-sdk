@@ -27,6 +27,10 @@ export class HoldButton extends LitElement {
     static styles = [
         tailwindSheet,
         css`
+            button {
+                cursor: pointer;
+            }
+
             .progress-bg {
                 position: absolute;
                 top: 0;

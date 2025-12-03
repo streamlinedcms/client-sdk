@@ -3,3 +3,16 @@
 /* Tailwind v4 uses CSS-based configuration */
 /* Content paths are auto-detected from the source files */
 @source "../components/*.ts";
+
+/*
+ * Shadow DOM fix for Tailwind v4 CSS custom properties.
+ *
+ * Tailwind v4 uses @property declarations with `inherits: false` for variables
+ * like --tw-border-style, --tw-shadow, etc. These @property rules are registered
+ * at the document level and don't automatically apply inside Shadow DOM.
+ *
+ * The postcss-shadow-dom-fix.js plugin automatically extracts all @property
+ * declarations and generates a *, ::before, ::after rule with the initial values.
+ *
+ * Reference: https://github.com/tailwindlabs/tailwindcss/discussions/16772
+ */

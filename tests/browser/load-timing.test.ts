@@ -42,10 +42,12 @@ beforeAll(async () => {
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*",
             });
+            // Return new key-value format: { elements: {...}, groups: {...} }
             res.end(JSON.stringify({
-                elements: [
-                    { elementId: "test-content", content: "Loaded from API" }
-                ]
+                elements: {
+                    "test-content": { content: "Loaded from API", updatedAt: new Date().toISOString() }
+                },
+                groups: {}
             }));
             return;
         }

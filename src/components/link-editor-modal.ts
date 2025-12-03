@@ -1,24 +1,36 @@
 /**
- * HTML Editor Modal Component
+ * Link Editor Modal Component
  *
- * A modal dialog for editing raw HTML content of an element.
- * Provides a textarea for editing and Apply/Cancel buttons.
+ * A modal dialog for editing link properties (href, target, text).
+ * Provides form inputs and Apply/Cancel buttons.
  */
 
 import { LitElement, html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { tailwindSheet } from "./styles.js";
 
-@customElement("scms-html-editor-modal")
-export class HtmlEditorModal extends LitElement {
+export interface LinkData {
+    href: string;
+    target: string;
+    text: string;
+}
+
+@customElement("scms-link-editor-modal")
+export class LinkEditorModal extends LitElement {
     @property({ type: String, attribute: "element-id" })
     elementId: string | null = null;
 
-    @property({ type: String })
-    content = "";
+    @property({ type: Object })
+    linkData: LinkData = { href: "", target: "", text: "" };
 
     @state()
-    private editedContent = "";
+    private editedHref = "";
+
+    @state()
+    private editedTarget = "";
+
+    @state()
+    private editedText = "";
 
     static styles = [
         tailwindSheet,
@@ -47,18 +59,13 @@ export class HtmlEditorModal extends LitElement {
             .modal {
                 position: relative;
                 width: 90%;
-                max-width: 800px;
-                max-height: 80vh;
+                max-width: 500px;
                 display: flex;
                 flex-direction: column;
             }
 
-            textarea {
-                font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-                    "Liberation Mono", monospace;
-                font-size: 13px;
-                line-height: 1.5;
-                tab-size: 2;
+            input, select {
+                font-size: 14px;
             }
 
             button {
@@ -69,7 +76,9 @@ export class HtmlEditorModal extends LitElement {
 
     connectedCallback() {
         super.connectedCallback();
-        this.editedContent = this.content;
+        this.editedHref = this.linkData.href;
+        this.editedTarget = this.linkData.target;
+        this.editedText = this.linkData.text;
         // Prevent body scroll while modal is open
         document.body.style.overflow = "hidden";
     }
@@ -80,20 +89,38 @@ export class HtmlEditorModal extends LitElement {
     }
 
     updated(changedProperties: Map<string, unknown>) {
-        if (changedProperties.has("content")) {
-            this.editedContent = this.content;
+        if (changedProperties.has("linkData")) {
+            this.editedHref = this.linkData.href;
+            this.editedTarget = this.linkData.target;
+            this.editedText = this.linkData.text;
         }
     }
 
-    private handleInput(e: Event) {
-        const textarea = e.target as HTMLTextAreaElement;
-        this.editedContent = textarea.value;
+    private handleHrefInput(e: Event) {
+        const input = e.target as HTMLInputElement;
+        this.editedHref = input.value;
+    }
+
+    private handleTargetChange(e: Event) {
+        const select = e.target as HTMLSelectElement;
+        this.editedTarget = select.value;
+    }
+
+    private handleTextInput(e: Event) {
+        const input = e.target as HTMLInputElement;
+        this.editedText = input.value;
     }
 
     private handleApply() {
         this.dispatchEvent(
             new CustomEvent("apply", {
-                detail: { content: this.editedContent },
+                detail: {
+                    linkData: {
+                        href: this.editedHref,
+                        target: this.editedTarget,
+                        text: this.editedText,
+                    },
+                },
                 bubbles: true,
                 composed: true,
             })
@@ -116,7 +143,11 @@ export class HtmlEditorModal extends LitElement {
     }
 
     private hasChanges(): boolean {
-        return this.editedContent !== this.content;
+        return (
+            this.editedHref !== this.linkData.href ||
+            this.editedTarget !== this.linkData.target ||
+            this.editedText !== this.linkData.text
+        );
     }
 
     private handleBackdropClick(e: Event) {
@@ -144,7 +175,7 @@ export class HtmlEditorModal extends LitElement {
                 <!-- Header -->
                 <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-gray-900">Edit HTML</span>
+                        <span class="text-sm font-medium text-gray-900">Edit Link</span>
                         <span class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded">
                             ${this.elementId}
                         </span>
@@ -165,15 +196,51 @@ export class HtmlEditorModal extends LitElement {
                     </button>
                 </div>
 
-                <!-- Editor -->
-                <div class="flex-1 overflow-hidden">
-                    <textarea
-                        class="w-full h-64 p-4 border-0 resize-none focus:outline-none focus:ring-0"
-                        .value=${this.editedContent}
-                        @input=${this.handleInput}
-                        spellcheck="false"
-                        autofocus
-                    ></textarea>
+                <!-- Form -->
+                <div class="p-4 space-y-4">
+                    <!-- Link Text -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Link Text
+                        </label>
+                        <input
+                            type="text"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                            .value=${this.editedText}
+                            @input=${this.handleTextInput}
+                            placeholder="Click here"
+                        />
+                    </div>
+
+                    <!-- URL -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            URL
+                        </label>
+                        <input
+                            type="url"
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                            .value=${this.editedHref}
+                            @input=${this.handleHrefInput}
+                            placeholder="https://example.com"
+                            autofocus
+                        />
+                    </div>
+
+                    <!-- Target -->
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">
+                            Open In
+                        </label>
+                        <select
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white"
+                            .value=${this.editedTarget}
+                            @change=${this.handleTargetChange}
+                        >
+                            <option value="">Same window</option>
+                            <option value="_blank">New tab</option>
+                        </select>
+                    </div>
                 </div>
 
                 <!-- Footer -->
@@ -205,6 +272,6 @@ export class HtmlEditorModal extends LitElement {
 
 declare global {
     interface HTMLElementTagNameMap {
-        "scms-html-editor-modal": HtmlEditorModal;
+        "scms-link-editor-modal": LinkEditorModal;
     }
 }
