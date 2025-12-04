@@ -731,11 +731,12 @@ class EditorController {
         });
         this.templateAddButtons.clear();
 
-        // Remove all delete buttons and drag handles
+        // Remove all delete buttons and drag handles (query DOM directly to catch any stragglers)
         this.templates.forEach((templateInfo) => {
             const { container } = templateInfo;
             container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((instanceElement) => {
-                const deleteBtn = this.instanceDeleteButtons.get(instanceElement);
+                // Remove delete button - query DOM directly
+                const deleteBtn = instanceElement.querySelector(".scms-instance-delete");
                 if (deleteBtn) {
                     deleteBtn.remove();
                 }
@@ -746,6 +747,8 @@ class EditorController {
                 }
             });
         });
+        // Clear the WeakMap tracking
+        this.instanceDeleteButtons = new WeakMap();
 
         // Destroy all sortable instances
         this.sortableInstances.forEach((sortable) => {
@@ -832,6 +835,9 @@ class EditorController {
 
         document.body.appendChild(toolbar);
         this.toolbar = toolbar;
+
+        // Set initial hasChanges state (may be true if there are orphaned saved elements)
+        this.updateToolbarHasChanges();
 
         // Add body padding to prevent content overlap
         this.updateBodyPadding();
@@ -1088,17 +1094,31 @@ class EditorController {
                 info.element.dataset.scmsInputHandler = "true";
             }
 
+            // Add keydown listener for Tab navigation (all element types)
+            if (!info.element.dataset.scmsKeydownHandler) {
+                info.element.addEventListener("keydown", (e: KeyboardEvent) => {
+                    if (e.key === "Tab") {
+                        e.preventDefault();
+                        this.navigateToNextEditable(info.element, e.shiftKey);
+                    }
+                });
+                info.element.dataset.scmsKeydownHandler = "true";
+            }
+
             // Make text and html elements contenteditable (not images or links)
             // Only the primary element is focused, but all are editable for consistency
             if (elementType === "text" || elementType === "html") {
                 info.element.setAttribute("contenteditable", "true");
             }
+
+            // Make images and links focusable for keyboard navigation
+            if (elementType === "image" || elementType === "link") {
+                info.element.setAttribute("tabindex", "-1");
+            }
         }
 
-        // Focus the primary element
-        if (elementType === "text" || elementType === "html") {
-            primaryInfo.element.focus();
-        }
+        // Focus the primary element (all types need focus for keyboard navigation)
+        primaryInfo.element.focus();
 
         // Update toolbar
         if (this.toolbar) {
@@ -1108,6 +1128,36 @@ class EditorController {
 
         // Update template context on toolbar
         this.updateToolbarTemplateContext();
+    }
+
+    /**
+     * Navigate to the next or previous editable element from the current one.
+     * Uses DOM order to determine sequence. Includes all scms element types.
+     */
+    private navigateToNextEditable(currentElement: HTMLElement, reverse: boolean): void {
+        // Get all editable elements in DOM order (all scms types)
+        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const allEditables = Array.from(document.querySelectorAll<HTMLElement>(selector));
+
+        if (allEditables.length === 0) return;
+
+        const currentIndex = allEditables.indexOf(currentElement);
+        if (currentIndex === -1) return;
+
+        // Calculate next index with wrapping
+        let nextIndex: number;
+        if (reverse) {
+            nextIndex = currentIndex === 0 ? allEditables.length - 1 : currentIndex - 1;
+        } else {
+            nextIndex = currentIndex === allEditables.length - 1 ? 0 : currentIndex + 1;
+        }
+
+        const nextElement = allEditables[nextIndex];
+        const nextKey = this.elementToKey.get(nextElement);
+
+        if (nextKey) {
+            this.startEditing(nextKey, nextElement);
+        }
     }
 
     /**
@@ -1314,11 +1364,13 @@ class EditorController {
     }
 
     /**
-     * Get keys that are pending deletion (in originalContent but not in currentContent)
+     * Get keys that are pending deletion (saved on server but not in currentContent)
+     * Only includes keys that were actually saved to the API (in savedContentKeys),
+     * not elements that only existed in the hard-coded HTML.
      */
     private getPendingDeletes(): string[] {
         const deletes: string[] = [];
-        this.originalContent.forEach((_, key) => {
+        this.savedContentKeys.forEach((key) => {
             if (!this.currentContent.has(key)) {
                 deletes.push(key);
             }
