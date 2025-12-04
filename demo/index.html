@@ -3,7 +3,7 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Streamlined CMS - Demo</title>
+        <title>Streamlined CMS - Feature Demo</title>
 
         <!-- Load the SDK - just one script tag, no FOUC -->
         <script
@@ -119,21 +119,21 @@
             }
 
             .page-tab {
-                padding: 15px 20px;
+                padding: 15px 16px;
                 border: none;
                 background: none;
                 cursor: pointer;
-                font-size: 1em;
+                font-size: 0.95em;
                 color: #666;
                 border-bottom: 3px solid transparent;
-                transition: all 0.2s;
+                transition: color 0.15s, border-color 0.15s, background-color 0.15s;
                 white-space: nowrap;
             }
 
-            @media (max-width: 480px) {
+            @media (max-width: 640px) {
                 .page-tab {
-                    padding: 12px 15px;
-                    font-size: 0.9em;
+                    padding: 10px 12px;
+                    font-size: 0.85em;
                 }
             }
 
@@ -156,26 +156,6 @@
                 display: block;
             }
 
-            .hero {
-                background: white;
-                padding: 60px 40px;
-                border-radius: 8px;
-                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-                margin-bottom: 30px;
-                text-align: center;
-            }
-
-            .hero h1 {
-                font-size: 2.5em;
-                margin-bottom: 15px;
-                color: #1a1a1a;
-            }
-
-            .hero .tagline {
-                font-size: 1.3em;
-                color: #666;
-            }
-
             .content-section {
                 background: white;
                 padding: 40px;
@@ -187,18 +167,6 @@
             @media (max-width: 480px) {
                 .container {
                     padding: 15px;
-                }
-
-                .hero {
-                    padding: 30px 20px;
-                }
-
-                .hero h1 {
-                    font-size: 1.8em;
-                }
-
-                .hero .tagline {
-                    font-size: 1.1em;
                 }
 
                 .content-section {
@@ -224,30 +192,6 @@
 
             p {
                 margin-bottom: 15px;
-            }
-
-            .features {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(min(250px, 100%), 1fr));
-                gap: 20px;
-                margin-top: 20px;
-            }
-
-            .feature-card {
-                background: #f9fafb;
-                padding: 25px;
-                border-radius: 6px;
-                border: 1px solid #e5e7eb;
-            }
-
-            .feature-card h3 {
-                color: #3b82f6;
-            }
-
-            @media (max-width: 480px) {
-                .feature-card {
-                    padding: 20px;
-                }
             }
 
             .info-box {
@@ -280,6 +224,16 @@
                 word-break: break-word;
             }
 
+            .info-box ul {
+                color: #1e40af;
+                margin: 10px 0;
+                padding-left: 20px;
+            }
+
+            .info-box li {
+                margin-bottom: 4px;
+            }
+
             @media (max-width: 480px) {
                 .info-box {
                     padding: 15px;
@@ -290,7 +244,24 @@
                 }
             }
 
-            /* Team grid */
+            /* Demo sections */
+            .demo-area {
+                background: #f9fafb;
+                border: 2px dashed #e5e7eb;
+                border-radius: 8px;
+                padding: 30px;
+                margin-top: 20px;
+            }
+
+            .demo-area h3 {
+                color: #6b7280;
+                font-size: 0.9em;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                margin-bottom: 15px;
+            }
+
+            /* Team grid for templates demo */
             .team-grid {
                 display: grid;
                 grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr));
@@ -301,8 +272,9 @@
             .team-member {
                 text-align: center;
                 padding: 20px;
-                background: #f9fafb;
+                background: white;
                 border-radius: 8px;
+                border: 1px solid #e5e7eb;
             }
 
             .team-member img {
@@ -320,6 +292,39 @@
             .team-member .role {
                 color: #666;
                 font-size: 0.9em;
+            }
+
+            /* Link demo styles */
+            .link-demo {
+                display: flex;
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .link-demo a {
+                color: #3b82f6;
+                text-decoration: none;
+                padding: 10px 15px;
+                background: white;
+                border-radius: 6px;
+                border: 1px solid #e5e7eb;
+                transition: background-color 0.2s, border-color 0.2s;
+            }
+
+            .link-demo a:hover {
+                background: #eff6ff;
+                border-color: #3b82f6;
+            }
+
+            /* Image demo */
+            .image-demo {
+                text-align: center;
+            }
+
+            .image-demo img {
+                max-width: 100%;
+                border-radius: 8px;
+                margin-top: 15px;
             }
 
             /* Footer styles */
@@ -370,15 +375,34 @@
                 text-decoration: underline;
             }
 
-            /* Media demo */
-            .media-demo {
-                text-align: center;
-                margin-top: 20px;
+            /* Attributes demo */
+            .attributes-demo {
+                display: grid;
+                gap: 20px;
             }
 
-            .media-demo img {
-                max-width: 100%;
-                border-radius: 8px;
+            .attribute-example {
+                background: white;
+                padding: 20px;
+                border-radius: 6px;
+                border: 1px solid #e5e7eb;
+            }
+
+            .attribute-example h4 {
+                color: #3b82f6;
+                margin-bottom: 10px;
+                font-size: 1em;
+            }
+
+            .attribute-example p {
+                margin-bottom: 10px;
+                color: #666;
+                font-size: 0.9em;
+            }
+
+            .attribute-example img {
+                max-width: 200px;
+                border-radius: 4px;
             }
         </style>
     </head>
@@ -388,169 +412,273 @@
             <div class="header-inner">
                 <div class="logo" data-scms-text="logo">StreamlinedCMS</div>
                 <nav class="nav-links">
-                    <a href="https://example.com/products" data-scms-link="nav-link-1">Products</a>
+                    <a href="https://example.com/docs" data-scms-link="nav-link-1">Docs</a>
                     <a href="https://example.com/pricing" data-scms-link="nav-link-2">Pricing</a>
-                    <a href="https://example.com/contact" data-scms-link="nav-link-3">Contact</a>
+                    <a href="https://example.com/support" data-scms-link="nav-link-3">Support</a>
                 </nav>
             </div>
         </header>
 
-        <!-- Page tabs for demo navigation -->
+        <!-- Feature tabs -->
         <div class="page-tabs">
             <div class="page-tabs-inner">
-                <button class="page-tab active" data-page="home">Home</button>
-                <button class="page-tab" data-page="about">About</button>
-                <button class="page-tab" data-page="features">Features</button>
+                <button class="page-tab active" data-page="text">Text</button>
+                <button class="page-tab" data-page="images">Images</button>
+                <button class="page-tab" data-page="links">Links</button>
+                <button class="page-tab" data-page="html">HTML</button>
+                <button class="page-tab" data-page="groups">Groups</button>
+                <button class="page-tab" data-page="templates">Templates</button>
+                <button class="page-tab" data-page="attributes">Attributes</button>
             </div>
         </div>
 
         <div class="container">
-            <div class="info-box">
-                <h3>Content Groups &amp; Link Editing Demo</h3>
-                <p>
-                    This demo shows <strong>content groups</strong> and <strong>link editing</strong> in action.
-                    The header and footer are shared across all pages using <code>data-scms-group</code>.
-                </p>
-                <p>
-                    <strong>Links:</strong> The nav links use <code>data-scms-link</code>.
-                    Click to select, then use "Edit Link" to change URL/target, or double-click to navigate.
-                </p>
-                <p>
-                    <a href="#" data-scms-signin>Sign In</a> to enable editing mode.
-                </p>
-            </div>
-
-            <!-- HOME PAGE -->
-            <div class="page active" id="page-home" data-scms-group="home">
-                <div class="hero">
-                    <h1 data-scms-text="hero-title">Welcome to Streamlined CMS</h1>
-                    <p class="tagline" data-scms-text="hero-tagline">
-                        Edit your website content inline, right where you see it.
+            <!-- TEXT PAGE -->
+            <div class="page active" id="page-text">
+                <div class="info-box">
+                    <h3>Text Editing</h3>
+                    <p>
+                        Use <code>data-scms-text="element-id"</code> for simple text content.
+                        Click any text element to edit it inline. Perfect for headings, paragraphs, and labels.
+                    </p>
+                    <p>
+                        <a href="#" data-scms-signin>Sign in</a> to enable editing mode, then click any outlined element below.
                     </p>
                 </div>
 
                 <div class="content-section">
-                    <h2 data-scms-text="intro-heading">Simple, Fast, Powerful</h2>
-                    <p data-scms-text="intro-text">
-                        Streamlined CMS makes website editing as simple as clicking and typing. No
-                        complex dashboards, no confusing admin panels. Just click on any text, edit it,
-                        and save. Your changes go live instantly.
-                    </p>
-                </div>
-
-                <div class="content-section">
-                    <h2 data-scms-text="cta-heading">Ready to Get Started?</h2>
-                    <p data-scms-text="cta-text">
-                        Try editing any text on this page to see how easy it is. Sign in with your
-                        account to enable editing mode. Changes you make are saved to the cloud and
-                        appear for all visitors.
-                    </p>
+                    <div class="demo-area">
+                        <h3>Editable Text Examples</h3>
+                        <h2 data-scms-text="text-demo-heading">This Heading is Editable</h2>
+                        <p data-scms-text="text-demo-paragraph">
+                            This paragraph can be edited by clicking on it. The text you enter will be
+                            saved and displayed to all visitors. Try changing this text to see how
+                            simple inline editing works.
+                        </p>
+                        <p data-scms-text="text-demo-paragraph-2">
+                            Here's another paragraph you can edit. Each element has a unique ID so
+                            changes are tracked independently.
+                        </p>
+                    </div>
                 </div>
             </div>
 
-            <!-- ABOUT PAGE -->
-            <div class="page" id="page-about" data-scms-group="about">
-                <div class="content-section">
-                    <h2 data-scms-text="about-heading">About Our Company</h2>
-                    <p data-scms-text="about-text-1">
-                        We believe content management should be simple. That's why we built
-                        Streamlined CMS - a tool that lets you edit your website content directly
-                        on the page, without complex admin interfaces.
+            <!-- HTML PAGE -->
+            <div class="page" id="page-html">
+                <div class="info-box">
+                    <h3>HTML Editing</h3>
+                    <p>
+                        Use <code>data-scms-html="element-id"</code> for rich HTML content.
+                        When selected, use the "Edit HTML" button in the toolbar to open a code editor.
                     </p>
-                    <p data-scms-text="about-text-2">
-                        Founded in 2025, our mission is to make website editing accessible to
-                        everyone, from small business owners to enterprise teams.
+                    <p>
+                        This is useful for content that needs formatting like bold, italic, lists, or embedded elements.
+                    </p>
+                </div>
+
+                <div class="content-section">
+                    <div class="demo-area">
+                        <h3>Editable HTML Example</h3>
+                        <div data-scms-html="html-demo-content">
+                            <p>This content supports <strong>bold</strong>, <em>italic</em>, and other HTML formatting.</p>
+                            <ul>
+                                <li>List item one</li>
+                                <li>List item two</li>
+                                <li>List item three</li>
+                            </ul>
+                            <p>Select this element and click <strong>Edit HTML</strong> in the toolbar to modify the source.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- IMAGES PAGE -->
+            <div class="page" id="page-images">
+                <div class="info-box">
+                    <h3>Image Editing</h3>
+                    <p>
+                        Use <code>data-scms-image="element-id"</code> on <code>&lt;img&gt;</code> tags.
+                        Click to select, then use "Change Image" or double-click to open the media manager.
+                    </p>
+                    <p>
+                        Images are uploaded to cloud storage and served via CDN for fast loading.
+                    </p>
+                </div>
+
+                <div class="content-section">
+                    <div class="demo-area image-demo">
+                        <h3>Editable Image</h3>
+                        <p>Click the image below to select it, then change it via the toolbar.</p>
+                        <img
+                            data-scms-image="image-demo-hero"
+                            src="https://placehold.co/600x300/3b82f6/white?text=Click+to+Change"
+                            alt="Demo hero image"
+                        />
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="demo-area image-demo">
+                        <h3>Another Editable Image</h3>
+                        <img
+                            data-scms-image="image-demo-secondary"
+                            src="https://placehold.co/400x200/10b981/white?text=Secondary+Image"
+                            alt="Demo secondary image"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            <!-- LINKS PAGE -->
+            <div class="page" id="page-links">
+                <div class="info-box">
+                    <h3>Link Editing</h3>
+                    <p>
+                        Use <code>data-scms-link="element-id"</code> on <code>&lt;a&gt;</code> tags.
+                        Click to select, then use "Edit Link" to change the URL, text, and target.
+                    </p>
+                    <p>
+                        Double-click a link to navigate to it (useful for testing).
+                    </p>
+                </div>
+
+                <div class="content-section">
+                    <div class="demo-area">
+                        <h3>Editable Links</h3>
+                        <div class="link-demo">
+                            <a href="https://example.com/getting-started" data-scms-link="link-demo-1">
+                                Getting Started Guide
+                            </a>
+                            <a href="https://example.com/api-docs" data-scms-link="link-demo-2">
+                                API Documentation
+                            </a>
+                            <a href="https://example.com/tutorials" data-scms-link="link-demo-3" target="_blank">
+                                Video Tutorials (opens in new tab)
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- GROUPS PAGE -->
+            <div class="page" id="page-groups">
+                <div class="info-box">
+                    <h3>Content Groups</h3>
+                    <p>
+                        Use <code>data-scms-group="group-id"</code> on a container to group related content.
+                        Elements in a group share their content across all pages that use the same group.
+                    </p>
+                    <p>
+                        Perfect for headers, footers, and sidebars that appear on multiple pages.
+                    </p>
+                    <ul>
+                        <li>The <strong>header</strong> above uses <code>data-scms-group="header"</code></li>
+                        <li>The <strong>footer</strong> below uses <code>data-scms-group="footer"</code></li>
+                        <li>Edit them on any page and changes appear everywhere</li>
+                    </ul>
+                </div>
+
+                <div class="content-section">
+                    <h2>How Groups Work</h2>
+                    <p>
+                        Without groups, each page would have its own copy of the header and footer content.
+                        With groups, they share a single source of truth.
+                    </p>
+                    <p>
+                        Try editing the logo or navigation links in the header - the changes will
+                        persist as you switch between tabs because the header is grouped.
+                    </p>
+
+                    <div class="demo-area">
+                        <h3>Page-Specific Content (Not Grouped)</h3>
+                        <p data-scms-text="groups-page-content">
+                            This paragraph is NOT in a group. It only exists on this page.
+                            Each page can have its own unique content alongside shared group content.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TEMPLATES PAGE -->
+            <div class="page" id="page-templates">
+                <div class="info-box">
+                    <h3>Repeating Templates</h3>
+                    <p>
+                        Use <code>data-scms-template="template-id"</code> on a container to make its
+                        first child a repeatable template. Authors can add and remove instances.
+                    </p>
+                    <p>
+                        Perfect for team members, testimonials, product cards, FAQ items, and more.
                     </p>
                 </div>
 
                 <div class="content-section">
                     <h2 data-scms-text="team-heading">Our Team</h2>
                     <p data-scms-text="team-intro">
-                        Meet the people behind Streamlined CMS.
+                        Meet the people behind the product. In author mode, hover over a team member
+                        to see the delete button, or use the "Add item" button to add more.
                     </p>
-                    <div class="team-grid">
+
+                    <div class="team-grid" data-scms-template="team-member">
                         <div class="team-member">
                             <img
-                                data-scms-image="team-photo-1"
-                                src="https://placehold.co/120x120?text=CEO"
-                                alt="Team member"
+                                data-scms-image="photo"
+                                src="https://placehold.co/120x120/6366f1/white?text=AJ"
+                                alt="Team member photo"
                             />
-                            <h4 data-scms-text="team-name-1">Alex Chen</h4>
-                            <p class="role" data-scms-text="team-role-1">CEO & Founder</p>
-                        </div>
-                        <div class="team-member">
-                            <img
-                                data-scms-image="team-photo-2"
-                                src="https://placehold.co/120x120?text=CTO"
-                                alt="Team member"
-                            />
-                            <h4 data-scms-text="team-name-2">Sam Rivera</h4>
-                            <p class="role" data-scms-text="team-role-2">CTO</p>
-                        </div>
-                        <div class="team-member">
-                            <img
-                                data-scms-image="team-photo-3"
-                                src="https://placehold.co/120x120?text=Design"
-                                alt="Team member"
-                            />
-                            <h4 data-scms-text="team-name-3">Jordan Lee</h4>
-                            <p class="role" data-scms-text="team-role-3">Head of Design</p>
+                            <h4 data-scms-text="name">Alex Johnson</h4>
+                            <p class="role" data-scms-text="role">Founder & CEO</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- FEATURES PAGE -->
-            <div class="page" id="page-features" data-scms-group="features">
-                <div class="content-section">
-                    <h2 data-scms-text="features-heading">Platform Features</h2>
-                    <p data-scms-text="features-intro">
-                        Everything you need to manage your website content effectively.
+            <!-- ATTRIBUTES PAGE -->
+            <div class="page" id="page-attributes">
+                <div class="info-box">
+                    <h3>Element Attributes</h3>
+                    <p>
+                        Beyond content, you can edit SEO, accessibility, and custom attributes on any element.
+                        Select an element and use the toolbar's "More" menu to access:
                     </p>
-                    <div class="features">
-                        <div class="feature-card">
-                            <h3 data-scms-text="feature1-title">Inline Editing</h3>
-                            <p data-scms-text="feature1-desc">
-                                Edit content directly on your live website. No switching between
-                                preview and edit modes. What you see is what you get.
-                            </p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 data-scms-text="feature2-title">Lightning Fast</h3>
-                            <p data-scms-text="feature2-desc">
-                                Built on edge technology for instant updates worldwide. Changes
-                                appear in milliseconds, not minutes.
-                            </p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 data-scms-text="feature3-title">Simple Integration</h3>
-                            <p data-scms-text="feature3-desc">
-                                Add one script tag to your website and you're ready to go. Works
-                                with any static site, CMS, or framework.
-                            </p>
-                        </div>
-                        <div class="feature-card">
-                            <h3 data-scms-text="feature4-title">Content Groups</h3>
-                            <p data-scms-text="feature4-desc">
-                                Organize content into logical groups like headers and footers.
-                                Edit once, update everywhere across your site.
-                            </p>
-                        </div>
-                    </div>
+                    <ul>
+                        <li><strong>SEO:</strong> alt text, title, rel attributes</li>
+                        <li><strong>Accessibility:</strong> aria-label, aria-describedby, role, tabindex</li>
+                        <li><strong>Custom:</strong> data-* attributes, classes, and more</li>
+                    </ul>
                 </div>
 
                 <div class="content-section">
-                    <h2 data-scms-text="media-heading">Media Management</h2>
-                    <p data-scms-text="media-text">
-                        Upload and manage images directly from the editor. Click the image below
-                        to see it in action:
-                    </p>
-                    <div class="media-demo">
-                        <img
-                            data-scms-image="demo-image"
-                            src="https://placehold.co/500x300?text=Click+to+Edit"
-                            alt="Demo image"
-                        />
+                    <h2>Attribute Editing Examples</h2>
+
+                    <div class="attributes-demo">
+                        <div class="attribute-example">
+                            <h4>Image with SEO Attributes</h4>
+                            <p>Select this image and open SEO settings to edit alt text and title.</p>
+                            <img
+                                data-scms-image="attr-demo-image"
+                                src="https://placehold.co/200x150/f59e0b/white?text=Product"
+                                alt="Product screenshot"
+                                title="Our flagship product"
+                            />
+                        </div>
+
+                        <div class="attribute-example">
+                            <h4>Link with Accessibility</h4>
+                            <p>Select this link and open accessibility settings to add aria-label.</p>
+                            <a href="https://example.com/help" data-scms-link="attr-demo-link">
+                                Need help?
+                            </a>
+                        </div>
+
+                        <div class="attribute-example">
+                            <h4>Text with Custom Attributes</h4>
+                            <p>Select this text and open custom attributes to add data-* attributes.</p>
+                            <p data-scms-text="attr-demo-text">
+                                This text element can have custom attributes added for analytics,
+                                A/B testing, or integration with other tools.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -561,27 +689,27 @@
             <div class="footer-inner">
                 <div class="footer-grid">
                     <div class="footer-section">
-                        <h4 data-scms-text="footer-col1-title">Company</h4>
+                        <h4 data-scms-text="footer-col1-title">StreamlinedCMS</h4>
                         <p data-scms-text="footer-col1-text">
-                            Streamlined CMS helps teams manage website content with ease.
-                            No complex dashboards, just click and edit.
+                            Edit your website content inline, right where you see it.
+                            No complex dashboards required.
                         </p>
                     </div>
                     <div class="footer-section">
                         <h4 data-scms-text="footer-col2-title">Resources</h4>
                         <p data-scms-text="footer-col2-link1">Documentation</p>
                         <p data-scms-text="footer-col2-link2">API Reference</p>
-                        <p data-scms-text="footer-col2-link3">Support Center</p>
+                        <p data-scms-text="footer-col2-link3">Support</p>
                     </div>
                     <div class="footer-section">
                         <h4 data-scms-text="footer-col3-title">Contact</h4>
-                        <p data-scms-text="footer-col3-email">hello@example.com</p>
+                        <p data-scms-text="footer-col3-email">hello@streamlinedcms.com</p>
                         <p data-scms-text="footer-col3-phone">+1 (555) 123-4567</p>
                     </div>
                 </div>
                 <div class="footer-bottom">
                     <p>
-                        <span data-scms-html="copyright">&copy; 2025 Streamlined CMS</span>
+                        <span data-scms-html="copyright">&copy; 2025 StreamlinedCMS</span>
                         &nbsp;|&nbsp;
                         <a href="#" data-scms-signin>Sign In</a>
                     </p>
@@ -589,20 +717,58 @@
             </div>
         </footer>
 
-        <!-- Simple tab switching script -->
+        <!-- Tab switching with URL hash support -->
         <script>
-            document.querySelectorAll('.page-tab').forEach(tab => {
-                tab.addEventListener('click', () => {
-                    // Update active tab
-                    document.querySelectorAll('.page-tab').forEach(t => t.classList.remove('active'));
-                    tab.classList.add('active');
+            (function() {
+                const tabs = document.querySelectorAll('.page-tab');
+                const pages = document.querySelectorAll('.page');
+                let currentPage = null;
 
-                    // Show corresponding page
-                    const pageId = tab.getAttribute('data-page');
-                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-                    document.getElementById('page-' + pageId).classList.add('active');
+                function showPage(pageId, updateHash) {
+                    // Prevent redundant updates
+                    if (pageId === currentPage) return;
+                    currentPage = pageId;
+
+                    // Update tabs
+                    tabs.forEach(tab => {
+                        tab.classList.toggle('active', tab.getAttribute('data-page') === pageId);
+                    });
+
+                    // Update pages
+                    pages.forEach(page => {
+                        page.classList.toggle('active', page.id === 'page-' + pageId);
+                    });
+
+                    // Update URL hash if requested
+                    if (updateHash) {
+                        history.replaceState(null, '', '#' + pageId);
+                    }
+                }
+
+                function getPageFromHash() {
+                    const hash = window.location.hash.slice(1);
+                    // Validate that this is a real page
+                    const validPages = Array.from(tabs).map(t => t.getAttribute('data-page'));
+                    return validPages.includes(hash) ? hash : 'text';
+                }
+
+                // Handle tab clicks
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        const pageId = tab.getAttribute('data-page');
+                        showPage(pageId, true);
+                    });
                 });
-            });
+
+                // Handle browser back/forward
+                window.addEventListener('hashchange', () => {
+                    showPage(getPageFromHash(), false);
+                });
+
+                // Set initial page from URL hash
+                const initialPage = getPageFromHash();
+                showPage(initialPage, window.location.hash === '');
+            })();
         </script>
     </body>
 </html>

@@ -5,12 +5,10 @@
  * - Login popup for user authentication
  * - Media manager popup for file selection
  *
- * Uses penpal for secure cross-origin messaging.
+ * Uses PopupConnection for safe penpal lifecycle management.
  */
 
-import { WindowMessenger, connect } from "penpal";
-
-const POPUP_CHECK_INTERVAL = 500;
+import { PopupConnection } from "./popup-connection.js";
 
 export interface PopupConfig {
     appId: string;
@@ -34,10 +32,29 @@ export interface MediaFile {
 }
 
 export class PopupManager {
-    private config: PopupConfig;
+    private loginConnection: PopupConnection<string>;
+    private mediaConnection: PopupConnection<MediaFile>;
 
     constructor(config: PopupConfig) {
-        this.config = config;
+        const origin = new URL(config.appUrl).origin;
+
+        this.loginConnection = new PopupConnection<string>({
+            url: `${config.appUrl}/login?appId=${encodeURIComponent(config.appId)}`,
+            name: "scms-login",
+            width: 500,
+            height: 600,
+            allowedOrigins: [origin],
+            timeout: 300000, // 5 minutes for user to complete login
+        });
+
+        this.mediaConnection = new PopupConnection<MediaFile>({
+            url: `${config.appUrl}/media?appId=${encodeURIComponent(config.appId)}`,
+            name: "scms-media",
+            width: 800,
+            height: 600,
+            allowedOrigins: [origin],
+            timeout: 600000, // 10 minutes for user to select media
+        });
     }
 
     /**
@@ -45,53 +62,8 @@ export class PopupManager {
      * Returns API key on success, null if user closes popup
      */
     async openLoginPopup(): Promise<string | null> {
-        return new Promise((resolve) => {
-            const width = 500;
-            const height = 600;
-            const left = window.screenX + (window.outerWidth - width) / 2;
-            const top = window.screenY + (window.outerHeight - height) / 2;
-
-            const popup = window.open(
-                `${this.config.appUrl}/login?appId=${encodeURIComponent(this.config.appId)}`,
-                "scms-login",
-                `width=${width},height=${height},left=${left},top=${top},popup=yes`,
-            );
-
-            if (!popup) {
-                resolve(null);
-                return;
-            }
-
-            // Set up penpal to receive auth result from popup
-            const messenger = new WindowMessenger({
-                remoteWindow: popup,
-                allowedOrigins: [new URL(this.config.appUrl).origin],
-            });
-
-            const connection = connect<Record<string, never>>({
-                messenger,
-                methods: {
-                    // Method the popup calls to send auth result
-                    receiveAuthResult: (result: { key: string }) => {
-                        cleanup();
-                        resolve(result.key);
-                    },
-                },
-                timeout: 300000, // 5 minutes for user to complete login
-            });
-
-            // Poll for popup close (user cancelled)
-            const checkClosed = setInterval(() => {
-                if (popup.closed) {
-                    cleanup();
-                    resolve(null);
-                }
-            }, POPUP_CHECK_INTERVAL);
-
-            const cleanup = () => {
-                clearInterval(checkClosed);
-                connection.destroy();
-            };
+        return this.loginConnection.open({
+            receiveAuthResult: (result: { key: string }) => result.key,
         });
     }
 
@@ -100,60 +72,9 @@ export class PopupManager {
      * Returns selected file on success, null if user closes popup or cancels
      */
     async openMediaManager(): Promise<MediaFile | null> {
-        return new Promise((resolve) => {
-            const width = 800;
-            const height = 600;
-            const left = window.screenX + (window.outerWidth - width) / 2;
-            const top = window.screenY + (window.outerHeight - height) / 2;
-
-            const popup = window.open(
-                `${this.config.appUrl}/media?appId=${encodeURIComponent(this.config.appId)}`,
-                "scms-media",
-                `width=${width},height=${height},left=${left},top=${top},popup=yes`,
-            );
-
-            if (!popup) {
-                resolve(null);
-                return;
-            }
-
-            // Set up penpal to receive selection from popup
-            const messenger = new WindowMessenger({
-                remoteWindow: popup,
-                allowedOrigins: [new URL(this.config.appUrl).origin],
-            });
-
-            const connection = connect<Record<string, never>>({
-                messenger,
-                methods: {
-                    // Method the popup calls to send selected file
-                    receiveMediaSelection: (result: { file: MediaFile }) => {
-                        resolve(result.file);
-                        // Delay cleanup to allow method to return to popup
-                        setTimeout(cleanup, 0);
-                    },
-                    // Method the popup calls when user cancels
-                    receiveMediaCancel: () => {
-                        resolve(null);
-                        // Delay cleanup to allow method to return to popup
-                        setTimeout(cleanup, 0);
-                    },
-                },
-                timeout: 600000, // 10 minutes for user to select media
-            });
-
-            // Poll for popup close (user closed window)
-            const checkClosed = setInterval(() => {
-                if (popup.closed) {
-                    cleanup();
-                    resolve(null);
-                }
-            }, POPUP_CHECK_INTERVAL);
-
-            const cleanup = () => {
-                clearInterval(checkClosed);
-                connection.destroy();
-            };
+        return this.mediaConnection.open({
+            receiveMediaSelection: (result: { file: MediaFile }) => result.file,
+            receiveMediaCancel: () => null,
         });
     }
 }
