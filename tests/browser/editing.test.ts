@@ -640,3 +640,264 @@ test("cannot delete last instance", async () => {
         expect(await teamMembers.count()).toBe(1);
     }
 });
+
+// Toolbar template controls tests
+
+test("toolbar shows template controls when editing element inside template", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // Click on a template element
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+    const firstName = teamMembers.nth(0).locator('[data-scms-text="name"]');
+    await firstName.click();
+
+    // Template controls should be visible in toolbar
+    const moveUpButton = page.locator("scms-toolbar").locator("button[title='Move up']");
+    const moveDownButton = page.locator("scms-toolbar").locator("button[title='Move down']");
+    const addButton = page.locator("scms-toolbar").locator("button[title='Add item']");
+    const deleteButton = page.locator("scms-toolbar").locator("button[title='Delete item']");
+
+    expect(await moveUpButton.isVisible()).toBe(true);
+    expect(await moveDownButton.isVisible()).toBe(true);
+    expect(await addButton.isVisible()).toBe(true);
+    expect(await deleteButton.isVisible()).toBe(true);
+});
+
+test("toolbar template controls are hidden when editing non-template element", async () => {
+    server.clearContent();
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // Click on a non-template element (test-title is not in a template)
+    const testTitle = page.locator('[data-scms-html="test-title"]');
+    await testTitle.click();
+
+    // Template controls should NOT be visible in toolbar
+    const moveUpButton = page.locator("scms-toolbar").locator("button[title='Move up']");
+    expect(await moveUpButton.count()).toBe(0);
+});
+
+test("toolbar move up button reorders instance", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+
+    // Verify initial order
+    expect(await teamMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+    expect(await teamMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
+    expect(await teamMembers.nth(2).locator('[data-scms-text="name"]').textContent()).toBe("Carol");
+
+    // Click on second instance to select it
+    const secondName = teamMembers.nth(1).locator('[data-scms-text="name"]');
+    await secondName.click();
+
+    // Click move up button in toolbar
+    const moveUpButton = page.locator("scms-toolbar").locator("button[title='Move up']");
+    await moveUpButton.click();
+
+    // Order should now be Bob, Alice, Carol
+    expect(await teamMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
+    expect(await teamMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+    expect(await teamMembers.nth(2).locator('[data-scms-text="name"]').textContent()).toBe("Carol");
+});
+
+test("toolbar move down button reorders instance", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+
+    // Click on first instance to select it
+    const firstName = teamMembers.nth(0).locator('[data-scms-text="name"]');
+    await firstName.click();
+
+    // Click move down button in toolbar
+    const moveDownButton = page.locator("scms-toolbar").locator("button[title='Move down']");
+    await moveDownButton.click();
+
+    // Order should now be Bob, Alice, Carol
+    expect(await teamMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
+    expect(await teamMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+    expect(await teamMembers.nth(2).locator('[data-scms-text="name"]').textContent()).toBe("Carol");
+});
+
+test("toolbar move up button is disabled for first instance", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // Click on first instance
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+    const firstName = teamMembers.nth(0).locator('[data-scms-text="name"]');
+    await firstName.click();
+
+    // Move up button should be disabled
+    const moveUpButton = page.locator("scms-toolbar").locator("button[title='Move up']");
+    const isDisabled = await moveUpButton.isDisabled();
+    expect(isDisabled).toBe(true);
+});
+
+test("toolbar move down button is disabled for last instance", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // Click on last instance
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+    const lastName = teamMembers.nth(1).locator('[data-scms-text="name"]');
+    await lastName.click();
+
+    // Move down button should be disabled
+    const moveDownButton = page.locator("scms-toolbar").locator("button[title='Move down']");
+    const isDisabled = await moveDownButton.isDisabled();
+    expect(isDisabled).toBe(true);
+});
+
+test("toolbar add button creates new instance", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamContainer = page.locator('[data-scms-template="team"]');
+    let teamMembers = teamContainer.locator(".team-member");
+
+    // Initially 1 instance
+    expect(await teamMembers.count()).toBe(1);
+
+    // Click on the instance to select it
+    const firstName = teamMembers.nth(0).locator('[data-scms-text="name"]');
+    await firstName.click();
+
+    // Click add button in toolbar
+    const addButton = page.locator("scms-toolbar").locator("button[title='Add item']");
+    await addButton.click();
+
+    // Now should have 2 instances
+    teamMembers = teamContainer.locator(".team-member");
+    expect(await teamMembers.count()).toBe(2);
+});
+
+test("toolbar delete button removes current instance", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamContainer = page.locator('[data-scms-template="team"]');
+    let teamMembers = teamContainer.locator(".team-member");
+
+    // Initially 2 instances
+    expect(await teamMembers.count()).toBe(2);
+
+    // Click on second instance to select it
+    const secondName = teamMembers.nth(1).locator('[data-scms-text="name"]');
+    await secondName.click();
+
+    // Click delete button in toolbar
+    const deleteButton = page.locator("scms-toolbar").locator("button[title='Delete item']");
+    await deleteButton.click();
+
+    // Now should have 1 instance
+    teamMembers = teamContainer.locator(".team-member");
+    expect(await teamMembers.count()).toBe(1);
+
+    // Remaining should be Alice
+    expect(await teamMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+});
+
+test("toolbar delete button is disabled for single instance", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // Click on the only instance
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+    const firstName = teamMembers.nth(0).locator('[data-scms-text="name"]');
+    await firstName.click();
+
+    // Delete button should be disabled
+    const deleteButton = page.locator("scms-toolbar").locator("button[title='Delete item']");
+    const isDisabled = await deleteButton.isDisabled();
+    expect(isDisabled).toBe(true);
+});
+
+test("reorder is saved and persists after reload", async () => {
+    server.clearContent();
+    server.setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    server.setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    server.setContent("test-app", "team._order", JSON.stringify({ type: "order", value: ["abc12", "def34"] }));
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const teamMembers = page.locator('[data-scms-template="team"] .team-member');
+
+    // Verify initial order
+    expect(await teamMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+    expect(await teamMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
+
+    // Click on second instance and move up
+    const secondName = teamMembers.nth(1).locator('[data-scms-text="name"]');
+    await secondName.click();
+    const moveUpButton = page.locator("scms-toolbar").locator("button[title='Move up']");
+    await moveUpButton.click();
+
+    // Verify new order
+    expect(await teamMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
+    expect(await teamMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+
+    // Save changes
+    const saveButton = page.locator("scms-toolbar").locator("button:has-text('Save')");
+    await saveButton.click();
+
+    // Wait for save to complete
+    await page.waitForFunction(() => {
+        const toolbar = document.querySelector('scms-toolbar');
+        return toolbar && !toolbar.hasAttribute('saving');
+    }, { timeout: 3000 });
+
+    // Reload and verify order persisted
+    await page.reload();
+    await page.waitForSelector(".streamlined-editable");
+
+    const reloadedMembers = page.locator('[data-scms-template="team"] .team-member');
+    expect(await reloadedMembers.nth(0).locator('[data-scms-text="name"]').textContent()).toBe("Bob");
+    expect(await reloadedMembers.nth(1).locator('[data-scms-text="name"]').textContent()).toBe("Alice");
+});

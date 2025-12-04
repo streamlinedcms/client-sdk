@@ -42,6 +42,19 @@ export class Toolbar extends LitElement {
     @property({ type: String, attribute: "app-id" })
     appId: string | null = null;
 
+    // Template context - set when editing an element inside a template
+    @property({ type: String, attribute: "template-id" })
+    templateId: string | null = null;
+
+    @property({ type: String, attribute: "instance-id" })
+    instanceId: string | null = null;
+
+    @property({ type: Number, attribute: "instance-index" })
+    instanceIndex: number | null = null;
+
+    @property({ type: Number, attribute: "instance-count" })
+    instanceCount: number | null = null;
+
     @state()
     private expanded = false;
 
@@ -212,6 +225,42 @@ export class Toolbar extends LitElement {
         );
     }
 
+    private handleAddInstance() {
+        this.dispatchEvent(
+            new CustomEvent("add-instance", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
+    private handleDeleteInstance() {
+        this.dispatchEvent(
+            new CustomEvent("delete-instance", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
+    private handleMoveInstanceUp() {
+        this.dispatchEvent(
+            new CustomEvent("move-instance-up", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
+    private handleMoveInstanceDown() {
+        this.dispatchEvent(
+            new CustomEvent("move-instance-down", {
+                bubbles: true,
+                composed: true,
+            })
+        );
+    }
+
     private renderModeToggle() {
         return html`
             <scms-mode-toggle
@@ -320,6 +369,63 @@ export class Toolbar extends LitElement {
         `;
     }
 
+    private renderTemplateControls() {
+        if (!this.templateId) return nothing;
+
+        const canMoveUp = this.instanceIndex !== null && this.instanceIndex > 0;
+        const canMoveDown = this.instanceIndex !== null && this.instanceCount !== null && this.instanceIndex < this.instanceCount - 1;
+        const canDelete = this.instanceCount !== null && this.instanceCount > 1;
+
+        const enabledClass = "px-2 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors";
+        const disabledClass = "px-2 py-1.5 text-xs font-medium text-gray-300 border border-gray-200 rounded-md cursor-not-allowed";
+
+        return html`
+            <div class="flex items-center gap-1 ml-2 pl-2 border-l border-gray-200">
+                <button
+                    class=${canMoveUp ? enabledClass : disabledClass}
+                    ?disabled=${!canMoveUp}
+                    @click=${this.handleMoveInstanceUp}
+                    title="Move up"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                    </svg>
+                </button>
+                <button
+                    class=${canMoveDown ? enabledClass : disabledClass}
+                    ?disabled=${!canMoveDown}
+                    @click=${this.handleMoveInstanceDown}
+                    title="Move down"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </button>
+                <button
+                    class="px-2 py-1.5 text-xs font-medium text-green-600 hover:text-green-800 border border-green-300 rounded-md hover:bg-green-50 transition-colors"
+                    @click=${this.handleAddInstance}
+                    title="Add item"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                </button>
+                <button
+                    class=${canDelete
+                        ? "px-2 py-1.5 text-xs font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 transition-colors"
+                        : disabledClass}
+                    ?disabled=${!canDelete}
+                    @click=${this.handleDeleteInstance}
+                    title="Delete item"
+                >
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+            </div>
+        `;
+    }
+
     private renderSignOutButton() {
         return html`
             <button
@@ -379,7 +485,7 @@ export class Toolbar extends LitElement {
                         ${this.renderModeToggle()}
                     </div>
 
-                    <!-- Center: Reset + Active element + Element-specific buttons -->
+                    <!-- Center: Reset + Active element + Element-specific buttons + Template controls -->
                     <div class="flex items-center gap-3">
                         ${this.renderResetButton()}
                         ${this.renderActiveElement()}
@@ -390,6 +496,7 @@ export class Toolbar extends LitElement {
                         ${this.renderSeoButton()}
                         ${this.renderAccessibilityButton()}
                         ${this.renderAttributesButton()}
+                        ${this.renderTemplateControls()}
                     </div>
 
                     <!-- Right: Save + Sign Out + Admin (separated) -->
@@ -509,6 +616,72 @@ export class Toolbar extends LitElement {
         `;
     }
 
+    private renderMobileTemplateSection() {
+        if (!this.templateId) return nothing;
+
+        const canMoveUp = this.instanceIndex !== null && this.instanceIndex > 0;
+        const canMoveDown = this.instanceIndex !== null && this.instanceCount !== null && this.instanceIndex < this.instanceCount - 1;
+        const canDelete = this.instanceCount !== null && this.instanceCount > 1;
+
+        const enabledClass = "flex-1 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center justify-center";
+        const disabledClass = "flex-1 px-3 py-2 text-sm font-medium text-gray-300 border border-gray-200 rounded-md cursor-not-allowed inline-flex items-center justify-center";
+
+        return html`
+            <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
+                ${this.renderMobileSectionHeader("Template Item")}
+                <div class="flex flex-col gap-2">
+                    <!-- Reorder buttons -->
+                    <div class="flex gap-2">
+                        <button
+                            class=${canMoveUp ? enabledClass : disabledClass}
+                            ?disabled=${!canMoveUp}
+                            @click=${this.handleMoveInstanceUp}
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                            </svg>
+                            Move Up
+                        </button>
+                        <button
+                            class=${canMoveDown ? enabledClass : disabledClass}
+                            ?disabled=${!canMoveDown}
+                            @click=${this.handleMoveInstanceDown}
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                            Move Down
+                        </button>
+                    </div>
+                    <!-- Add/Delete buttons -->
+                    <div class="flex gap-2">
+                        <button
+                            class="flex-1 px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800 border border-green-300 rounded-md hover:bg-green-50 transition-colors inline-flex items-center justify-center"
+                            @click=${this.handleAddInstance}
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                            </svg>
+                            Add Item
+                        </button>
+                        <button
+                            class=${canDelete
+                                ? "flex-1 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 transition-colors inline-flex items-center justify-center"
+                                : disabledClass}
+                            ?disabled=${!canDelete}
+                            @click=${this.handleDeleteInstance}
+                        >
+                            <svg class="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     private renderMobileSettingsSection() {
         return html`
             <div class="mobile-section">
@@ -584,6 +757,9 @@ export class Toolbar extends LitElement {
                     <div class="px-4 py-3 border-t border-gray-100">
                         <!-- Element section (only when element selected) -->
                         ${this.activeElement ? this.renderMobileElementSection() : nothing}
+
+                        <!-- Template section (only when element is in a template) -->
+                        ${this.activeElement ? this.renderMobileTemplateSection() : nothing}
 
                         <!-- Metadata section (only when element selected) -->
                         ${this.activeElement ? this.renderMobileMetadataSection() : nothing}

@@ -793,6 +793,22 @@ class EditorController {
             this.handleEditAttributes();
         });
 
+        toolbar.addEventListener("add-instance", () => {
+            this.handleAddInstance();
+        });
+
+        toolbar.addEventListener("delete-instance", () => {
+            this.handleDeleteInstance();
+        });
+
+        toolbar.addEventListener("move-instance-up", () => {
+            this.handleMoveInstanceUp();
+        });
+
+        toolbar.addEventListener("move-instance-down", () => {
+            this.handleMoveInstanceDown();
+        });
+
         document.body.appendChild(toolbar);
         this.toolbar = toolbar;
 
@@ -1018,6 +1034,9 @@ class EditorController {
             this.toolbar.activeElement = key;
             this.toolbar.activeElementType = elementType;
         }
+
+        // Update template context on toolbar
+        this.updateToolbarTemplateContext();
     }
 
     /**
@@ -1089,6 +1108,9 @@ class EditorController {
             this.toolbar.activeElement = null;
             this.toolbar.activeElementType = null;
         }
+
+        // Clear template context on toolbar
+        this.updateToolbarTemplateContext();
     }
 
     /**
@@ -1904,6 +1926,46 @@ class EditorController {
         return file;
     }
 
+    // ==================== Template Toolbar Handlers ====================
+
+    private handleAddInstance(): void {
+        if (!this.toolbar?.templateId) {
+            this.log.debug("No template context for add instance");
+            return;
+        }
+        this.addInstance(this.toolbar.templateId);
+    }
+
+    private handleDeleteInstance(): void {
+        if (!this.toolbar?.templateId || !this.toolbar?.instanceId) {
+            this.log.debug("No template context for delete instance");
+            return;
+        }
+        this.removeInstance(this.toolbar.templateId, this.toolbar.instanceId);
+    }
+
+    private handleMoveInstanceUp(): void {
+        if (!this.toolbar?.templateId || this.toolbar?.instanceIndex === null) {
+            this.log.debug("No template context for move up");
+            return;
+        }
+        const fromIndex = this.toolbar.instanceIndex;
+        if (fromIndex > 0) {
+            this.reorderInstance(this.toolbar.templateId, fromIndex, fromIndex - 1);
+        }
+    }
+
+    private handleMoveInstanceDown(): void {
+        if (!this.toolbar?.templateId || this.toolbar?.instanceIndex === null || this.toolbar?.instanceCount === null) {
+            this.log.debug("No template context for move down");
+            return;
+        }
+        const fromIndex = this.toolbar.instanceIndex;
+        if (fromIndex < this.toolbar.instanceCount - 1) {
+            this.reorderInstance(this.toolbar.templateId, fromIndex, fromIndex + 1);
+        }
+    }
+
     // ==================== Template Instance Management ====================
 
     /**
@@ -2040,6 +2102,76 @@ class EditorController {
         this.log.debug("Removed template instance", { templateId, instanceId });
 
         // Update toolbar
+        this.updateToolbarTemplateContext();
+    }
+
+    /**
+     * Reorder a template instance by moving it from one index to another
+     */
+    public reorderInstance(templateId: string, fromIndex: number, toIndex: number): void {
+        const templateInfo = this.templates.get(templateId);
+        if (!templateInfo) {
+            this.log.error("Template not found", { templateId });
+            return;
+        }
+
+        const { container, instanceIds } = templateInfo;
+
+        // Validate indices
+        if (fromIndex < 0 || fromIndex >= instanceIds.length || toIndex < 0 || toIndex >= instanceIds.length) {
+            this.log.error("Invalid reorder indices", { fromIndex, toIndex, count: instanceIds.length });
+            return;
+        }
+
+        if (fromIndex === toIndex) {
+            return; // No-op
+        }
+
+        const instanceId = instanceIds[fromIndex];
+
+        // Find the instance element
+        const instanceElement = container.querySelector<HTMLElement>(
+            `[data-scms-instance="${instanceId}"]`
+        );
+        if (!instanceElement) {
+            this.log.error("Instance element not found", { templateId, instanceId });
+            return;
+        }
+
+        // Update the order array
+        instanceIds.splice(fromIndex, 1);
+        instanceIds.splice(toIndex, 0, instanceId);
+
+        // Move DOM element to new position
+        // Find the element at the target position (after array update)
+        if (toIndex === instanceIds.length - 1) {
+            // Moving to last position - insert before the add button
+            const addButton = this.templateAddButtons.get(templateId);
+            if (addButton && addButton.parentElement === container) {
+                container.insertBefore(instanceElement, addButton);
+            } else {
+                container.appendChild(instanceElement);
+            }
+        } else {
+            // Insert before the element that's now at toIndex + 1
+            const nextInstanceId = instanceIds[toIndex + 1];
+            const nextElement = container.querySelector<HTMLElement>(
+                `[data-scms-instance="${nextInstanceId}"]`
+            );
+            if (nextElement) {
+                container.insertBefore(instanceElement, nextElement);
+            }
+        }
+
+        // Update order in content
+        this.updateOrderContent(templateId, templateInfo);
+
+        // Mark as having unsaved changes
+        this.updateToolbarHasChanges();
+
+        this.log.debug("Reordered template instance", { templateId, instanceId, fromIndex, toIndex });
+
+        // Update toolbar (index may have changed)
         this.updateToolbarTemplateContext();
     }
 
@@ -2207,11 +2339,55 @@ class EditorController {
 
     /**
      * Update toolbar with current template context
-     * TODO: Add templateContext property to Toolbar component
+     * Shows add/remove/reorder controls when editing an element inside a template
      */
     private updateToolbarTemplateContext(): void {
-        // Placeholder for future toolbar integration
-        // Will show add/remove controls when editing a template element
+        if (!this.toolbar) return;
+
+        // Get template context from currently editing element
+        if (!this.editingKey) {
+            // Clear template context when not editing
+            this.toolbar.templateId = null;
+            this.toolbar.instanceId = null;
+            this.toolbar.instanceIndex = null;
+            this.toolbar.instanceCount = null;
+            return;
+        }
+
+        const infos = this.editableElements.get(this.editingKey);
+        if (!infos || infos.length === 0) {
+            this.toolbar.templateId = null;
+            this.toolbar.instanceId = null;
+            this.toolbar.instanceIndex = null;
+            this.toolbar.instanceCount = null;
+            return;
+        }
+
+        // Use the first info to get template context
+        const info = infos[0];
+        if (!info.templateId || !info.instanceId) {
+            // Element is not in a template
+            this.toolbar.templateId = null;
+            this.toolbar.instanceId = null;
+            this.toolbar.instanceIndex = null;
+            this.toolbar.instanceCount = null;
+            return;
+        }
+
+        const templateInfo = this.templates.get(info.templateId);
+        if (!templateInfo) {
+            this.toolbar.templateId = null;
+            this.toolbar.instanceId = null;
+            this.toolbar.instanceIndex = null;
+            this.toolbar.instanceCount = null;
+            return;
+        }
+
+        // Set template context on toolbar
+        this.toolbar.templateId = info.templateId;
+        this.toolbar.instanceId = info.instanceId;
+        this.toolbar.instanceIndex = templateInfo.instanceIds.indexOf(info.instanceId);
+        this.toolbar.instanceCount = templateInfo.instanceIds.length;
     }
 
     /**
