@@ -1159,6 +1159,13 @@ class EditorController {
         // Focus the primary element (all types need focus for keyboard navigation)
         primaryInfo.element.focus();
 
+        // On mobile, scroll the element into view after keyboard opens
+        if (window.innerWidth < 640) {
+            setTimeout(() => {
+                primaryInfo.element.scrollIntoView({ block: "center", behavior: "smooth" });
+            }, 300);
+        }
+
         // Update toolbar
         if (this.toolbar) {
             this.toolbar.activeElement = key;

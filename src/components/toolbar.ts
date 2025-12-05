@@ -61,7 +61,12 @@ export class Toolbar extends LitElement {
     @state()
     private isMobile = false;
 
+    @state()
+    private collapsedSections: Set<string> = new Set();
+
     private resizeObserver: ResizeObserver | null = null;
+
+    private static readonly STORAGE_KEY = "scms-toolbar-collapsed-sections";
 
     static styles = [
         tailwindSheet,
@@ -104,8 +109,67 @@ export class Toolbar extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         this.checkMobile();
+        this.loadCollapsedSections();
         this.resizeObserver = new ResizeObserver(() => this.checkMobile());
         this.resizeObserver.observe(document.body);
+    }
+
+    private loadCollapsedSections() {
+        try {
+            const stored = sessionStorage.getItem(Toolbar.STORAGE_KEY);
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed)) {
+                    this.collapsedSections = new Set(parsed);
+                }
+            }
+        } catch {
+            // Ignore storage errors
+        }
+    }
+
+    private saveCollapsedSections() {
+        try {
+            sessionStorage.setItem(
+                Toolbar.STORAGE_KEY,
+                JSON.stringify([...this.collapsedSections])
+            );
+        } catch {
+            // Ignore storage errors
+        }
+    }
+
+    private isSectionCollapsed(section: string): boolean {
+        // If user has explicitly set a preference, use it
+        if (this.collapsedSections.has(section)) {
+            return true;
+        }
+        // Check if user explicitly expanded it (stored as "!section")
+        if (this.collapsedSections.has(`!${section}`)) {
+            return false;
+        }
+        // Default states: element and template open, others closed
+        return section !== "element" && section !== "template";
+    }
+
+    private toggleSection(section: string) {
+        const isCurrentlyCollapsed = this.isSectionCollapsed(section);
+        const newCollapsed = new Set(this.collapsedSections);
+
+        // Clear both states for this section
+        newCollapsed.delete(section);
+        newCollapsed.delete(`!${section}`);
+
+        if (isCurrentlyCollapsed) {
+            // User is expanding - store explicit "expanded" marker
+            newCollapsed.add(`!${section}`);
+        } else {
+            // User is collapsing - store the section name
+            newCollapsed.add(section);
+        }
+
+        this.collapsedSections = newCollapsed;
+        this.saveCollapsedSections();
     }
 
     disconnectedCallback() {
@@ -547,22 +611,39 @@ export class Toolbar extends LitElement {
         `;
     }
 
-    private renderMobileSectionHeader(title: string) {
+    private renderMobileSectionHeader(title: string, sectionId: string) {
+        const isCollapsed = this.isSectionCollapsed(sectionId);
         return html`
-            <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">
-                ${title}
-            </div>
+            <button
+                class="w-full flex items-center justify-between text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 py-1 -my-1 hover:text-gray-700 transition-colors"
+                @click=${() => this.toggleSection(sectionId)}
+                aria-expanded=${!isCollapsed}
+            >
+                <span>${title}</span>
+                <svg
+                    class="w-4 h-4 transition-transform duration-200 ${isCollapsed ? "" : "rotate-180"}"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M19 9l-7 7-7-7"
+                    />
+                </svg>
+            </button>
         `;
     }
 
     private renderMobileElementSection() {
-        // Type-specific layouts
-        if (this.activeElementType === "link") {
-            return html`
-                <div
-                    class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3"
-                >
-                    ${this.renderMobileSectionHeader("Element")}
+        const isCollapsed = this.isSectionCollapsed("element");
+
+        // Type-specific content
+        const renderContent = () => {
+            if (this.activeElementType === "link") {
+                return html`
                     <div class="flex gap-2">
                         <button
                             class="flex-1 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
@@ -590,80 +671,91 @@ export class Toolbar extends LitElement {
                             </svg>
                         </button>
                     </div>
-                </div>
-            `;
-        }
+                `;
+            }
 
-        if (this.activeElementType === "image") {
-            return html`
-                <div
-                    class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3"
-                >
-                    ${this.renderMobileSectionHeader("Element")}
+            if (this.activeElementType === "image") {
+                return html`
                     <button
                         class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
                         @click=${this.handleChangeImage}
                     >
                         Change Image
                     </button>
-                </div>
-            `;
-        }
+                `;
+            }
 
-        // Text/HTML types
-        return html`
-            <div
-                class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3"
-            >
-                ${this.renderMobileSectionHeader("Element")}
+            // Text/HTML types
+            return html`
                 <button
                     class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
                     @click=${this.handleEditHtml}
                 >
                     Edit HTML
                 </button>
+            `;
+        };
+
+        return html`
+            <div
+                class="mobile-section mb-4 pb-4 border-b border-gray-200 bg-gray-50 -mx-4 px-4 py-3"
+            >
+                ${this.renderMobileSectionHeader("Element", "element")}
+                ${isCollapsed ? nothing : renderContent()}
             </div>
         `;
     }
 
     private renderMobileMetadataSection() {
+        const isCollapsed = this.isSectionCollapsed("metadata");
+
         return html`
             <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
-                ${this.renderMobileSectionHeader("Metadata")}
-                <div class="flex flex-col gap-2">
-                    <button
-                        class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
-                        @click=${this.handleEditSeo}
-                    >
-                        SEO (Search Engine Optimization)
-                    </button>
-                    <button
-                        class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
-                        @click=${this.handleEditAccessibility}
-                    >
-                        Accessibility
-                    </button>
-                    <button
-                        class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
-                        @click=${this.handleEditAttributes}
-                    >
-                        Attributes
-                    </button>
-                </div>
+                ${this.renderMobileSectionHeader("Metadata", "metadata")}
+                ${isCollapsed
+                    ? nothing
+                    : html`
+                          <div class="flex flex-col gap-2">
+                              <button
+                                  class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                                  @click=${this.handleEditSeo}
+                              >
+                                  SEO (Search Engine Optimization)
+                              </button>
+                              <button
+                                  class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                                  @click=${this.handleEditAccessibility}
+                              >
+                                  Accessibility
+                              </button>
+                              <button
+                                  class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                                  @click=${this.handleEditAttributes}
+                              >
+                                  Attributes
+                              </button>
+                          </div>
+                      `}
             </div>
         `;
     }
 
     private renderMobileActionsSection() {
+        const isCollapsed = this.isSectionCollapsed("actions");
+
         return html`
             <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
-                ${this.renderMobileSectionHeader("Actions")}
-                <scms-hold-button
-                    label="Hold to reset element"
-                    hold-duration="800"
-                    @hold-complete=${this.handleReset}
-                    class="w-full"
-                ></scms-hold-button>
+                ${this.renderMobileSectionHeader("Actions", "actions")}
+                ${isCollapsed
+                    ? nothing
+                    : html`
+                          <scms-hold-button
+                              label="Hold to reset element"
+                              hold-duration="800"
+                              @hold-complete=${this.handleReset}
+                              class="w-full"
+                          ></scms-hold-button>
+                      `}
             </div>
         `;
     }
@@ -671,6 +763,7 @@ export class Toolbar extends LitElement {
     private renderMobileTemplateSection() {
         if (!this.templateId) return nothing;
 
+        const isCollapsed = this.isSectionCollapsed("template");
         const canMoveUp = this.instanceIndex !== null && this.instanceIndex > 0;
         const canMoveDown =
             this.instanceIndex !== null &&
@@ -685,96 +778,100 @@ export class Toolbar extends LitElement {
 
         return html`
             <div class="mobile-section mb-4 pb-4 border-b border-gray-200">
-                ${this.renderMobileSectionHeader("Template Item")}
-                <div class="flex flex-col gap-2">
-                    <!-- Reorder buttons -->
-                    <div class="flex gap-2">
-                        <button
-                            class=${canMoveUp ? enabledClass : disabledClass}
-                            ?disabled=${!canMoveUp}
-                            @click=${this.handleMoveInstanceUp}
-                        >
-                            <svg
-                                class="w-4 h-4 mr-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M5 15l7-7 7 7"
-                                />
-                            </svg>
-                            Move Up
-                        </button>
-                        <button
-                            class=${canMoveDown ? enabledClass : disabledClass}
-                            ?disabled=${!canMoveDown}
-                            @click=${this.handleMoveInstanceDown}
-                        >
-                            <svg
-                                class="w-4 h-4 mr-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M19 9l-7 7-7-7"
-                                />
-                            </svg>
-                            Move Down
-                        </button>
-                    </div>
-                    <!-- Add/Delete buttons -->
-                    <div class="flex gap-2">
-                        <button
-                            class="flex-1 px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800 border border-green-300 rounded-md hover:bg-green-50 transition-colors inline-flex items-center justify-center"
-                            @click=${this.handleAddInstance}
-                        >
-                            <svg
-                                class="w-4 h-4 mr-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M12 4v16m8-8H4"
-                                />
-                            </svg>
-                            Add Item
-                        </button>
-                        <button
-                            class=${canDelete
-                                ? "flex-1 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 transition-colors inline-flex items-center justify-center"
-                                : disabledClass}
-                            ?disabled=${!canDelete}
-                            @click=${this.handleDeleteInstance}
-                        >
-                            <svg
-                                class="w-4 h-4 mr-1"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                            >
-                                <path
-                                    stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="2"
-                                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
-                            </svg>
-                            Delete
-                        </button>
-                    </div>
-                </div>
+                ${this.renderMobileSectionHeader("Template Item", "template")}
+                ${isCollapsed
+                    ? nothing
+                    : html`
+                          <div class="flex flex-col gap-2">
+                              <!-- Reorder buttons -->
+                              <div class="flex gap-2">
+                                  <button
+                                      class=${canMoveUp ? enabledClass : disabledClass}
+                                      ?disabled=${!canMoveUp}
+                                      @click=${this.handleMoveInstanceUp}
+                                  >
+                                      <svg
+                                          class="w-4 h-4 mr-1"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                      >
+                                          <path
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                              stroke-width="2"
+                                              d="M5 15l7-7 7 7"
+                                          />
+                                      </svg>
+                                      Move Up
+                                  </button>
+                                  <button
+                                      class=${canMoveDown ? enabledClass : disabledClass}
+                                      ?disabled=${!canMoveDown}
+                                      @click=${this.handleMoveInstanceDown}
+                                  >
+                                      <svg
+                                          class="w-4 h-4 mr-1"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                      >
+                                          <path
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                              stroke-width="2"
+                                              d="M19 9l-7 7-7-7"
+                                          />
+                                      </svg>
+                                      Move Down
+                                  </button>
+                              </div>
+                              <!-- Add/Delete buttons -->
+                              <div class="flex gap-2">
+                                  <button
+                                      class="flex-1 px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800 border border-green-300 rounded-md hover:bg-green-50 transition-colors inline-flex items-center justify-center"
+                                      @click=${this.handleAddInstance}
+                                  >
+                                      <svg
+                                          class="w-4 h-4 mr-1"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                      >
+                                          <path
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                              stroke-width="2"
+                                              d="M12 4v16m8-8H4"
+                                          />
+                                      </svg>
+                                      Add Item
+                                  </button>
+                                  <button
+                                      class=${canDelete
+                                          ? "flex-1 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 transition-colors inline-flex items-center justify-center"
+                                          : disabledClass}
+                                      ?disabled=${!canDelete}
+                                      @click=${this.handleDeleteInstance}
+                                  >
+                                      <svg
+                                          class="w-4 h-4 mr-1"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                      >
+                                          <path
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                              stroke-width="2"
+                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                          />
+                                      </svg>
+                                      Delete
+                                  </button>
+                              </div>
+                          </div>
+                      `}
             </div>
         `;
     }
@@ -782,7 +879,6 @@ export class Toolbar extends LitElement {
     private renderMobileSettingsSection() {
         return html`
             <div class="mobile-section">
-                ${this.renderMobileSectionHeader("Settings")}
                 <div class="flex items-center justify-between">
                     <button
                         class="px-3 py-1.5 text-sm font-medium text-gray-400 hover:text-gray-600 transition-colors"
@@ -885,8 +981,8 @@ export class Toolbar extends LitElement {
 
                 <!-- Expandable drawer -->
                 <div
-                    class="overflow-hidden transition-all duration-200 ease-out"
-                    style="max-height: ${this.expanded ? "500px" : "0"}"
+                    class="${this.expanded ? "overflow-y-auto" : "overflow-hidden"} transition-all duration-200 ease-out"
+                    style="max-height: ${this.expanded ? "calc(100vh - 56px - env(safe-area-inset-bottom, 0px))" : "0"}"
                 >
                     <div class="px-4 py-3 border-t border-gray-100">
                         <!-- Element section (only when element selected) -->
