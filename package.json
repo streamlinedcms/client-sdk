@@ -11,7 +11,7 @@
   "scripts": {
     "build": "rollup -c",
     "build:staging": "MODE=staging rollup -c",
-    "deploy:staging": "npm run build:staging && wrangler pages deploy dist --project-name streamlined-cms-cdn-staging",
+    "deploy:staging": "npm run build:staging && wrangler pages deploy",
     "dev": "rollup -c -w",
     "demo": "npm run build && ln -sfn ../dist demo/dist && vite demo --host --port 3000",
     "test": "vitest run",
