@@ -899,6 +899,7 @@ class EditorController {
 
         this.keyStorage.clearStoredKey();
         this.apiKey = null;
+        this.currentMode = "viewer";
 
         this.editableElements.forEach((infos) => {
             for (const info of infos) {
@@ -910,6 +911,12 @@ class EditorController {
                 info.element.removeAttribute("contenteditable");
             }
         });
+
+        // Remove event listeners (same as enableViewerMode)
+        document.removeEventListener("click", this.handleDocumentClick);
+        window.removeEventListener("beforeunload", this.handleBeforeUnload);
+
+        this.hideTemplateControls();
         this.stopEditing();
 
         // Convert all custom triggers back to sign-in
