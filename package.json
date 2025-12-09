@@ -18,6 +18,8 @@
     "cdn:upload:PRODUCTION": "echo '⚠️  UPLOADING TO PRODUCTION CDN' && read -p 'Type YES to continue: ' c && [ \"$c\" = 'YES' ] && node scripts/cdn-upload.js production",
     "cdn:publish:staging": "node scripts/cdn-publish.js staging",
     "cdn:publish:PRODUCTION": "echo '⚠️  PUBLISHING TO PRODUCTION CDN' && read -p 'Type YES to continue: ' c && [ \"$c\" = 'YES' ] && node scripts/cdn-publish.js production",
+    "cdn:purge:staging": "node scripts/cdn-purge.js staging",
+    "cdn:purge:PRODUCTION": "echo '⚠️  PURGING PRODUCTION CDN CACHE' && read -p 'Type YES to continue: ' c && [ \"$c\" = 'YES' ] && node scripts/cdn-purge.js production",
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:browser": "vitest run tests/browser",
