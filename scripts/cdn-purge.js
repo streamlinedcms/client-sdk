@@ -18,19 +18,26 @@ import { parse as parseToml } from "smol-toml";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Must match ASSET_COLLECTIONS in cdn worker
-const ASSET_COLLECTIONS = {
-    "client-sdk": [
-        "streamlined-cms.js",
-        "streamlined-cms.min.js",
-        "streamlined-cms.esm.js",
-        "streamlined-cms.esm.min.js",
-        "streamlined-cms.js.map",
-        "streamlined-cms.min.js.map",
-        "streamlined-cms.esm.js.map",
-        "streamlined-cms.esm.min.js.map",
-    ],
-};
+// Load .env file from cdn package (where CLOUDFLARE_API_TOKEN is stored)
+function loadEnvFile(filepath) {
+    if (!existsSync(filepath)) return;
+    const content = readFileSync(filepath, "utf-8");
+    for (const line of content.split("\n")) {
+        const match = line.match(/^([^=#]+)=(.*)$/);
+        if (match) {
+            const key = match[1].trim();
+            // Don't override existing env vars
+            if (!process.env[key]) {
+                process.env[key] = match[2].trim();
+            }
+        }
+    }
+}
+
+loadEnvFile(join(__dirname, "../.env"));
+
+// Known collections (must match VALID_COLLECTIONS in cdn worker)
+const VALID_COLLECTIONS = ["client-sdk"];
 
 const environment = process.argv[2];
 
@@ -60,7 +67,7 @@ if (!accountId) {
 }
 
 // Zone ID for streamlinedcms.com (same for staging subdomain)
-const ZONE_ID = "f0ada6cb76674ab6c9a22df2d30ff788";
+const ZONE_ID = "615704bba69197c546c51b1a5afb3c2a";
 
 const cdnDomain =
     environment === "staging" ? "cdn.staging.streamlinedcms.com" : "cdn.streamlinedcms.com";
@@ -87,11 +94,30 @@ async function selectOption(question, options) {
     return index;
 }
 
+/**
+ * Fetch the file list for a version from the CDN manifest endpoint.
+ */
+async function fetchFilesForVersion(collection, version) {
+    const versionPath = version.match(/^\d/) ? `v${version}` : version;
+    const manifestUrl = `https://${cdnDomain}/${collection}/${versionPath}/manifest.json`;
+
+    try {
+        const response = await fetch(manifestUrl);
+        if (!response.ok) {
+            console.error(`Warning: Could not fetch manifest for ${version} (${response.status})`);
+            return null;
+        }
+        const manifest = await response.json();
+        return manifest.files || [];
+    } catch (error) {
+        console.error(`Warning: Error fetching manifest for ${version}:`, error.message);
+        return null;
+    }
+}
+
 // Step 1: Select collection
-const collections = Object.keys(ASSET_COLLECTIONS);
-const collectionIndex = await selectOption("Select collection to purge:", collections);
-const collection = collections[collectionIndex];
-const files = ASSET_COLLECTIONS[collection];
+const collectionIndex = await selectOption("Select collection to purge:", VALID_COLLECTIONS);
+const collection = VALID_COLLECTIONS[collectionIndex];
 
 // Step 2: Select version
 const versionOptions = ["Manifest (versions.json)", "Specific version(s)", "All known versions"];
@@ -152,29 +178,53 @@ if (versionIndex === 0) {
         }
     }
 
+    // Fetch file lists for each version
+    console.log("\nFetching file lists from CDN...");
+    const versionFiles = new Map();
+    for (const version of versions) {
+        const files = await fetchFilesForVersion(collection, version);
+        if (files && files.length > 0) {
+            versionFiles.set(version, files);
+        } else {
+            console.log(`  Skipping ${version} (no files found)`);
+        }
+    }
+
+    if (versionFiles.size === 0) {
+        console.error("\nNo files found for any specified version.");
+        process.exit(1);
+    }
+
+    // Get unique file list across all versions for selection
+    const allFiles = [...new Set([...versionFiles.values()].flat())].sort();
+
     // Step 3: Select files scope
     const fileOptions = ["All files", "Specific file(s)"];
     const fileIndex = await selectOption("Select files to purge:", fileOptions);
 
-    let filesToPurge = files;
+    let filesToPurge = allFiles;
 
     if (fileIndex === 1) {
         // Specific files
-        const input = await prompt(`\nEnter file number(s), comma-separated (1-${files.length}):\n${files.map((f, i) => `  ${i + 1}. ${f}`).join("\n")}\n\nSelection: `);
+        const input = await prompt(`\nEnter file number(s), comma-separated (1-${allFiles.length}):\n${allFiles.map((f, i) => `  ${i + 1}. ${f}`).join("\n")}\n\nSelection: `);
         const indices = input.split(",").map((s) => parseInt(s.trim(), 10) - 1);
-        const invalid = indices.filter((i) => i < 0 || i >= files.length);
+        const invalid = indices.filter((i) => i < 0 || i >= allFiles.length);
         if (invalid.length > 0) {
             console.error("Invalid selection");
             process.exit(1);
         }
-        filesToPurge = indices.map((i) => files[i]);
+        filesToPurge = indices.map((i) => allFiles[i]);
     }
 
-    // Build URLs
-    for (const version of versions) {
+    // Build URLs - only include files that exist for each version
+    for (const [version, files] of versionFiles) {
         const versionPath = version.match(/^\d/) ? `v${version}` : version;
+        // Also purge the manifest.json for this version
+        urlsToPurge.push(`https://${cdnDomain}/${collection}/${versionPath}/manifest.json`);
         for (const file of filesToPurge) {
-            urlsToPurge.push(`https://${cdnDomain}/${collection}/${versionPath}/${file}`);
+            if (files.includes(file)) {
+                urlsToPurge.push(`https://${cdnDomain}/${collection}/${versionPath}/${file}`);
+            }
         }
     }
 }
@@ -208,12 +258,20 @@ for (let i = 0; i < urlsToPurge.length; i += BATCH_SIZE) {
     batches.push(urlsToPurge.slice(i, i + BATCH_SIZE));
 }
 
-// Get API token from environment
-const apiToken = process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN;
+// Get API token from environment (purge-specific token preferred)
+const apiToken = process.env.CLOUDFLARE_PURGE_TOKEN || process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN;
 if (!apiToken) {
-    console.error("Error: CLOUDFLARE_API_TOKEN or CF_API_TOKEN environment variable required");
+    console.error("Error: CLOUDFLARE_PURGE_TOKEN environment variable required");
+    console.error("Add CLOUDFLARE_PURGE_TOKEN to packages/cdn/.env");
     process.exit(1);
 }
+
+// Debug: show which token source is being used
+const tokenSource = process.env.CLOUDFLARE_PURGE_TOKEN ? "CLOUDFLARE_PURGE_TOKEN"
+    : process.env.CLOUDFLARE_API_TOKEN ? "CLOUDFLARE_API_TOKEN"
+    : "CF_API_TOKEN";
+console.log(`Using token from: ${tokenSource} (${apiToken.slice(0, 8)}...${apiToken.slice(-4)})`);
+console.log(`Zone ID: ${ZONE_ID}\n`);
 
 let totalPurged = 0;
 

@@ -54,18 +54,28 @@ const [major, minor] = version.split(".");
 // Asset collection name for KV key prefixing
 const collection = "client-sdk";
 
-const aliases = [
+// KV entries to write:
+// - Exact version marker ("_") to mark version as published
+// - Aliases pointing to the version
+const VERSION_MARKER = "_";
+const kvEntries = [
+    [version, VERSION_MARKER],  // Exact version marker
     ["latest", version],
     [major, version],
     [`${major}.${minor}`, version],
 ];
 
-console.log(`Publishing SDK v${version} aliases to ${environment}:\n`);
+console.log(`Publishing SDK v${version} to ${environment}:\n`);
 
+console.log(`  Version marker:`);
+console.log(`    "${collection}/${version}" -> "${VERSION_MARKER}" (marks version as published)\n`);
+
+console.log(`  Aliases:`);
+const aliases = kvEntries.slice(1);
 const maxKeyLen = Math.max(...aliases.map(([alias]) => `${collection}/${alias}`.length));
 for (const [alias, targetVersion] of aliases) {
     const key = `${collection}/${alias}`;
-    console.log(`  "${key}"${" ".repeat(maxKeyLen - key.length)} -> "${targetVersion}"`);
+    console.log(`    "${key}"${" ".repeat(maxKeyLen - key.length)} -> "${targetVersion}"`);
 }
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -80,15 +90,15 @@ if (answer.toLowerCase() !== "yes") {
 
 console.log();
 
-for (const [alias, targetVersion] of aliases) {
-    const kvKey = `${collection}/${alias}`;
+for (const [key, value] of kvEntries) {
+    const kvKey = `${collection}/${key}`;
     try {
         execSync(
-            `wrangler kv key put --namespace-id="${namespaceId}" --remote "${kvKey}" "${targetVersion}"`,
+            `wrangler kv key put --namespace-id="${namespaceId}" --remote "${kvKey}" "${value}"`,
             { stdio: "inherit" },
         );
     } catch (error) {
-        console.error(`\nFailed to set alias "${kvKey}"`);
+        console.error(`\nFailed to set "${kvKey}"`);
         process.exit(1);
     }
 }
