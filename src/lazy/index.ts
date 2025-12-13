@@ -145,7 +145,8 @@ class EditorController {
     // Keys in originalContent but not in currentContent = pending deletes
     private originalContent: Map<string, string> = new Map();
     private currentContent: Map<string, string> = new Map();
-    private editingKey: string | null = null;
+    private selectedKey: string | null = null; // Currently selected element (visual highlight, toolbar shows info)
+    private editingKey: string | null = null; // Currently editing element (contenteditable, focused)
     private customSignInTriggers: Map<Element, string> = new Map(); // element -> original text
     private toolbar: Toolbar | null = null;
     private htmlEditorModal: HtmlEditorModal | null = null;
@@ -636,7 +637,7 @@ class EditorController {
     };
 
     private handleDocumentClick = (e: Event): void => {
-        if (!this.editingKey) return;
+        if (!this.editingKey && !this.selectedKey) return;
 
         const target = e.target as Node;
 
@@ -654,7 +655,16 @@ class EditorController {
             return;
         }
 
+        // Stop editing and deselect
         this.stopEditing();
+        this.deselectElement();
+
+        // Clear toolbar
+        if (this.toolbar) {
+            this.toolbar.activeElement = null;
+            this.toolbar.activeElementType = null;
+        }
+        this.updateToolbarTemplateContext();
     };
 
     private handleBeforeUnload = (e: BeforeUnloadEvent): void => {
@@ -710,6 +720,79 @@ class EditorController {
     }
 
     /**
+     * Set up click and double-click handlers for an editable element.
+     * Shared by enableEditing() and setupInstanceForAuthorMode().
+     */
+    private setupElementClickHandler(element: HTMLElement, key: string): void {
+        const elementType = this.getEditableType(key);
+
+        if (!element.dataset.scmsClickHandler) {
+            element.addEventListener("click", (e) => {
+                if (this.editingEnabled) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    const isMobile = window.innerWidth < 640;
+
+                    // Check for double-tap (mobile) on images and links
+                    const now = Date.now();
+                    const isDoubleTap =
+                        this.lastTapKey === key && now - this.lastTapTime < this.doubleTapDelay;
+
+                    if (isDoubleTap) {
+                        if (elementType === "image") {
+                            this.handleChangeImage();
+                        } else if (elementType === "link") {
+                            this.handleGoToLink();
+                        }
+                        this.lastTapKey = null;
+                        this.lastTapTime = 0;
+                    } else if (isMobile) {
+                        // Mobile two-step: first tap selects, second tap edits
+                        if (this.selectedKey === key && this.editingKey !== key) {
+                            this.startEditing(key, element);
+                        } else {
+                            this.selectElement(key, element);
+                        }
+                        this.lastTapKey = key;
+                        this.lastTapTime = now;
+                    } else {
+                        // Desktop: edit immediately
+                        this.startEditing(key, element);
+                        this.lastTapKey = key;
+                        this.lastTapTime = now;
+                    }
+                }
+            });
+            element.dataset.scmsClickHandler = "true";
+        }
+
+        // Double-click handler for images to open media manager (desktop)
+        if (elementType === "image" && !element.dataset.scmsDblClickHandler) {
+            element.addEventListener("dblclick", (e) => {
+                if (this.editingEnabled) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.handleChangeImage();
+                }
+            });
+            element.dataset.scmsDblClickHandler = "true";
+        }
+
+        // Double-click handler for links to navigate (desktop)
+        if (elementType === "link" && !element.dataset.scmsDblClickHandler) {
+            element.addEventListener("dblclick", (e) => {
+                if (this.editingEnabled) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.handleGoToLink();
+                }
+            });
+            element.dataset.scmsDblClickHandler = "true";
+        }
+    }
+
+    /**
      * Enable editing on elements - adds classes, handlers, template controls
      */
     private enableEditing(): void {
@@ -717,64 +800,9 @@ class EditorController {
         this.editingEnabled = true;
 
         this.editableElements.forEach((infos, key) => {
-            const elementType = this.getEditableType(key);
-
             for (const info of infos) {
                 info.element.classList.add("streamlined-editable");
-
-                if (!info.element.dataset.scmsClickHandler) {
-                    info.element.addEventListener("click", (e) => {
-                        if (this.editingEnabled) {
-                            e.preventDefault();
-                            e.stopPropagation();
-
-                            // Check for double-tap (mobile) on images and links
-                            const now = Date.now();
-                            const isDoubleTap =
-                                this.lastTapKey === key &&
-                                now - this.lastTapTime < this.doubleTapDelay;
-
-                            if (isDoubleTap) {
-                                if (elementType === "image") {
-                                    this.handleChangeImage();
-                                } else if (elementType === "link") {
-                                    this.handleGoToLink();
-                                }
-                                this.lastTapKey = null;
-                                this.lastTapTime = 0;
-                            } else {
-                                this.startEditing(key, info.element);
-                                this.lastTapKey = key;
-                                this.lastTapTime = now;
-                            }
-                        }
-                    });
-                    info.element.dataset.scmsClickHandler = "true";
-                }
-
-                // Add double-click handler for images to open media manager (desktop)
-                if (elementType === "image" && !info.element.dataset.scmsDblClickHandler) {
-                    info.element.addEventListener("dblclick", (e) => {
-                        if (this.editingEnabled) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            this.handleChangeImage();
-                        }
-                    });
-                    info.element.dataset.scmsDblClickHandler = "true";
-                }
-
-                // Add double-click handler for links to navigate (desktop)
-                if (elementType === "link" && !info.element.dataset.scmsDblClickHandler) {
-                    info.element.addEventListener("dblclick", (e) => {
-                        if (this.editingEnabled) {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            this.handleGoToLink();
-                        }
-                    });
-                    info.element.dataset.scmsDblClickHandler = "true";
-                }
+                this.setupElementClickHandler(info.element, key);
             }
         });
 
@@ -798,6 +826,8 @@ class EditorController {
             for (const info of infos) {
                 info.element.classList.remove(
                     "streamlined-editable",
+                    "streamlined-selected",
+                    "streamlined-selected-sibling",
                     "streamlined-editing",
                     "streamlined-editing-sibling",
                 );
@@ -812,6 +842,7 @@ class EditorController {
         window.removeEventListener("beforeunload", this.handleBeforeUnload);
 
         this.hideTemplateControls();
+        this.deselectElement();
         this.stopEditing();
     }
 
@@ -1059,6 +1090,16 @@ class EditorController {
                 font-style: italic;
             }
 
+            .streamlined-selected {
+                outline: 2px solid #ef4444;
+                outline-offset: -2px;
+            }
+
+            .streamlined-selected-sibling {
+                outline: 2px solid #fca5a5;
+                outline-offset: -2px;
+            }
+
             .streamlined-editing {
                 outline: 2px solid #ef4444;
                 outline-offset: -2px;
@@ -1181,6 +1222,85 @@ class EditorController {
         document.head.appendChild(style);
     }
 
+    /**
+     * Select an element without starting editing (mobile two-step flow).
+     * Shows visual selection and updates toolbar, but doesn't make contenteditable or focus.
+     */
+    private selectElement(key: string, clickedElement?: HTMLElement): void {
+        const infos = this.editableElements.get(key);
+        if (!infos || infos.length === 0) {
+            this.log.warn("Element not found for selection", { key });
+            return;
+        }
+
+        // Use the clicked element, or first element if not specified
+        const primaryInfo = clickedElement
+            ? infos.find((i) => i.element === clickedElement) || infos[0]
+            : infos[0];
+
+        const elementType = this.getEditableType(key);
+        this.log.trace("Selecting element", {
+            key,
+            elementId: primaryInfo.elementId,
+            groupId: primaryInfo.groupId,
+            elementType,
+        });
+
+        // Deselect previous element if different
+        if (this.selectedKey && this.selectedKey !== key) {
+            this.deselectElement();
+        }
+
+        // Stop editing if we're editing a different element
+        if (this.editingKey && this.editingKey !== key) {
+            this.stopEditing();
+        }
+
+        this.selectedKey = key;
+
+        // Add selection classes
+        for (const info of infos) {
+            const isPrimary = info.element === primaryInfo.element;
+            if (isPrimary) {
+                info.element.classList.add("streamlined-selected");
+            } else {
+                info.element.classList.add("streamlined-selected-sibling");
+            }
+        }
+
+        // Update toolbar
+        if (this.toolbar) {
+            this.toolbar.activeElement = key;
+            this.toolbar.activeElementType = elementType;
+        }
+
+        // Update template context on toolbar
+        this.updateToolbarTemplateContext();
+    }
+
+    /**
+     * Deselect the currently selected element without starting editing.
+     */
+    private deselectElement(): void {
+        if (!this.selectedKey) return;
+
+        const infos = this.editableElements.get(this.selectedKey);
+        if (infos) {
+            for (const info of infos) {
+                info.element.classList.remove("streamlined-selected");
+                info.element.classList.remove("streamlined-selected-sibling");
+            }
+        }
+
+        this.selectedKey = null;
+
+        // Clear toolbar if not editing
+        if (!this.editingKey && this.toolbar) {
+            this.toolbar.activeElement = null;
+            this.toolbar.activeElementType = null;
+        }
+    }
+
     private startEditing(key: string, clickedElement?: HTMLElement): void {
         const infos = this.editableElements.get(key);
         if (!infos || infos.length === 0) {
@@ -1202,31 +1322,32 @@ class EditorController {
             sharedCount: infos.length,
         });
 
-        // Stop editing previous element if any
-        if (this.editingKey) {
-            const prevInfos = this.editableElements.get(this.editingKey);
-            if (prevInfos) {
-                for (const prevInfo of prevInfos) {
-                    prevInfo.element.classList.remove("streamlined-editing");
-                    prevInfo.element.classList.remove("streamlined-editing-sibling");
-                    prevInfo.element.setAttribute("contenteditable", "false");
-                }
-            }
+        // Ensure element is selected first (handles deselecting previous, updating toolbar)
+        this.selectElement(key, clickedElement);
+
+        // Stop editing previous element if any (different from current)
+        if (this.editingKey && this.editingKey !== key) {
+            this.stopEditing();
         }
 
-        // originalContent is already set during scanEditableElements
-        // No need to snapshot here
+        // Already editing this element - nothing more to do
+        if (this.editingKey === key) {
+            return;
+        }
 
         this.editingKey = key;
 
-        // Set up editing state for all elements sharing this key
+        // Transition from selected to editing state
         for (const info of infos) {
             const isPrimary = info.element === primaryInfo.element;
+
+            // Remove selected classes, add editing classes
+            info.element.classList.remove("streamlined-selected");
+            info.element.classList.remove("streamlined-selected-sibling");
 
             if (isPrimary) {
                 info.element.classList.add("streamlined-editing");
             } else {
-                // Sibling elements get subtle highlight
                 info.element.classList.add("streamlined-editing-sibling");
             }
 
@@ -1275,15 +1396,6 @@ class EditorController {
                 primaryInfo.element.scrollIntoView({ block: "center", behavior: "smooth" });
             }, 300);
         }
-
-        // Update toolbar
-        if (this.toolbar) {
-            this.toolbar.activeElement = key;
-            this.toolbar.activeElementType = elementType;
-        }
-
-        // Update template context on toolbar
-        this.updateToolbarTemplateContext();
     }
 
     /**
@@ -1380,14 +1492,12 @@ class EditorController {
 
         this.editingKey = null;
 
-        // Update toolbar
-        if (this.toolbar) {
+        // Only clear toolbar if nothing is selected (mobile two-step mode keeps selection)
+        if (!this.selectedKey && this.toolbar) {
             this.toolbar.activeElement = null;
             this.toolbar.activeElementType = null;
+            this.updateToolbarTemplateContext();
         }
-
-        // Clear template context on toolbar
-        this.updateToolbarTemplateContext();
     }
 
     /**
@@ -2694,60 +2804,8 @@ class EditorController {
             const key = this.elementToKey.get(element);
             if (!key) return;
 
-            const elementType = this.getEditableType(key);
-
             element.classList.add("streamlined-editable");
-
-            if (!element.dataset.scmsClickHandler) {
-                element.addEventListener("click", (e) => {
-                    if (this.currentMode === "author") {
-                        e.preventDefault();
-                        e.stopPropagation();
-
-                        const now = Date.now();
-                        const isDoubleTap =
-                            this.lastTapKey === key && now - this.lastTapTime < this.doubleTapDelay;
-
-                        if (isDoubleTap) {
-                            if (elementType === "image") {
-                                this.handleChangeImage();
-                            } else if (elementType === "link") {
-                                this.handleGoToLink();
-                            }
-                            this.lastTapKey = null;
-                            this.lastTapTime = 0;
-                        } else {
-                            this.startEditing(key, element);
-                            this.lastTapKey = key;
-                            this.lastTapTime = now;
-                        }
-                    }
-                });
-                element.dataset.scmsClickHandler = "true";
-            }
-
-            // Double-click handlers for desktop
-            if (elementType === "image" && !element.dataset.scmsDblClickHandler) {
-                element.addEventListener("dblclick", (e) => {
-                    if (this.currentMode === "author") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.handleChangeImage();
-                    }
-                });
-                element.dataset.scmsDblClickHandler = "true";
-            }
-
-            if (elementType === "link" && !element.dataset.scmsDblClickHandler) {
-                element.addEventListener("dblclick", (e) => {
-                    if (this.currentMode === "author") {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        this.handleGoToLink();
-                    }
-                });
-                element.dataset.scmsDblClickHandler = "true";
-            }
+            this.setupElementClickHandler(element, key);
         });
 
         // Add delete button for this instance
@@ -2874,9 +2932,10 @@ class EditorController {
     private updateToolbarTemplateContext(): void {
         if (!this.toolbar) return;
 
-        // Get template context from currently editing element
-        if (!this.editingKey) {
-            // Clear template context when not editing
+        // Get template context from currently editing or selected element
+        const activeKey = this.editingKey || this.selectedKey;
+        if (!activeKey) {
+            // Clear template context when nothing is active
             this.toolbar.templateId = null;
             this.toolbar.instanceId = null;
             this.toolbar.instanceIndex = null;
@@ -2884,7 +2943,7 @@ class EditorController {
             return;
         }
 
-        const infos = this.editableElements.get(this.editingKey);
+        const infos = this.editableElements.get(activeKey);
         if (!infos || infos.length === 0) {
             this.toolbar.templateId = null;
             this.toolbar.instanceId = null;
