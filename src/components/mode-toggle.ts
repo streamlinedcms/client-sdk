@@ -1,7 +1,7 @@
 /**
  * Mode Toggle Component
  *
- * A Lit web component that displays an Author/Viewer mode toggle switch.
+ * A Lit web component that displays an Editing/Preview mode toggle switch.
  * Uses Shadow DOM with Tailwind for styling.
  *
  * This is a composable component - it has no positioning and can be used
@@ -57,7 +57,7 @@ export class ModeToggle extends LitElement {
                         : "text-gray-500 hover:text-gray-700"}"
                     @click=${() => this.handleModeChange("viewer")}
                 >
-                    Viewer
+                    Preview
                 </button>
                 <button
                     class="${baseButtonClasses} ${!isViewer
@@ -65,7 +65,7 @@ export class ModeToggle extends LitElement {
                         : "text-gray-500 hover:text-gray-700"}"
                     @click=${() => this.handleModeChange("author")}
                 >
-                    Author
+                    Editing
                 </button>
             </div>
         `;

@@ -713,6 +713,7 @@ class EditorController {
      * Enable editing on elements - adds classes, handlers, template controls
      */
     private enableEditing(): void {
+        if (this.editingEnabled) return;
         this.editingEnabled = true;
 
         this.editableElements.forEach((infos, key) => {
@@ -2028,7 +2029,16 @@ class EditorController {
      */
     private normalizeDomWhitespace(element: HTMLElement, type: EditableType): void {
         if (type === "text") {
-            element.textContent = this.normalizeWhitespace(element.textContent || "");
+            const innerHTML = element.innerHTML;
+            const textContent = element.textContent || "";
+            if (innerHTML !== textContent) {
+                const id = element.getAttribute("data-scms-text");
+                this.log.warn(
+                    `Element "${id}" has data-scms-text but contains HTML. Use data-scms-html to preserve formatting.`,
+                    { innerHTML }
+                );
+            }
+            element.textContent = this.normalizeWhitespace(innerHTML);
         } else if (type === "html") {
             element.innerHTML = this.normalizeHtmlWhitespace(element.innerHTML);
         } else if (type === "link" && element instanceof HTMLAnchorElement) {
@@ -2748,6 +2758,9 @@ class EditorController {
      * Add floating delete button to a template instance
      */
     private addInstanceDeleteButton(instanceElement: HTMLElement): void {
+        // Don't add if already has one
+        if (instanceElement.querySelector(".scms-instance-delete")) return;
+
         // Get template info from instance
         const instanceId = instanceElement.getAttribute("data-scms-instance");
         if (!instanceId) return;
