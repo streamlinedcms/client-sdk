@@ -16,6 +16,10 @@ import {
     type ElementAttributes,
 } from "../types.js";
 
+// Attributes that cannot be set via the custom attributes modal
+// as they could break the editor or page layout
+const RESERVED_ATTRIBUTES = ["class", "id", "style"] as const;
+
 interface AttributeEntry {
     name: string;
     value: string;
@@ -33,6 +37,9 @@ export class AttributesModal extends LitElement {
 
     @property({ type: Object, attribute: "element-defined-attrs" })
     elementDefinedAttrs: ElementAttributes = {};
+
+    @property({ type: Object, attribute: "reserved-attrs" })
+    reservedAttrs: ElementAttributes = {};
 
     @property({ type: Object, attribute: "other-attrs" })
     otherAttrs: ElementAttributes = {};
@@ -190,6 +197,10 @@ export class AttributesModal extends LitElement {
         return name in this.otherAttrs;
     }
 
+    private isReservedAttribute(name: string): boolean {
+        return (RESERVED_ATTRIBUTES as readonly string[]).includes(name);
+    }
+
     private getAttributeEntries(): AttributeEntry[] {
         const entries: AttributeEntry[] = [];
         const seen = new Set<string>();
@@ -278,6 +289,11 @@ export class AttributesModal extends LitElement {
 
         if (!/^[a-z][a-z0-9-]*$/.test(name)) {
             this.addError = "Use lowercase letters, numbers, and hyphens (must start with letter)";
+            return;
+        }
+
+        if (this.isReservedAttribute(name)) {
+            this.addError = `"${name}" is a reserved attribute and cannot be modified.`;
             return;
         }
 
@@ -392,6 +408,15 @@ export class AttributesModal extends LitElement {
         const a11yEntries = entries.filter((e) => this.isAccessibilityAttribute(e.name));
         // Element-defined attributes (src, href, target)
         const elementDefinedEntries = entries.filter((e) => e.source === "element");
+        // Reserved attributes (class, id, style) - read-only
+        const reservedEntries: AttributeEntry[] = Object.entries(this.reservedAttrs).map(
+            ([name, value]) => ({
+                name,
+                value,
+                isKnown: false,
+                source: "other" as const,
+            }),
+        );
         // Other attributes (dynamic, extensions, etc.)
         const otherEntries = entries.filter((e) => !e.isKnown && e.source === "other");
 
@@ -566,6 +591,17 @@ export class AttributesModal extends LitElement {
                         <div class="space-y-2">
                             ${otherEntries.length > 0
                                 ? otherEntries.map((entry) => this.renderDisabledRow(entry))
+                                : html`<p class="text-sm text-gray-400 italic">None</p>`}
+                        </div>
+                    </div>
+
+                    <!-- Reserved attributes (read-only) -->
+                    <div class="attr-section">
+                        <div class="text-sm font-medium text-gray-500 mb-1">Reserved Attributes</div>
+                        <p class="attr-hint mb-2">Cannot be modified (class, id, style)</p>
+                        <div class="space-y-2">
+                            ${reservedEntries.length > 0
+                                ? reservedEntries.map((entry) => this.renderDisabledRow(entry))
                                 : html`<p class="text-sm text-gray-400 italic">None</p>`}
                         </div>
                     </div>

@@ -95,6 +95,9 @@ import type { ElementAttributes } from "../types.js";
 const TOOLBAR_HEIGHT_DESKTOP = 48;
 const TOOLBAR_HEIGHT_MOBILE = 56;
 
+// Module-level tracking for beforeunload handler (survives HMR)
+let currentBeforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null;
+
 interface EditableElementInfo {
     element: HTMLElement;
     elementId: string;
@@ -900,6 +903,11 @@ class EditorController {
         document.addEventListener("click", this.handleDocumentClick);
 
         // Warn before leaving page with unsaved changes
+        // Remove any existing handler first (survives HMR)
+        if (currentBeforeUnloadHandler) {
+            window.removeEventListener("beforeunload", currentBeforeUnloadHandler);
+        }
+        currentBeforeUnloadHandler = this.handleBeforeUnload;
         window.addEventListener("beforeunload", this.handleBeforeUnload);
 
         this.injectEditStyles();
@@ -928,8 +936,11 @@ class EditorController {
         // Remove click-outside handler
         document.removeEventListener("click", this.handleDocumentClick);
 
-        // Remove beforeunload handler
+        // Remove beforeunload handler and clear module-level reference
         window.removeEventListener("beforeunload", this.handleBeforeUnload);
+        if (currentBeforeUnloadHandler === this.handleBeforeUnload) {
+            currentBeforeUnloadHandler = null;
+        }
 
         this.hideTemplateControls();
         this.deselectElement();
@@ -2253,16 +2264,18 @@ class EditorController {
      */
     private normalizeDomWhitespace(element: HTMLElement, type: EditableType): void {
         if (type === "text") {
-            const innerHTML = element.innerHTML;
-            const textContent = element.textContent || "";
-            if (innerHTML !== textContent) {
+            // Check for actual HTML elements (not just entity-encoded text like &amp;)
+            const hasHtmlElements = Array.from(element.childNodes).some(
+                (node) => node.nodeType === Node.ELEMENT_NODE,
+            );
+            if (hasHtmlElements) {
                 const id = element.getAttribute("data-scms-text");
                 this.log.warn(
                     `Element "${id}" has data-scms-text but contains HTML. Use data-scms-html to preserve formatting.`,
-                    { innerHTML }
+                    { innerHTML: element.innerHTML },
                 );
             }
-            element.textContent = this.normalizeWhitespace(innerHTML);
+            element.textContent = this.normalizeWhitespace(element.textContent || "");
         } else if (type === "html") {
             element.innerHTML = this.normalizeHtmlWhitespace(element.innerHTML);
         } else if (type === "link" && element instanceof HTMLAnchorElement) {
@@ -2271,18 +2284,24 @@ class EditorController {
         // image type doesn't need whitespace normalization
     }
 
+    /** Reserved attributes that should be shown but not editable */
+    private static readonly RESERVED_ATTRIBUTES = ["class", "id", "style"];
+
     /**
-     * Get attributes from the DOM element, split into element attrs and other attrs.
-     * Element attrs are core attributes (src, href, target).
-     * Other attrs are everything else (dynamic, extensions, etc).
+     * Get attributes from the DOM element, split into categories.
+     * - elementAttrs: core attributes (src, href, target)
+     * - reservedAttrs: class, id, style (read-only)
+     * - otherAttrs: everything else (dynamic, extensions, etc)
      */
     private getDomAttributes(element: HTMLElement): {
         elementAttrs: ElementAttributes;
+        reservedAttrs: ElementAttributes;
         otherAttrs: ElementAttributes;
     } {
         const elementAttrs: ElementAttributes = {};
+        const reservedAttrs: ElementAttributes = {};
         const otherAttrs: ElementAttributes = {};
-        const excludePatterns = [/^data-scms-/, /^class$/, /^id$/, /^style$/, /^contenteditable$/];
+        const excludePatterns = [/^data-scms-/, /^contenteditable$/];
 
         for (let i = 0; i < element.attributes.length; i++) {
             const attr = element.attributes[i];
@@ -2290,15 +2309,17 @@ class EditorController {
             if (excludePatterns.some((p) => p.test(attr.name))) {
                 continue;
             }
-            // Separate element attributes from other attributes
+            // Categorize attributes
             if (EditorController.ELEMENT_ATTRIBUTES.includes(attr.name)) {
                 elementAttrs[attr.name] = attr.value;
+            } else if (EditorController.RESERVED_ATTRIBUTES.includes(attr.name)) {
+                reservedAttrs[attr.name] = attr.value;
             } else {
                 otherAttrs[attr.name] = attr.value;
             }
         }
 
-        return { elementAttrs, otherAttrs };
+        return { elementAttrs, reservedAttrs, otherAttrs };
     }
 
     /**
@@ -2479,10 +2500,11 @@ class EditorController {
         const modal = document.createElement("scms-attributes-modal") as AttributesModal;
         modal.elementId = primaryInfo.elementId;
         modal.elementAttrs = this.getElementAttributes(key);
-        const { elementAttrs: elementDefinedAttrs, otherAttrs } = this.getDomAttributes(
+        const { elementAttrs: elementDefinedAttrs, reservedAttrs, otherAttrs } = this.getDomAttributes(
             primaryInfo.element,
         );
         modal.elementDefinedAttrs = elementDefinedAttrs;
+        modal.reservedAttrs = reservedAttrs;
         modal.otherAttrs = otherAttrs;
 
         modal.addEventListener("click", (e: Event) => e.stopPropagation());
