@@ -23,6 +23,12 @@ import type {
 } from "../types.js";
 
 /**
+ * Placeholder image for new template instances (gray background with "add image" icon at 50% centered)
+ */
+const IMAGE_PLACEHOLDER_DATA_URI =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect fill='%23e5e7eb' width='48' height='48'/%3E%3Cg transform='translate(12,12)'%3E%3Cpath d='M18 20H4V6h9V4H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-9h-2v9zm-7.79-3.17l-1.96-2.36L5.5 18h11l-3.54-4.71zM20 4V1h-2v3h-3c.01.01 0 2 0 2h3v2.99c.01.01 2 0 2 0V6h3V4h-3z' fill='%239ca3af'/%3E%3C/g%3E%3C/svg%3E";
+
+/**
  * Error thrown when an API request fails due to authentication issues (401/403)
  */
 class AuthError extends Error {
@@ -2663,6 +2669,21 @@ class EditorController {
 
         clone.setAttribute("data-scms-instance", newInstanceId);
         clone.removeAttribute("data-scms-template");
+
+        // Add placeholder to image elements without src
+        clone.querySelectorAll<HTMLImageElement>("img[data-scms-image]").forEach((img) => {
+            if (!img.src) {
+                img.src = IMAGE_PLACEHOLDER_DATA_URI;
+            }
+        });
+        // Also check if clone itself is the image element
+        if (
+            clone instanceof HTMLImageElement &&
+            clone.hasAttribute("data-scms-image") &&
+            !clone.src
+        ) {
+            clone.src = IMAGE_PLACEHOLDER_DATA_URI;
+        }
 
         // Insert before the add button (which is the last child)
         const addButton = this.templateAddButtons.get(templateId);
