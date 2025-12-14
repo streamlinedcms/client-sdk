@@ -1,7 +1,6 @@
 # Client SDK
 
-[![npm version](https://img.shields.io/npm/v/@streamlined-cms/client-sdk.svg?style=flat-square)](https://www.npmjs.com/package/@streamlined-cms/client-sdk)
-[![license](https://img.shields.io/npm/l/@streamlined-cms/client-sdk.svg?style=flat-square)](https://github.com/StreamlinedCMS/client-sdk/blob/main/LICENSE)
+[![license](https://img.shields.io/github/license/StreamlinedCMS/client-sdk?style=flat-square)](https://github.com/StreamlinedCMS/client-sdk/blob/master/LICENSE)
 
 The Streamlined CMS client SDK is a lightweight JavaScript library that enables inline content editing for websites. Add a single script tag to your HTML and mark elements as editable—no admin interface required.
 
@@ -15,8 +14,6 @@ The Streamlined CMS client SDK is a lightweight JavaScript library that enables 
 
 ## Installation
 
-### CDN (Recommended)
-
 Add this script tag to your HTML `<head>`:
 
 ```html
@@ -27,12 +24,6 @@ Add this script tag to your HTML `<head>`:
 ```
 
 Get your App ID from [app.streamlinedcms.com](https://app.streamlinedcms.com).
-
-### npm
-
-```bash
-npm install @streamlined-cms/client-sdk
-```
 
 ## Quick Example
 
