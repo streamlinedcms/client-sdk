@@ -101,8 +101,12 @@ import type { ElementAttributes } from "../types.js";
 const TOOLBAR_HEIGHT_DESKTOP = 48;
 const TOOLBAR_HEIGHT_MOBILE = 56;
 
-// Module-level tracking for beforeunload handler (survives HMR)
-let currentBeforeUnloadHandler: ((e: BeforeUnloadEvent) => void) | null = null;
+// Window property for beforeunload handler tracking (survives Vite HMR)
+declare global {
+    interface Window {
+        __scms_beforeUnloadHandler?: (e: BeforeUnloadEvent) => void;
+    }
+}
 
 interface EditableElementInfo {
     element: HTMLElement;
@@ -856,7 +860,9 @@ class EditorController {
                     const isDoubleTap =
                         this.lastTapKey === key && now - this.lastTapTime < this.doubleTapDelay;
 
-                    if (isDoubleTap) {
+                    if (isDoubleTap && isMobile) {
+                        // Mobile double-tap: open media manager for images, navigate for links
+                        // (Desktop uses native dblclick event instead)
                         if (elementType === "image") {
                             this.handleChangeImage();
                         } else if (elementType === "link") {
@@ -927,11 +933,11 @@ class EditorController {
         document.addEventListener("click", this.handleDocumentClick);
 
         // Warn before leaving page with unsaved changes
-        // Remove any existing handler first (survives HMR)
-        if (currentBeforeUnloadHandler) {
-            window.removeEventListener("beforeunload", currentBeforeUnloadHandler);
+        // Remove any existing handler first (window property survives Vite HMR)
+        if (window.__scms_beforeUnloadHandler) {
+            window.removeEventListener("beforeunload", window.__scms_beforeUnloadHandler);
         }
-        currentBeforeUnloadHandler = this.handleBeforeUnload;
+        window.__scms_beforeUnloadHandler = this.handleBeforeUnload;
         window.addEventListener("beforeunload", this.handleBeforeUnload);
 
         this.injectEditStyles();
@@ -960,10 +966,10 @@ class EditorController {
         // Remove click-outside handler
         document.removeEventListener("click", this.handleDocumentClick);
 
-        // Remove beforeunload handler and clear module-level reference
+        // Remove beforeunload handler and clear window reference
         window.removeEventListener("beforeunload", this.handleBeforeUnload);
-        if (currentBeforeUnloadHandler === this.handleBeforeUnload) {
-            currentBeforeUnloadHandler = null;
+        if (window.__scms_beforeUnloadHandler === this.handleBeforeUnload) {
+            window.__scms_beforeUnloadHandler = undefined;
         }
 
         this.hideTemplateControls();
