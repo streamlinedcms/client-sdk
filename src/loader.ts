@@ -234,6 +234,12 @@
             foundGroupBeforeTemplate = true;
         }
 
+        // Check the element itself for instance ID (when editable element IS the instance element)
+        const selfInstanceId = element.getAttribute("data-scms-instance");
+        if (selfInstanceId) {
+            instanceId = selfInstanceId;
+        }
+
         let current = element.parentElement;
         while (current) {
             // Check for group

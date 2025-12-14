@@ -317,6 +317,10 @@ class EditorController {
         let instanceId: string | null = null;
         let foundGroupBeforeTemplate = false;
 
+        // Check element itself first (handles case where instance/group is on same element as data-scms-*)
+        instanceId = element.getAttribute("data-scms-instance");
+        groupId = element.getAttribute("data-scms-group");
+
         let current = element.parentElement;
         while (current) {
             // Check for group
@@ -454,6 +458,20 @@ class EditorController {
             if (id) return { id, type };
         }
         return null;
+    }
+
+    /**
+     * Check if a template instance element is also the editable element.
+     * When true, we can't add inline controls (delete button, drag handle) inside it
+     * because they would become part of the editable content.
+     */
+    private isInstanceAlsoEditable(instanceElement: HTMLElement): boolean {
+        return (
+            instanceElement.hasAttribute("data-scms-text") ||
+            instanceElement.hasAttribute("data-scms-html") ||
+            instanceElement.hasAttribute("data-scms-image") ||
+            instanceElement.hasAttribute("data-scms-link")
+        );
     }
 
     private getEditableType(key: string): EditableType {
@@ -974,22 +992,32 @@ class EditorController {
         });
 
         // Add delete buttons and drag handles to existing instances
+        // (skip if instance element IS the editable element - use toolbar controls instead)
         this.templates.forEach((templateInfo, templateId) => {
             const { container } = templateInfo;
-            container
-                .querySelectorAll<HTMLElement>("[data-scms-instance]")
-                .forEach((instanceElement) => {
-                    if (!this.instanceDeleteButtons.has(instanceElement)) {
-                        this.addInstanceDeleteButton(instanceElement);
-                    }
-                    // Add drag handle if multiple instances
-                    if (templateInfo.instanceCount > 1) {
-                        this.addInstanceDragHandle(instanceElement);
-                    }
-                });
+            const instances = container.querySelectorAll<HTMLElement>("[data-scms-instance]");
+            let hasInlineControls = false;
 
-            // Initialize SortableJS for drag-and-drop reordering
-            if (!this.sortableInstances.has(templateId) && templateInfo.instanceCount > 1) {
+            instances.forEach((instanceElement) => {
+                // Skip inline controls if instance is also the editable element
+                if (this.isInstanceAlsoEditable(instanceElement)) return;
+
+                hasInlineControls = true;
+                if (!this.instanceDeleteButtons.has(instanceElement)) {
+                    this.addInstanceDeleteButton(instanceElement);
+                }
+                // Add drag handle if multiple instances
+                if (templateInfo.instanceCount > 1) {
+                    this.addInstanceDragHandle(instanceElement);
+                }
+            });
+
+            // Initialize SortableJS for drag-and-drop reordering (only if we have drag handles)
+            if (
+                hasInlineControls &&
+                !this.sortableInstances.has(templateId) &&
+                templateInfo.instanceCount > 1
+            ) {
                 this.initializeSortable(templateId, container);
             }
         });
@@ -2660,14 +2688,18 @@ class EditorController {
         this.log.debug("Added template instance", { templateId, instanceId: newInstanceId });
 
         // If we now have 2+ instances, add delete buttons and drag handles to all instances
+        // (skip if instance element IS the editable element - use toolbar controls instead)
         if (templateInfo.instanceCount >= 2 && this.currentMode === "author") {
+            let hasInlineControls = false;
             container
                 .querySelectorAll<HTMLElement>("[data-scms-instance]")
                 .forEach((instanceElement) => {
+                    if (this.isInstanceAlsoEditable(instanceElement)) return;
+                    hasInlineControls = true;
                     this.addInstanceDeleteButton(instanceElement);
                     this.addInstanceDragHandle(instanceElement);
                 });
-            if (!this.sortableInstances.has(templateId)) {
+            if (hasInlineControls && !this.sortableInstances.has(templateId)) {
                 this.initializeSortable(templateId, container);
             }
         }
@@ -2709,7 +2741,12 @@ class EditorController {
         // Collect all element keys for this instance
         const keysToDelete: string[] = [];
         const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
-        instanceElement.querySelectorAll<HTMLElement>(selector).forEach((el) => {
+        // Include instanceElement itself if it matches (e.g., <li data-scms-text="item">)
+        const descendants = Array.from(instanceElement.querySelectorAll<HTMLElement>(selector));
+        const elements = instanceElement.matches(selector)
+            ? [instanceElement, ...descendants]
+            : descendants;
+        elements.forEach((el) => {
             const info = this.getEditableInfo(el);
             if (info) {
                 const context = this.getStorageContext(el);
@@ -2869,7 +2906,12 @@ class EditorController {
         groupId: string | null,
     ): void {
         const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
-        instanceElement.querySelectorAll<HTMLElement>(selector).forEach((element) => {
+        // Include instanceElement itself if it matches (e.g., <li data-scms-text="item">)
+        const descendants = Array.from(instanceElement.querySelectorAll<HTMLElement>(selector));
+        const elements = instanceElement.matches(selector)
+            ? [instanceElement, ...descendants]
+            : descendants;
+        elements.forEach((element) => {
             const info = this.getEditableInfo(element);
             if (!info) return;
 
@@ -2936,7 +2978,12 @@ class EditorController {
         _instanceId: string,
     ): void {
         const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
-        instanceElement.querySelectorAll<HTMLElement>(selector).forEach((element) => {
+        // Include instanceElement itself if it matches (e.g., <li data-scms-text="item">)
+        const descendants = Array.from(instanceElement.querySelectorAll<HTMLElement>(selector));
+        const elements = instanceElement.matches(selector)
+            ? [instanceElement, ...descendants]
+            : descendants;
+        elements.forEach((element) => {
             const key = this.elementToKey.get(element);
             if (!key) return;
 
@@ -2944,8 +2991,10 @@ class EditorController {
             this.setupElementClickHandler(element, key);
         });
 
-        // Add delete button for this instance
-        this.addInstanceDeleteButton(instanceElement);
+        // Add delete button for this instance (skip if instance is also the editable element)
+        if (!this.isInstanceAlsoEditable(instanceElement)) {
+            this.addInstanceDeleteButton(instanceElement);
+        }
     }
 
     /**

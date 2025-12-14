@@ -1661,3 +1661,180 @@ test("drag and drop marks changes as unsaved", async () => {
     saveButton = page.locator("scms-toolbar").locator("button:has-text('Save')");
     expect(await saveButton.isVisible()).toBe(true);
 });
+
+// Template where instance element IS the editable element (e.g., <li data-scms-text="item">)
+
+test("template instance that is also the editable element gets proper instance ID", async () => {
+    server.clearContent();
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    // The checklist template has <li data-scms-text="item"> where the <li> is both instance and editable
+    const checklistContainer = page.locator('[data-scms-template="checklist"]');
+    const items = checklistContainer.locator("li");
+
+    // All 3 items should be recognized
+    expect(await items.count()).toBe(3);
+
+    // Each <li> should have a data-scms-instance attribute assigned
+    for (let i = 0; i < 3; i++) {
+        const instanceId = await items.nth(i).getAttribute("data-scms-instance");
+        expect(instanceId).toMatch(/^[a-z0-9]{5}$/);
+    }
+});
+
+test("template instance that is also the editable element is editable", async () => {
+    server.clearContent();
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const checklistContainer = page.locator('[data-scms-template="checklist"]');
+    const items = checklistContainer.locator("li");
+
+    // Each <li> should have the streamlined-editable class
+    for (let i = 0; i < 3; i++) {
+        const className = await items.nth(i).getAttribute("class");
+        expect(className).toContain("streamlined-editable");
+    }
+});
+
+test("clicking template instance that is also editable starts editing", async () => {
+    server.clearContent();
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const checklistContainer = page.locator('[data-scms-template="checklist"]');
+    const firstItem = checklistContainer.locator("li").first();
+
+    // Click to start editing
+    await firstItem.click();
+
+    // Should be contenteditable
+    const isEditable = await firstItem.getAttribute("contenteditable");
+    expect(isEditable).toBe("true");
+
+    // Should have editing class
+    const className = await firstItem.getAttribute("class");
+    expect(className).toContain("streamlined-editing");
+});
+
+test("template instance=editable loads content from API", async () => {
+    server.clearContent();
+    // Set content for checklist items where instance element IS the editable element
+    server.setContent(
+        "test-app",
+        "checklist.abc12.item",
+        JSON.stringify({ type: "text", value: "Buy groceries" }),
+    );
+    server.setContent(
+        "test-app",
+        "checklist.def34.item",
+        JSON.stringify({ type: "text", value: "Walk the dog" }),
+    );
+    server.setContent(
+        "test-app",
+        "checklist._order",
+        JSON.stringify({ type: "order", value: ["abc12", "def34"] }),
+    );
+
+    await page.goto(testUrl);
+    await page.waitForSelector(".streamlined-editable");
+
+    const checklistContainer = page.locator('[data-scms-template="checklist"]');
+    const items = checklistContainer.locator("li");
+
+    // Should have 2 instances from API (not 3 from HTML)
+    expect(await items.count()).toBe(2);
+
+    // Content should match API data (use innerText to avoid delete button's ×)
+    expect(await items.nth(0).innerText()).toContain("Buy groceries");
+    expect(await items.nth(1).innerText()).toContain("Walk the dog");
+});
+
+test("adding new instance works when instance=editable", async () => {
+    server.clearContent();
+    server.setContent(
+        "test-app",
+        "checklist.abc12.item",
+        JSON.stringify({ type: "text", value: "First task" }),
+    );
+    server.setContent(
+        "test-app",
+        "checklist._order",
+        JSON.stringify({ type: "order", value: ["abc12"] }),
+    );
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const checklistContainer = page.locator('[data-scms-template="checklist"]');
+    let items = checklistContainer.locator("li");
+
+    // Initially 1 instance
+    expect(await items.count()).toBe(1);
+
+    // Click add button
+    const addButton = checklistContainer.locator(".scms-template-add");
+    await addButton.click();
+
+    // Should now have 2 instances
+    items = checklistContainer.locator("li");
+    expect(await items.count()).toBe(2);
+
+    // New instance should have instance ID
+    const newInstanceId = await items.nth(1).getAttribute("data-scms-instance");
+    expect(newInstanceId).toMatch(/^[a-z0-9]{5}$/);
+
+    // New instance should be editable
+    const className = await items.nth(1).getAttribute("class");
+    expect(className).toContain("streamlined-editable");
+});
+
+test("editing and saving instance=editable element works", async () => {
+    server.clearContent();
+    server.setContent(
+        "test-app",
+        "checklist.abc12.item",
+        JSON.stringify({ type: "text", value: "Original task" }),
+    );
+    server.setContent(
+        "test-app",
+        "checklist._order",
+        JSON.stringify({ type: "order", value: ["abc12"] }),
+    );
+
+    await page.goto(testUrl);
+    await page.waitForSelector("scms-toolbar");
+
+    const checklistContainer = page.locator('[data-scms-template="checklist"]');
+    const firstItem = checklistContainer.locator("li").first();
+
+    // Click to edit
+    await firstItem.click();
+
+    // Edit content
+    await firstItem.fill("Updated task");
+
+    // Save
+    const saveButton = page.locator("scms-toolbar").locator("button:has-text('Save')");
+    await saveButton.click();
+
+    // Wait for save to complete
+    await page.waitForFunction(
+        () => {
+            const item = document.querySelector('[data-scms-template="checklist"] li');
+            return item && !item.classList.contains("streamlined-editing");
+        },
+        { timeout: 3000 },
+    );
+
+    // Reload and verify
+    await page.reload();
+    await page.waitForSelector(".streamlined-editable");
+
+    const reloadedItem = page.locator('[data-scms-template="checklist"] li').first();
+    expect(await reloadedItem.textContent()).toBe("Updated task");
+});
