@@ -2037,11 +2037,11 @@ class EditorController {
     }
 
     private handleReset(): void {
-        if (!this.editingKey) {
+        if (!this.selectedKey) {
             return;
         }
 
-        const key = this.editingKey;
+        const key = this.selectedKey;
         const originalContent = this.originalContent.get(key);
         const elementType = this.getEditableType(key);
 
@@ -2055,12 +2055,12 @@ class EditorController {
     }
 
     private async handleChangeImage(): Promise<void> {
-        if (!this.editingKey) {
+        if (!this.selectedKey) {
             this.log.debug("No element selected for image change");
             return;
         }
 
-        const key = this.editingKey;
+        const key = this.selectedKey;
         const infos = this.editableElements.get(key);
         if (!infos || infos.length === 0 || !(infos[0].element instanceof HTMLImageElement)) {
             this.log.warn("Selected element is not an image");
@@ -2094,7 +2094,7 @@ class EditorController {
     }
 
     private handleEditHtml(): void {
-        if (!this.editingKey) {
+        if (!this.selectedKey) {
             this.log.debug("No element selected for HTML editing");
             return;
         }
@@ -2105,7 +2105,7 @@ class EditorController {
             return;
         }
 
-        const key = this.editingKey;
+        const key = this.selectedKey;
         const infos = this.editableElements.get(key);
         if (!infos || infos.length === 0) {
             return;
@@ -2172,7 +2172,7 @@ class EditorController {
     }
 
     private handleEditLink(): void {
-        if (!this.editingKey) {
+        if (!this.selectedKey) {
             this.log.debug("No element selected for link editing");
             return;
         }
@@ -2183,7 +2183,7 @@ class EditorController {
             return;
         }
 
-        const key = this.editingKey;
+        const key = this.selectedKey;
         const infos = this.editableElements.get(key);
         if (!infos || infos.length === 0 || !(infos[0].element instanceof HTMLAnchorElement)) {
             this.log.warn("Selected element is not a link");
@@ -2245,12 +2245,12 @@ class EditorController {
     }
 
     private handleGoToLink(): void {
-        if (!this.editingKey) {
+        if (!this.selectedKey) {
             this.log.debug("No element selected for go to link");
             return;
         }
 
-        const key = this.editingKey;
+        const key = this.selectedKey;
         const infos = this.editableElements.get(key);
         if (!infos || infos.length === 0 || !(infos[0].element instanceof HTMLAnchorElement)) {
             this.log.warn("Selected element is not a link");
@@ -2398,7 +2398,7 @@ class EditorController {
     ];
 
     private handleEditSeo(): void {
-        if (!this.editingKey) {
+        if (!this.selectedKey) {
             this.log.debug("No element selected for SEO editing");
             return;
         }
@@ -2408,7 +2408,7 @@ class EditorController {
             return;
         }
 
-        const key = this.editingKey;
+        const key = this.selectedKey;
         const infos = this.editableElements.get(key);
         if (!infos || infos.length === 0) return;
 
@@ -2457,7 +2457,7 @@ class EditorController {
     }
 
     private handleEditAccessibility(): void {
-        if (!this.editingKey) {
+        if (!this.selectedKey) {
             this.log.debug("No element selected for accessibility editing");
             return;
         }
@@ -2467,7 +2467,7 @@ class EditorController {
             return;
         }
 
-        const key = this.editingKey;
+        const key = this.selectedKey;
         const infos = this.editableElements.get(key);
         if (!infos || infos.length === 0) return;
 
@@ -2520,7 +2520,7 @@ class EditorController {
     }
 
     private handleEditAttributes(): void {
-        if (!this.editingKey) {
+        if (!this.selectedKey) {
             this.log.debug("No element selected for attributes editing");
             return;
         }
@@ -2530,7 +2530,7 @@ class EditorController {
             return;
         }
 
-        const key = this.editingKey;
+        const key = this.selectedKey;
         const infos = this.editableElements.get(key);
         if (!infos || infos.length === 0) return;
 
