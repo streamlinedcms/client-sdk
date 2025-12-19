@@ -192,6 +192,10 @@ npm run build
 npm run dev
 ```
 
+## Versioning
+
+See [docs/versioning-strategy.md](docs/versioning-strategy.md) for the SDK versioning strategy, including URL structure, cache headers, release process, and breaking change policy.
+
 ## Pull Requests
 
 Before submitting a PR:
