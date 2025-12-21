@@ -12,13 +12,15 @@
  */
 
 import { execSync } from "child_process";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync } from "fs";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { parse as parseToml } from "smol-toml";
+import dotenv from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: join(__dirname, "..", ".env") });
+
 const packageJson = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
 const environment = process.argv[2];
@@ -28,23 +30,12 @@ if (!["staging", "production"].includes(environment)) {
     process.exit(1);
 }
 
-// Read KV namespace ID from cdn package's wrangler config
-const wranglerConfigPath = join(
-    __dirname,
-    "../../cdn",
-    environment === "staging" ? "wrangler.staging.toml" : "wrangler.toml",
-);
-
-if (!existsSync(wranglerConfigPath)) {
-    console.error(`Error: wrangler config not found at ${wranglerConfigPath}`);
-    process.exit(1);
-}
-
-const wranglerConfig = parseToml(readFileSync(wranglerConfigPath, "utf-8"));
-const namespaceId = wranglerConfig.kv_namespaces?.[0]?.id;
+const namespaceId =
+    environment === "staging" ? process.env.KV_NAMESPACE_STAGING : process.env.KV_NAMESPACE_PRODUCTION;
 
 if (!namespaceId) {
-    console.error(`Error: KV namespace not configured in ${wranglerConfigPath}`);
+    const envVar = environment === "staging" ? "KV_NAMESPACE_STAGING" : "KV_NAMESPACE_PRODUCTION";
+    console.error(`Error: ${envVar} not set in .env`);
     process.exit(1);
 }
 

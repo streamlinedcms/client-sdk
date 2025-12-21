@@ -14,27 +14,10 @@ import { createInterface } from "readline";
 import { readFileSync, existsSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { parse as parseToml } from "smol-toml";
+import dotenv from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-
-// Load .env file from cdn package (where CLOUDFLARE_API_TOKEN is stored)
-function loadEnvFile(filepath) {
-    if (!existsSync(filepath)) return;
-    const content = readFileSync(filepath, "utf-8");
-    for (const line of content.split("\n")) {
-        const match = line.match(/^([^=#]+)=(.*)$/);
-        if (match) {
-            const key = match[1].trim();
-            // Don't override existing env vars
-            if (!process.env[key]) {
-                process.env[key] = match[2].trim();
-            }
-        }
-    }
-}
-
-loadEnvFile(join(__dirname, "../.env"));
+dotenv.config({ path: join(__dirname, "..", ".env") });
 
 // Known collections (must match VALID_COLLECTIONS in cdn worker)
 const VALID_COLLECTIONS = ["client-sdk"];
@@ -46,23 +29,10 @@ if (!["staging", "production"].includes(environment)) {
     process.exit(1);
 }
 
-// Read zone ID from cdn package's wrangler config
-const wranglerConfigPath = join(
-    __dirname,
-    "../../cdn",
-    environment === "staging" ? "wrangler.staging.toml" : "wrangler.toml",
-);
-
-if (!existsSync(wranglerConfigPath)) {
-    console.error(`Error: wrangler config not found at ${wranglerConfigPath}`);
-    process.exit(1);
-}
-
-const wranglerConfig = parseToml(readFileSync(wranglerConfigPath, "utf-8"));
-const accountId = wranglerConfig.account_id;
+const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
 
 if (!accountId) {
-    console.error(`Error: account_id not found in ${wranglerConfigPath}`);
+    console.error("Error: CLOUDFLARE_ACCOUNT_ID not set in .env");
     process.exit(1);
 }
 

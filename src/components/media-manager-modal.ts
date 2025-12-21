@@ -40,7 +40,8 @@ interface AuthResult {
 interface MediaManagerMethods {
     authenticate(apiKey: string): Promise<AuthResult>;
     selectFile(options?: SelectFileOptions): Promise<SelectFileResult>;
-    [key: string]: (...args: unknown[]) => Promise<unknown>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: (...args: any[]) => Promise<any>;
 }
 
 @customElement("scms-media-manager-modal")
