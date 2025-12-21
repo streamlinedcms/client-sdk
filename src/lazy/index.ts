@@ -1255,6 +1255,7 @@ class EditorController {
                 line-height: 1;
                 cursor: pointer;
                 opacity: 0;
+                pointer-events: none;
                 transition: opacity 0.2s, background 0.2s;
                 z-index: 10;
                 display: flex;
@@ -1268,6 +1269,7 @@ class EditorController {
 
             [data-scms-instance]:hover > .scms-instance-delete {
                 opacity: 1;
+                pointer-events: auto;
             }
 
             /* Template structure mismatch indicator */
