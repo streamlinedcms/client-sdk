@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { playwright } from "@vitest/browser-playwright";
 
 export default defineConfig({
     // Build-time constants must be defined to avoid reference errors.
@@ -10,9 +11,17 @@ export default defineConfig({
         __SDK_VERSION__: JSON.stringify("0.0.0-test"),
     },
     test: {
-        environment: "jsdom",
         globals: true,
         setupFiles: ["./tests/setup.ts"],
+        // Unit tests use jsdom, browser tests use Vitest browser mode
+        environment: "jsdom",
+        // Browser mode configuration
+        browser: {
+            enabled: false, // Enabled per-project or via CLI
+            provider: playwright(),
+            headless: true,
+            instances: [{ browser: "chromium" }],
+        },
         coverage: {
             provider: "v8",
             reporter: ["text"],
