@@ -20,8 +20,8 @@ export class TestServer {
     // Set of API keys that should be rejected with 401
     private invalidApiKeys: Set<string> = new Set();
 
-    constructor(_preferredPort?: number) {
-        // Preferred port is ignored - we always use getPort()
+    constructor(private preferredPort?: number) {
+        // If preferredPort is specified, we'll use it; otherwise use getPort()
     }
 
     /**
@@ -77,6 +77,74 @@ export class TestServer {
      */
     clearContent(): void {
         this.contentStore.clear();
+    }
+
+    /**
+     * Handle test configuration endpoints (for browser-based tests)
+     * These endpoints allow tests running in the browser to configure the server
+     */
+    private async handleTestRequest(
+        req: IncomingMessage,
+        res: ServerResponse,
+        pathname: string,
+    ): Promise<boolean> {
+        const corsHeaders = {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+        };
+
+        // Handle CORS preflight
+        if (req.method === "OPTIONS") {
+            res.writeHead(204, corsHeaders);
+            res.end();
+            return true;
+        }
+
+        // GET /test/config - Get server configuration (for browser tests to discover URL)
+        if (pathname === "/test/config" && req.method === "GET") {
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ url: `http://localhost:${this.port}` }));
+            return true;
+        }
+
+        // POST /test/content - Set content for an element
+        if (pathname === "/test/content" && req.method === "POST") {
+            const body = await this.readBody(req);
+            const { appId, elementId, content } = JSON.parse(body);
+            this.setContent(appId, elementId, content);
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        // DELETE /test/content - Clear all content
+        if (pathname === "/test/content" && req.method === "DELETE") {
+            this.clearContent();
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        // POST /test/invalid-api-key - Mark an API key as invalid
+        if (pathname === "/test/invalid-api-key" && req.method === "POST") {
+            const body = await this.readBody(req);
+            const { apiKey } = JSON.parse(body);
+            this.setInvalidApiKey(apiKey);
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        // DELETE /test/invalid-api-keys - Clear all invalid API keys
+        if (pathname === "/test/invalid-api-keys" && req.method === "DELETE") {
+            this.clearInvalidApiKeys();
+            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
+            res.end(JSON.stringify({ success: true }));
+            return true;
+        }
+
+        return false;
     }
 
     private async handleApiRequest(
@@ -360,8 +428,8 @@ export class TestServer {
     }
 
     async start(): Promise<void> {
-        // Find any available port
-        this.port = await getPort();
+        // Use preferred port if specified, otherwise find any available port
+        this.port = this.preferredPort ?? await getPort();
 
         return new Promise((resolve, reject) => {
             this.server = createServer(async (req, res) => {
@@ -369,7 +437,13 @@ export class TestServer {
                     const url = new URL(req.url || "/", `http://localhost:${this.port}`);
                     const pathname = url.pathname;
 
-                    // Handle API requests first (strip /v1 prefix like the real worker)
+                    // Handle test configuration endpoints (for browser-based tests)
+                    if (pathname.startsWith("/test/")) {
+                        const handled = await this.handleTestRequest(req, res, pathname);
+                        if (handled) return;
+                    }
+
+                    // Handle API requests (strip /v1 prefix like the real worker)
                     if (pathname.startsWith("/v1/")) {
                         const strippedPath = pathname.slice(3); // Remove "/v1"
                         const handled = await this.handleApiRequest(req, res, strippedPath);
@@ -386,7 +460,7 @@ export class TestServer {
                     else if (pathname === "/" || pathname === "/index.html") {
                         const htmlPath = join(
                             process.cwd(),
-                            "tests/browser/fixtures/test-page.html",
+                            "tests/browser/support/fixtures/test-page.html",
                         );
                         let html = await readFile(htmlPath, "utf-8");
                         // Replace template placeholder with actual API URL
@@ -399,7 +473,7 @@ export class TestServer {
                     else if (pathname === "/auth-test.html") {
                         const htmlPath = join(
                             process.cwd(),
-                            "tests/browser/fixtures/test-page-no-mock-auth.html",
+                            "tests/browser/support/fixtures/test-page-no-mock-auth.html",
                         );
                         let html = await readFile(htmlPath, "utf-8");
                         html = html.replace("{{API_URL}}", `http://localhost:${this.port}/v1`);

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Streamlined CMS - Browser Test</title>
+        <style>
+            body {
+                font-family: sans-serif;
+                padding: 20px;
+            }
+            .test-section {
+                margin-bottom: 20px;
+                padding: 20px;
+                border: 1px solid #ddd;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="test-section">
+            <h1 data-scms-html="test-title">Test Title</h1>
+            <p data-scms-html="test-paragraph">Test paragraph content.</p>
+        </div>
+
+        <div class="test-section">
+            <h2 data-scms-html="test-heading">Test Heading</h2>
+            <p data-scms-html="test-content">More test content here.</p>
+        </div>
+
+        <div class="test-section">
+            <a href="https://example.com" data-scms-link="test-link">Default Link Text</a>
+        </div>
+
+        <!-- Template test section -->
+        <div class="test-section">
+            <h2>Team Members (Template Test)</h2>
+            <div data-scms-template="team" class="team-container">
+                <div class="team-member">
+                    <h3 data-scms-text="name">Default Name</h3>
+                    <p data-scms-text="role">Default Role</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template inside a group -->
+        <div class="test-section" data-scms-group="sidebar">
+            <h2>Testimonials (Template in Group)</h2>
+            <div data-scms-template="testimonials">
+                <blockquote class="testimonial">
+                    <p data-scms-text="quote">Default quote text</p>
+                    <cite data-scms-text="author">Default Author</cite>
+                </blockquote>
+            </div>
+        </div>
+
+        <!-- Inline group (group attribute on same element as data-scms-*) -->
+        <div class="test-section">
+            <h2>Inline Group Test</h2>
+            <span data-scms-group="company-name" data-scms-text="name">Default Company</span>
+        </div>
+
+        <!-- Group inside template (shared content across instances) -->
+        <div class="test-section">
+            <h2>Products with Shared Company Info (Group in Template)</h2>
+            <div data-scms-template="products" class="products-container">
+                <div class="product-card">
+                    <h3 data-scms-text="product-name">Default Product</h3>
+                    <p data-scms-text="product-desc">Default description</p>
+                    <!-- This group is shared across all product instances -->
+                    <div class="company-info" data-scms-group="company">
+                        <span data-scms-text="name">Company Name</span>
+                        <span data-scms-text="tagline">Company Tagline</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Multi-instance template (all children should be recognized) -->
+        <div class="test-section">
+            <h2>Features (Multi-Instance Test)</h2>
+            <ul data-scms-template="features" class="features-list">
+                <li class="feature-item"><span data-scms-text="feature">Feature One</span></li>
+                <li class="feature-item"><span data-scms-text="feature">Feature Two</span></li>
+                <li class="feature-item"><span data-scms-text="feature">Feature Three</span></li>
+            </ul>
+        </div>
+
+        <!-- Structure mismatch template (children have different structure) -->
+        <div class="test-section">
+            <h2>Mismatched Template Test</h2>
+            <div data-scms-template="mismatched" class="mismatched-container">
+                <div class="item"><span data-scms-text="title">Title One</span></div>
+                <div class="item"><span data-scms-text="title">Title Two</span><span data-scms-text="extra">Extra Field</span></div>
+            </div>
+        </div>
+
+        <!-- Template where instance element IS the editable element -->
+        <div class="test-section">
+            <h2>Checklist (Instance = Editable)</h2>
+            <ol data-scms-template="checklist" class="checklist">
+                <li data-scms-text="item">First item</li>
+                <li data-scms-text="item">Second item</li>
+                <li data-scms-text="item">Third item</li>
+            </ol>
+        </div>
+    </body>
+</html>
