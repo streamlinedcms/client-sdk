@@ -575,6 +575,11 @@ class EditorController {
                 const existing = this.editableElements.get(key);
                 if (existing) {
                     existing.push(elementInfo);
+                    // Sync the new element with existing content (e.g., group inside template)
+                    const content = this.currentContent.get(key);
+                    if (content) {
+                        this.applyElementContent(key, elementInfo, content);
+                    }
                 } else {
                     this.editableElements.set(key, [elementInfo]);
 
@@ -3690,6 +3695,15 @@ class EditorController {
             const existing = this.editableElements.get(key);
             if (existing) {
                 existing.push(elementInfo);
+                // Sync the new element with existing shared content (e.g., group inside template)
+                let content = this.currentContent.get(key);
+                if (!content && existing.length > 0) {
+                    // No saved content yet - get content from an existing element
+                    content = this.getElementContent(key, existing[0]);
+                }
+                if (content) {
+                    this.applyElementContent(key, elementInfo, content);
+                }
             } else {
                 this.editableElements.set(key, [elementInfo]);
 
