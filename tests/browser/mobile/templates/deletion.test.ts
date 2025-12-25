@@ -1,23 +1,17 @@
 /**
  * Template instance deletion tests
  *
- * Tests the deletion of template instances via toolbar controls.
+ * Tests the deletion of template instances via mobile toolbar controls.
  */
 
 import { test, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
-import { setContent } from "../support/test-helpers.js";
+import { setContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     waitForCondition,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { Toolbar } from "../../../src/components/toolbar.js";
-
-// Extended type to access private properties for testing
-interface ToolbarInternal extends Toolbar {
-    isMobile: boolean;
-    expanded: boolean;
-}
+} from "~/@browser-support/sdk-helpers.js";
+import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();
@@ -36,44 +30,62 @@ beforeAll(async () => {
     );
 
     await initializeSDK();
+
+    // Wait for toolbar to detect mobile viewport and re-render
+    const toolbar = document.querySelector("scms-toolbar");
+    await waitForCondition(() => toolbar?.shadowRoot?.querySelector(".h-14") !== null);
 });
 
 beforeEach(async () => {
-    document.body.click();
-    await new Promise((r) => setTimeout(r, 100));
+    // Small delay to ensure clean state
+    await new Promise((r) => setTimeout(r, 50));
 });
 
 afterEach(async () => {
-    // Reset to desktop mode
-    const toolbar = getToolbar() as ToolbarInternal;
-    toolbar.isMobile = false;
-    toolbar.expanded = false;
+    // Collapse drawer first
+    collapseDrawer();
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Click body to deselect and wait for it to complete
+    document.body.click();
     await new Promise((r) => setTimeout(r, 100));
+    await waitForCondition(() => {
+        const selected = document.querySelector(".streamlined-selected");
+        const editing = document.querySelector(".streamlined-editing");
+        return selected === null && editing === null;
+    });
 });
 
 afterAll(async () => {
+    // Ensure clean state first
+    collapseDrawer();
+    await new Promise((r) => setTimeout(r, 200));
+    document.body.click();
+    await new Promise((r) => setTimeout(r, 200));
+
     // Restore instances for other tests that depend on team having multiple members
-    // Add instances until we have at least 3
-    const toolbar = getToolbar() as ToolbarInternal;
     while (getTeamMembers().length < 3) {
         const members = getTeamMembers();
         if (members.length === 0) break;
         const nameElement = members[0]?.querySelector('[data-scms-text="name"]') as HTMLElement;
         if (!nameElement) break;
+
+        // Mobile: first click selects
         nameElement.click();
-        await waitForCondition(() => nameElement.classList.contains("streamlined-editing"));
-        toolbar.isMobile = true;
-        toolbar.expanded = true;
-        await new Promise((r) => setTimeout(r, 100));
+        await waitForCondition(() => nameElement.classList.contains("streamlined-selected"));
+
+        await expandDrawer();
         const addBtn = findToolbarButton("Add Item");
         if (addBtn) {
             addBtn.click();
             await new Promise((r) => setTimeout(r, 300));
         }
+
+        // Clean up for next iteration
+        collapseDrawer();
+        await new Promise((r) => setTimeout(r, 100));
         document.body.click();
         await new Promise((r) => setTimeout(r, 100));
-        toolbar.isMobile = false;
-        toolbar.expanded = false;
     }
 });
 
@@ -106,17 +118,32 @@ async function selectTemplateElement(index: number): Promise<void> {
     const members = getTeamMembers();
     const nameElement = members[index]?.querySelector('[data-scms-text="name"]') as HTMLElement;
     nameElement.click();
-    await waitForCondition(() => nameElement.classList.contains("streamlined-editing"));
+    // Mobile uses two-step interaction: first tap selects, second tap edits
+    // For template controls, we only need selection (not editing)
+    await waitForCondition(() => nameElement.classList.contains("streamlined-selected"));
 }
 
 /**
- * Helper to set mobile mode and expand drawer
+ * Helper to expand the mobile drawer
  */
-async function setMobileMode(): Promise<void> {
-    const toolbar = getToolbar() as ToolbarInternal;
-    toolbar.isMobile = true;
-    toolbar.expanded = true;
-    await new Promise((r) => setTimeout(r, 100));
+async function expandDrawer(): Promise<void> {
+    const toolbar = getToolbar();
+    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Open")) {
+        menuBtn.click();
+        await new Promise((r) => setTimeout(r, 100));
+    }
+}
+
+/**
+ * Helper to collapse the mobile drawer
+ */
+function collapseDrawer(): void {
+    const toolbar = getToolbar();
+    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Close")) {
+        menuBtn.click();
+    }
 }
 
 /**
@@ -136,7 +163,7 @@ function findToolbarButton(text: string): HTMLButtonElement | null {
 /**
  * Helper to click a toolbar button by text
  */
-async function clickMobileToolbarButton(text: string): Promise<void> {
+async function clickToolbarButton(text: string): Promise<void> {
     const btn = findToolbarButton(text);
     if (!btn) {
         throw new Error(`Button "${text}" not found`);
@@ -150,10 +177,10 @@ test("Delete button removes template instance", async () => {
 
     // Select middle instance
     await selectTemplateElement(1);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Delete
-    await clickMobileToolbarButton("Delete");
+    await clickToolbarButton("Delete");
 
     // Wait for deletion to complete
     await new Promise((r) => setTimeout(r, 300));
@@ -167,10 +194,10 @@ test("Delete removes correct instance", async () => {
 
     // Select first instance (abc12)
     await selectTemplateElement(0);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Delete
-    await clickMobileToolbarButton("Delete");
+    await clickToolbarButton("Delete");
     await new Promise((r) => setTimeout(r, 300));
 
     // The first instance should be gone
@@ -183,19 +210,26 @@ test("Delete sets hasChanges to true", async () => {
 
     // If only 1 instance left, add one first
     if (getTeamMembers().length <= 1) {
-        // Need to add instance - select and use Add Item
         await selectTemplateElement(0);
-        await setMobileMode();
-        await clickMobileToolbarButton("Add Item");
-        await new Promise((r) => setTimeout(r, 300));
+        await expandDrawer();
+        await clickToolbarButton("Add Item");
+
+        // Wait for new instance to be fully initialized with click handlers
+        await new Promise((r) => setTimeout(r, 500));
+
+        // Collapse and deselect before continuing
+        collapseDrawer();
+        await new Promise((r) => setTimeout(r, 100));
+        document.body.click();
+        await new Promise((r) => setTimeout(r, 200));
     }
 
     // Select an instance
     await selectTemplateElement(0);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Delete
-    await clickMobileToolbarButton("Delete");
+    await clickToolbarButton("Delete");
     await new Promise((r) => setTimeout(r, 300));
 
     // Should have unsaved changes
@@ -206,8 +240,8 @@ test("cannot delete last remaining instance", async () => {
     // Delete instances until only one remains
     while (getTeamMembers().length > 1) {
         await selectTemplateElement(0);
-        await setMobileMode();
-        await clickMobileToolbarButton("Delete");
+        await expandDrawer();
+        await clickToolbarButton("Delete");
         await new Promise((r) => setTimeout(r, 300));
         document.body.click();
         await new Promise((r) => setTimeout(r, 100));
@@ -218,10 +252,10 @@ test("cannot delete last remaining instance", async () => {
     expect(lastCount).toBe(1);
 
     await selectTemplateElement(0);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Delete - should not remove the last instance
-    await clickMobileToolbarButton("Delete");
+    await clickToolbarButton("Delete");
     await new Promise((r) => setTimeout(r, 300));
 
     // Still should have 1 instance

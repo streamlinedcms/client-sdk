@@ -11,8 +11,8 @@ import {
     waitForSelector,
     clickToolbarButton,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { AttributesModal } from "../../../src/components/attributes-modal.js";
+} from "~/@browser-support/sdk-helpers.js";
+import type { AttributesModal } from "~/src/components/attributes-modal.js";
 
 beforeAll(async () => {
     setupTestHelpers();

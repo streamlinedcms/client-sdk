@@ -6,20 +6,13 @@
  */
 
 import { test, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
-import { setContent, clearContent } from "../support/test-helpers.js";
+import { setContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     waitForCondition,
     setupTestHelpers,
-    clickToolbarButton,
-} from "../support/sdk-helpers.js";
-import type { Toolbar } from "../../../src/components/toolbar.js";
-
-// Extended type to access private properties for testing
-interface ToolbarInternal extends Toolbar {
-    isMobile: boolean;
-    expanded: boolean;
-}
+} from "~/@browser-support/sdk-helpers.js";
+import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();
@@ -38,25 +31,41 @@ beforeAll(async () => {
     );
 
     await initializeSDK();
+
+    // Wait for toolbar to detect mobile viewport and re-render
+    const toolbar = document.querySelector("scms-toolbar");
+    await waitForCondition(() => toolbar?.shadowRoot?.querySelector(".h-14") !== null);
 });
 
 beforeEach(async () => {
-    document.body.click();
-    await new Promise((r) => setTimeout(r, 100));
+    // Small delay to ensure clean state
+    await new Promise((r) => setTimeout(r, 50));
 });
 
 afterEach(async () => {
-    // Reset to desktop mode
-    const toolbar = getToolbar() as ToolbarInternal;
-    toolbar.isMobile = false;
-    toolbar.expanded = false;
+    // Collapse drawer first
+    collapseDrawer();
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Click body to deselect and wait for it to complete
+    document.body.click();
     await new Promise((r) => setTimeout(r, 100));
+    await waitForCondition(() => {
+        const selected = document.querySelector(".streamlined-selected");
+        const editing = document.querySelector(".streamlined-editing");
+        return selected === null && editing === null;
+    });
 });
 
 afterAll(async () => {
+    // Ensure clean state before restoring order
+    collapseDrawer();
+    await new Promise((r) => setTimeout(r, 200));
+    document.body.click();
+    await new Promise((r) => setTimeout(r, 200));
+
     // Restore original order [abc12, def34, ghi56] for other tests
     const targetOrder = ["abc12", "def34", "ghi56"];
-    const toolbar = getToolbar() as ToolbarInternal;
 
     // Keep reordering until we match target order
     let attempts = 0;
@@ -71,13 +80,15 @@ afterAll(async () => {
             if (currentIndex !== i && currentIndex > i) {
                 // Element needs to move up
                 await selectTemplateElement(currentIndex);
-                await setMobileMode();
-                await clickMobileToolbarButton("Move Up");
+                await expandDrawer();
+                await clickToolbarButton("Move Up");
                 await new Promise((r) => setTimeout(r, 200));
+
+                // Clean up after move
+                collapseDrawer();
+                await new Promise((r) => setTimeout(r, 100));
                 document.body.click();
                 await new Promise((r) => setTimeout(r, 100));
-                toolbar.isMobile = false;
-                toolbar.expanded = false;
                 break;
             }
         }
@@ -108,33 +119,38 @@ function getInstanceOrder(): string[] {
 }
 
 /**
- * Get member names in current DOM order
- */
-function getMemberNames(): string[] {
-    const members = getTeamMembers();
-    return Array.from(members).map(
-        (m) => m.querySelector('[data-scms-text="name"]')?.textContent || ""
-    );
-}
-
-/**
  * Helper to select a template element
  */
 async function selectTemplateElement(index: number): Promise<void> {
     const members = getTeamMembers();
     const nameElement = members[index]?.querySelector('[data-scms-text="name"]') as HTMLElement;
     nameElement.click();
-    await waitForCondition(() => nameElement.classList.contains("streamlined-editing"));
+    // Mobile uses two-step interaction: first tap selects, second tap edits
+    // For template controls, we only need selection (not editing)
+    await waitForCondition(() => nameElement.classList.contains("streamlined-selected"));
 }
 
 /**
- * Helper to set mobile mode and expand drawer
+ * Helper to expand the mobile drawer
  */
-async function setMobileMode(): Promise<void> {
-    const toolbar = getToolbar() as ToolbarInternal;
-    toolbar.isMobile = true;
-    toolbar.expanded = true;
-    await new Promise((r) => setTimeout(r, 100));
+async function expandDrawer(): Promise<void> {
+    const toolbar = getToolbar();
+    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Open")) {
+        menuBtn.click();
+        await new Promise((r) => setTimeout(r, 100));
+    }
+}
+
+/**
+ * Helper to collapse the mobile drawer
+ */
+function collapseDrawer(): void {
+    const toolbar = getToolbar();
+    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Close")) {
+        menuBtn.click();
+    }
 }
 
 /**
@@ -154,7 +170,7 @@ function findToolbarButton(text: string): HTMLButtonElement | null {
 /**
  * Helper to click a toolbar button by text
  */
-async function clickMobileToolbarButton(text: string): Promise<void> {
+async function clickToolbarButton(text: string): Promise<void> {
     const btn = findToolbarButton(text);
     if (!btn) {
         throw new Error(`Button "${text}" not found`);
@@ -169,10 +185,10 @@ test("Move Down changes DOM order", async () => {
 
     // Select first instance
     await selectTemplateElement(0);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Move Down
-    await clickMobileToolbarButton("Move Down");
+    await clickToolbarButton("Move Down");
 
     // Wait for reorder to complete
     await new Promise((r) => setTimeout(r, 200));
@@ -183,15 +199,12 @@ test("Move Down changes DOM order", async () => {
 });
 
 test("Move Up changes DOM order", async () => {
-    // First, restore order by moving down the one that's now first
-    let currentOrder = getInstanceOrder();
-
     // Select second instance (abc12 which was moved)
     await selectTemplateElement(1);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Move Up
-    await clickMobileToolbarButton("Move Up");
+    await clickToolbarButton("Move Up");
     await new Promise((r) => setTimeout(r, 200));
 
     // Should be back to original order
@@ -202,10 +215,10 @@ test("Move Up changes DOM order", async () => {
 test("Move Down from middle moves instance down", async () => {
     // Select middle instance (def34 at index 1)
     await selectTemplateElement(1);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Move Down
-    await clickMobileToolbarButton("Move Down");
+    await clickToolbarButton("Move Down");
     await new Promise((r) => setTimeout(r, 200));
 
     // Middle instance should now be last
@@ -216,10 +229,10 @@ test("Move Down from middle moves instance down", async () => {
 test("Move Up from last position works", async () => {
     // Select last instance (def34 which is now at index 2)
     await selectTemplateElement(2);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Move Up
-    await clickMobileToolbarButton("Move Up");
+    await clickToolbarButton("Move Up");
     await new Promise((r) => setTimeout(r, 200));
 
     // Should move up one position
@@ -232,10 +245,10 @@ test("reordering sets hasChanges to true", async () => {
 
     // Select middle instance
     await selectTemplateElement(1);
-    await setMobileMode();
+    await expandDrawer();
 
     // Click Move Down
-    await clickMobileToolbarButton("Move Down");
+    await clickToolbarButton("Move Down");
     await new Promise((r) => setTimeout(r, 200));
 
     // Should have unsaved changes
@@ -247,19 +260,29 @@ test("toolbar updates instanceIndex after move", async () => {
 
     // Restore order first
     await selectTemplateElement(2); // def34 is last
-    await setMobileMode();
-    await clickMobileToolbarButton("Move Up");
+    await expandDrawer();
+    await clickToolbarButton("Move Up");
     await new Promise((r) => setTimeout(r, 200));
+
+    // Clean up before next operation
+    collapseDrawer();
+    await new Promise((r) => setTimeout(r, 100));
+    document.body.click();
+    await new Promise((r) => setTimeout(r, 100));
 
     // Now select first instance
     await selectTemplateElement(0);
-    await setMobileMode();
-
-    const initialIndex = toolbar.instanceIndex;
+    await expandDrawer();
 
     // Move down
-    await clickMobileToolbarButton("Move Down");
+    await clickToolbarButton("Move Down");
     await new Promise((r) => setTimeout(r, 200));
+
+    // Clean up before verification
+    collapseDrawer();
+    await new Promise((r) => setTimeout(r, 100));
+    document.body.click();
+    await new Promise((r) => setTimeout(r, 100));
 
     // After moving down, instanceIndex should increase
     // (Need to re-select to see updated index since we moved)

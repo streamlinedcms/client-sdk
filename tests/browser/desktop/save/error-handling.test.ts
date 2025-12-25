@@ -11,9 +11,9 @@ import {
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import { setNextPatchError, clearNextPatchError } from "../support/test-helpers.js";
-import type { Toolbar } from "../../../src/components/toolbar.js";
+} from "~/@browser-support/sdk-helpers.js";
+import { setNextPatchError, clearNextPatchError } from "~/@browser-support/test-helpers.js";
+import type { Toolbar } from "~/src/components/toolbar.js";
 
 // Mock window.alert to capture the error message
 let lastAlertMessage: string | null = null;

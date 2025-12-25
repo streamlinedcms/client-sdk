@@ -6,7 +6,7 @@
  */
 
 import { test, expect, beforeAll } from "vitest";
-import { setupTestHelpers } from "../support/sdk-helpers.js";
+import { setupTestHelpers } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();

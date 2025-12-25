@@ -3,8 +3,8 @@
  */
 
 import { test, expect, beforeAll } from "vitest";
-import { initializeSDK, setupTestHelpers } from "../support/sdk-helpers.js";
-import type { Toolbar } from "../../../src/components/toolbar.js";
+import { initializeSDK, setupTestHelpers } from "~/@browser-support/sdk-helpers.js";
+import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();

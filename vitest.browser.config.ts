@@ -1,11 +1,20 @@
 import { defineConfig, type Plugin } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
+import { existsSync, readFileSync } from "fs";
+import path from "path";
 import getPort from "get-port";
 import { setPort } from "./tests/browser/support/test-port.js";
 
 // Get an available port and share it with globalSetup
-const port = await getPort();
-setPort(port);
+// Reuse existing port if set (config may load multiple times with projects)
+const PORT_FILE = "./tests/browser/.test-server-port";
+let port: number;
+if (existsSync(PORT_FILE)) {
+    port = parseInt(readFileSync(PORT_FILE, "utf-8"), 10);
+} else {
+    port = await getPort();
+    setPort(port);
+}
 
 /**
  * Plugin to handle CSS imports as strings (like rollup-plugin-postcss).
@@ -65,21 +74,45 @@ export default defineConfig({
         // Disable CSS modules to get raw CSS
         modules: false,
     },
+    resolve: {
+        alias: {
+            "~/src": path.resolve(__dirname, "./src"),
+            "~/@browser-support": path.resolve(__dirname, "./tests/browser/support"),
+        },
+    },
     test: {
-        name: "browser",
-        include: ["tests/browser/**/*.browser.test.ts"],
         globals: true,
         globalSetup: ["./tests/browser/support/globalSetup.ts"],
         testTimeout: 10000, // 10 second max per test
         fileParallelism: false, // Run files sequentially to avoid shared API state conflicts
+        projects: [
+            {
+                extends: true,
+                test: {
+                    name: "desktop",
+                    include: ["tests/browser/desktop/**/*.test.ts"],
+                    browser: {
+                        viewport: { width: 1280, height: 720 },
+                    },
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: "mobile",
+                    include: ["tests/browser/mobile/**/*.test.ts"],
+                    browser: {
+                        viewport: { width: 375, height: 667 },
+                    },
+                },
+            },
+        ],
         browser: {
             enabled: true,
             provider: playwright(),
             headless: true,
             instances: [{ browser: "chromium" }],
             testerHtmlPath: "./tests/browser/support/fixtures/tester.html",
-            // Use desktop viewport to avoid mobile two-click editing behavior
-            viewport: { width: 1280, height: 720 },
         },
         coverage: {
             provider: "v8",

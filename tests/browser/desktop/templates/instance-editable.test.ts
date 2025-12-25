@@ -4,14 +4,14 @@
  */
 
 import { test, expect, beforeAll, afterAll } from "vitest";
-import { setContent } from "../support/test-helpers.js";
+import { setContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
-    
-} from "../support/sdk-helpers.js";
+
+} from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();

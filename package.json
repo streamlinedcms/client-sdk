@@ -24,6 +24,8 @@
     "test": "npm run test:unit && npm run test:browser",
     "test:unit": "vitest run --config vitest.config.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:browser:desktop": "vitest run --config vitest.browser.config.ts --project=desktop",
+    "test:browser:mobile": "vitest run --config vitest.browser.config.ts --project=mobile",
     "test:watch": "vitest --config vitest.config.ts",
     "test:browser:watch": "vitest --config vitest.browser.config.ts",
     "test:browser:coverage": "vitest run --config vitest.browser.config.ts --coverage",

@@ -12,8 +12,8 @@ import {
     waitForSelector,
     clickToolbarButton,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { SeoModal } from "../../../src/components/seo-modal.js";
+} from "~/@browser-support/sdk-helpers.js";
+import type { SeoModal } from "~/src/components/seo-modal.js";
 
 beforeAll(async () => {
     setupTestHelpers();

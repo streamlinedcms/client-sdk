@@ -11,8 +11,8 @@ import {
     waitForCondition,
     setupTestHelpers,
     getController,
-} from "../support/sdk-helpers.js";
-import type { Toolbar } from "../../../src/components/toolbar.js";
+} from "~/@browser-support/sdk-helpers.js";
+import type { Toolbar } from "~/src/components/toolbar.js";
 
 const DRAFT_STORAGE_KEY = "scms_draft";
 

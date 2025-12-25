@@ -11,7 +11,7 @@ import {
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
+} from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();

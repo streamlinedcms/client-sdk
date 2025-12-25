@@ -9,8 +9,8 @@ import {
     initializeSDK,
     waitForCondition,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { Toolbar } from "../../../src/components/toolbar.js";
+} from "~/@browser-support/sdk-helpers.js";
+import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();

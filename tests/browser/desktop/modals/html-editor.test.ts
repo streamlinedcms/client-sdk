@@ -11,8 +11,8 @@ import {
     waitForSelector,
     clickToolbarButton,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { HtmlEditorModal } from "../../../src/components/html-editor-modal.js";
+} from "~/@browser-support/sdk-helpers.js";
+import type { HtmlEditorModal } from "~/src/components/html-editor-modal.js";
 
 beforeAll(async () => {
     setupTestHelpers();

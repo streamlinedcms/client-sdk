@@ -9,8 +9,8 @@ import {
     initializeSDK,
     waitForCondition,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { HoldButton } from "../../../src/components/hold-button.js";
+} from "~/@browser-support/sdk-helpers.js";
+import type { HoldButton } from "~/src/components/hold-button.js";
 
 beforeAll(async () => {
     setupTestHelpers();

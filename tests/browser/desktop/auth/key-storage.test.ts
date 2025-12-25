@@ -5,8 +5,8 @@
  */
 
 import { test, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { setupTestHelpers } from "../support/sdk-helpers.js";
-import { KeyStorage } from "../../../src/key-storage.js";
+import { setupTestHelpers } from "~/@browser-support/sdk-helpers.js";
+import { KeyStorage } from "~/src/key-storage.js";
 
 const AUTH_STORAGE_KEY = "scms_auth";
 const MODE_STORAGE_KEY = "scms_mode";

@@ -6,14 +6,14 @@
  */
 
 import { test, expect, beforeAll, beforeEach } from "vitest";
-import { setContent, clearContent } from "../support/test-helpers.js";
+import { setContent, clearContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { Toolbar } from "../../../src/components/toolbar.js";
+} from "~/@browser-support/sdk-helpers.js";
+import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();

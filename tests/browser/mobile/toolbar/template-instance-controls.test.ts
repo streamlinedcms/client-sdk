@@ -4,23 +4,17 @@
  * Tests the template instance controls in the mobile toolbar:
  * Move Up, Move Down, Add Item, Delete
  *
- * Note: These controls only appear in mobile view.
+ * These controls appear in the mobile expanded drawer.
  */
 
 import { test, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { setContent } from "../support/test-helpers.js";
+import { setContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     waitForCondition,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { Toolbar } from "../../../src/components/toolbar.js";
-
-// Extended type to access private properties for testing
-interface ToolbarInternal extends Toolbar {
-    isMobile: boolean;
-    expanded: boolean;
-}
+} from "~/@browser-support/sdk-helpers.js";
+import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();
@@ -39,19 +33,30 @@ beforeAll(async () => {
     );
 
     await initializeSDK();
+
+    // Wait for toolbar to detect mobile viewport and re-render
+    const toolbar = document.querySelector("scms-toolbar");
+    await waitForCondition(() => toolbar?.shadowRoot?.querySelector(".h-14") !== null);
 });
 
 beforeEach(async () => {
-    document.body.click();
-    await new Promise((r) => setTimeout(r, 100));
+    // Small delay to ensure clean state
+    await new Promise((r) => setTimeout(r, 50));
 });
 
 afterEach(async () => {
-    // Reset to desktop mode
-    const toolbar = getToolbar() as ToolbarInternal;
-    toolbar.isMobile = false;
-    toolbar.expanded = false;
+    // Collapse drawer first
+    collapseDrawer();
+    await new Promise((r) => setTimeout(r, 200));
+
+    // Click body to deselect and wait for it to complete
+    document.body.click();
     await new Promise((r) => setTimeout(r, 100));
+    await waitForCondition(() => {
+        const selected = document.querySelector(".streamlined-selected");
+        const editing = document.querySelector(".streamlined-editing");
+        return selected === null && editing === null;
+    });
 });
 
 /**
@@ -74,18 +79,49 @@ function getTeamMembers(): NodeListOf<Element> {
 async function selectTemplateElement(index: number): Promise<void> {
     const members = getTeamMembers();
     const nameElement = members[index]?.querySelector('[data-scms-text="name"]') as HTMLElement;
+
+    // Check if element is already selected/editing
+    const alreadyActive =
+        nameElement.classList.contains("streamlined-selected") ||
+        nameElement.classList.contains("streamlined-editing");
+
+    if (alreadyActive) {
+        // Already active, just verify toolbar has template context
+        const toolbar = getToolbar();
+        await waitForCondition(() => toolbar.templateId !== null);
+        return;
+    }
+
     nameElement.click();
-    await waitForCondition(() => nameElement.classList.contains("streamlined-editing"));
+    // Mobile uses two-step interaction: first tap selects, second tap edits
+    // For template controls, we only need selection (not editing)
+    await waitForCondition(() =>
+        nameElement.classList.contains("streamlined-selected") ||
+        nameElement.classList.contains("streamlined-editing")
+    );
 }
 
 /**
- * Helper to set mobile mode and expand drawer
+ * Helper to expand the mobile drawer
  */
-async function setMobileMode(): Promise<void> {
-    const toolbar = getToolbar() as ToolbarInternal;
-    toolbar.isMobile = true;
-    toolbar.expanded = true;
-    await new Promise((r) => setTimeout(r, 100));
+async function expandDrawer(): Promise<void> {
+    const toolbar = getToolbar();
+    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Open")) {
+        menuBtn.click();
+        await new Promise((r) => setTimeout(r, 100));
+    }
+}
+
+/**
+ * Helper to collapse the mobile drawer
+ */
+function collapseDrawer(): void {
+    const toolbar = getToolbar();
+    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Close")) {
+        menuBtn.click();
+    }
 }
 
 /**
@@ -107,75 +143,74 @@ test("selecting template element shows template context in toolbar", async () =>
 
     const toolbar = getToolbar();
     expect(toolbar.templateId).toBe("team");
-    // instanceIndex may be 0-indexed or 1-indexed depending on implementation
     expect(toolbar.instanceIndex).toBeGreaterThanOrEqual(0);
     expect(toolbar.instanceCount).toBeGreaterThanOrEqual(1);
 });
 
-test("mobile view shows Move Up button for template elements", async () => {
+test("expanded drawer shows Move Up button for template elements", async () => {
     await selectTemplateElement(1); // Select middle element
-    await setMobileMode();
+    await expandDrawer();
 
     const moveUpBtn = findToolbarButton("Move Up");
     expect(moveUpBtn).not.toBeNull();
 });
 
-test("mobile view shows Move Down button for template elements", async () => {
+test("expanded drawer shows Move Down button for template elements", async () => {
     await selectTemplateElement(1); // Select middle element
-    await setMobileMode();
+    await expandDrawer();
 
     const moveDownBtn = findToolbarButton("Move Down");
     expect(moveDownBtn).not.toBeNull();
 });
 
-test("Move Up is disabled for first instance in mobile view", async () => {
+test("Move Up is disabled for first instance", async () => {
     await selectTemplateElement(0); // Select first element
-    await setMobileMode();
+    await expandDrawer();
 
     const moveUpBtn = findToolbarButton("Move Up");
     expect(moveUpBtn).not.toBeNull();
     expect(moveUpBtn!.disabled).toBe(true);
 });
 
-test("Move Down is disabled for last instance in mobile view", async () => {
+test("Move Down is disabled for last instance", async () => {
     const members = getTeamMembers();
     await selectTemplateElement(members.length - 1); // Select last element
-    await setMobileMode();
+    await expandDrawer();
 
     const moveDownBtn = findToolbarButton("Move Down");
     expect(moveDownBtn).not.toBeNull();
     expect(moveDownBtn!.disabled).toBe(true);
 });
 
-test("Move Up is enabled for non-first instances in mobile view", async () => {
+test("Move Up is enabled for non-first instances", async () => {
     await selectTemplateElement(1); // Select middle element
-    await setMobileMode();
+    await expandDrawer();
 
     const moveUpBtn = findToolbarButton("Move Up");
     expect(moveUpBtn).not.toBeNull();
     expect(moveUpBtn!.disabled).toBe(false);
 });
 
-test("Move Down is enabled for non-last instances in mobile view", async () => {
+test("Move Down is enabled for non-last instances", async () => {
     await selectTemplateElement(0); // Select first element
-    await setMobileMode();
+    await expandDrawer();
 
     const moveDownBtn = findToolbarButton("Move Down");
     expect(moveDownBtn).not.toBeNull();
     expect(moveDownBtn!.disabled).toBe(false);
 });
 
-test("mobile view shows Add Item button for template elements", async () => {
+test("expanded drawer shows Add Item button for template elements", async () => {
     await selectTemplateElement(0);
-    await setMobileMode();
+    await expandDrawer();
 
     const addBtn = findToolbarButton("Add Item");
     expect(addBtn).not.toBeNull();
 });
 
-test("mobile view shows Delete button for template elements", async () => {
+test("expanded drawer shows Delete button for template elements", async () => {
     await selectTemplateElement(0);
-    await setMobileMode();
+    await expandDrawer();
 
     const deleteBtn = findToolbarButton("Delete");
     expect(deleteBtn).not.toBeNull();

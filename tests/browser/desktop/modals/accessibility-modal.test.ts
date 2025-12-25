@@ -11,8 +11,8 @@ import {
     waitForSelector,
     clickToolbarButton,
     setupTestHelpers,
-} from "../support/sdk-helpers.js";
-import type { AccessibilityModal } from "../../../src/components/accessibility-modal.js";
+} from "~/@browser-support/sdk-helpers.js";
+import type { AccessibilityModal } from "~/src/components/accessibility-modal.js";
 
 beforeAll(async () => {
     setupTestHelpers();
