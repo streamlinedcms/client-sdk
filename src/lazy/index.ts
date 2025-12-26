@@ -240,28 +240,16 @@ import type { AccessibilityModal } from "../components/accessibility-modal.js";
 import type { AttributesModal } from "../components/attributes-modal.js";
 import type { MediaManagerModal } from "../components/media-manager-modal.js";
 import type { ElementAttributes } from "../types.js";
+import {
+    createEditorState,
+    type EditorState,
+    type EditableElementInfo,
+    type TemplateInfo,
+} from "./state.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
 const TOOLBAR_HEIGHT_MOBILE = 56;
-
-interface EditableElementInfo {
-    element: HTMLElement;
-    elementId: string;
-    groupId: string | null;
-    templateId: string | null;
-    instanceId: string | null;
-}
-
-interface TemplateInfo {
-    templateId: string;
-    container: HTMLElement;
-    templateElement: HTMLElement; // The first child (template definition)
-    templateHtml: string; // Original HTML before content population
-    groupId: string | null; // If template is inside a group
-    instanceIds: string[]; // Ordered list of instance IDs
-    instanceCount: number;
-}
 
 /**
  * Content response from API
@@ -282,47 +270,13 @@ class EditorController {
     private log: Logger;
     private keyStorage: KeyStorage;
     private popupManager: PopupManager;
-    private apiKey: string | null = null;
-    private currentMode: EditorMode = "viewer";
-    private editingEnabled = false;
-    // Map key is composite: groupId:elementId for grouped, just elementId for ungrouped
-    // Multiple elements can share the same key (groups inside templates)
-    private editableElements: Map<string, EditableElementInfo[]> = new Map();
-    // Reverse lookup: element -> key (for click handling)
+    private state: EditorState;
+    // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
-    private editableTypes: Map<string, EditableType> = new Map();
-    // Content state: originalContent is snapshot at load/save, currentContent is authoritative local state
-    // Keys in originalContent but not in currentContent = pending deletes
-    private originalContent: Map<string, string> = new Map();
-    private currentContent: Map<string, string> = new Map();
-    private selectedKey: string | null = null; // Currently selected element (visual highlight, toolbar shows info)
-    private editingKey: string | null = null; // Currently editing element (contenteditable, focused)
-    private selectedInstance: HTMLElement | null = null; // Currently selected template instance (for mobile controls)
-    private customSignInTriggers: Map<Element, string> = new Map(); // element -> original text
-    private toolbar: Toolbar | null = null;
-    private htmlEditorModal: HtmlEditorModal | null = null;
-    private linkEditorModal: LinkEditorModal | null = null;
-    private seoModal: SeoModal | null = null;
-    private accessibilityModal: AccessibilityModal | null = null;
-    private attributesModal: AttributesModal | null = null;
-    private mediaManagerModal: MediaManagerModal | null = null;
-    private saving = false;
-    // Store attributes per element (keyed by composite key)
-    private elementAttributes: Map<string, ElementAttributes> = new Map();
-    // Double-tap tracking for mobile
-    private lastTapTime = 0;
-    private lastTapKey: string | null = null;
-    private readonly doubleTapDelay = 400; // ms
-    // Template tracking for instance management
-    private templates: Map<string, TemplateInfo> = new Map();
-    // Track template UI elements for cleanup
-    private templateAddButtons: Map<string, HTMLButtonElement> = new Map();
+    // Track instance delete buttons - WeakMap can't be reactive
     private instanceDeleteButtons: WeakMap<HTMLElement, HTMLButtonElement> = new WeakMap();
-    private sortableInstances: Map<string, Sortable> = new Map();
-    // Keys that have saved content from API (used to skip whitespace normalization)
-    private savedContentKeys: Set<string> = new Set();
-    // Track if domain warning has been shown (only show once)
-    private domainWarningShown = false;
+    // Double-tap delay constant
+    private readonly doubleTapDelay = 400; // ms
     // localStorage key for draft persistence (namespaced by app ID by default)
     private _draftStorageKey: string;
 
@@ -344,6 +298,9 @@ class EditorController {
         const logLevel = config.logLevel || "error";
         this.log = new Logger("StreamlinedCMS", logLevel);
 
+        // Initialize reactive state
+        this.state = createEditorState();
+
         // Initialize key storage and popup manager
         this.keyStorage = new KeyStorage(config.appId);
         this.popupManager = new PopupManager({
@@ -360,29 +317,29 @@ class EditorController {
         const response = await fetch(url, options);
 
         // Show warning on 402 (payment required - upgrade needed for custom domain)
-        if (response.status === 402 && !this.domainWarningShown) {
-            if (this.toolbar) {
+        if (response.status === 402 && !this.state.domainWarningShown) {
+            if (this.state.toolbar) {
                 const domain = window.location.hostname;
-                this.toolbar.warning = `A paid plan is required to edit on live domains like "${domain}". See Admin → Billing.`;
+                this.state.toolbar.warning = `A paid plan is required to edit on live domains like "${domain}". See Admin → Billing.`;
             }
-            this.domainWarningShown = true;
+            this.state.domainWarningShown = true;
         }
 
         // Show warning on 403 (domain not whitelisted)
-        if (response.status === 403 && !this.domainWarningShown) {
-            if (this.toolbar) {
+        if (response.status === 403 && !this.state.domainWarningShown) {
+            if (this.state.toolbar) {
                 const domain = window.location.hostname;
-                this.toolbar.warning = `Domain "${domain}" is not whitelisted. Add it in Admin → Settings.`;
+                this.state.toolbar.warning = `Domain "${domain}" is not whitelisted. Add it in Admin → Settings.`;
             }
-            this.domainWarningShown = true;
+            this.state.domainWarningShown = true;
         }
 
         // Clear warning on successful request (user may have fixed the issue in another tab)
-        if (response.ok && this.domainWarningShown) {
-            if (this.toolbar) {
-                this.toolbar.warning = null;
+        if (response.ok && this.state.domainWarningShown) {
+            if (this.state.toolbar) {
+                this.state.toolbar.warning = null;
             }
-            this.domainWarningShown = false;
+            this.state.domainWarningShown = false;
         }
 
         return response;
@@ -413,17 +370,17 @@ class EditorController {
             // Collect all keys that have saved content
             // Ungrouped elements
             for (const elementId of Object.keys(data.elements)) {
-                this.savedContentKeys.add(elementId);
+                this.state.savedContentKeys.add(elementId);
             }
 
             // Grouped elements (key format: groupId:elementId)
             for (const [groupId, group] of Object.entries(data.groups)) {
                 for (const elementId of Object.keys(group.elements)) {
-                    this.savedContentKeys.add(`${groupId}:${elementId}`);
+                    this.state.savedContentKeys.add(`${groupId}:${elementId}`);
                 }
             }
 
-            this.log.debug("Fetched saved content keys", { count: this.savedContentKeys.size });
+            this.log.debug("Fetched saved content keys", { count: this.state.savedContentKeys.size });
             return true;
         } catch (error) {
             this.log.warn("Could not fetch saved content keys", error);
@@ -447,7 +404,7 @@ class EditorController {
 
         // Check for mock auth
         if (this.config.mockAuth?.enabled) {
-            this.apiKey = "mock-api-key";
+            this.state.apiKey = "mock-api-key";
             this.log.debug("Mock authentication enabled");
             this.initMediaManagerModal();
             this.setMode("author");
@@ -459,17 +416,17 @@ class EditorController {
         }
 
         // Set up auth UI based on stored state
-        // This validates stored API key and sets this.apiKey if valid
+        // This validates stored API key and sets this.state.apiKey if valid
         await this.setupAuthUI();
 
         // Initialize media manager modal (persistent, reused across selections)
         this.initMediaManagerModal();
 
         this.log.info("Lazy module initialized", {
-            editableCount: this.editableElements.size,
-            templateCount: this.templates.size,
-            hasApiKey: !!this.apiKey,
-            mode: this.currentMode,
+            editableCount: this.state.editableElements.size,
+            templateCount: this.state.templates.size,
+            hasApiKey: !!this.state.apiKey,
+            mode: this.state.currentMode,
         });
     }
 
@@ -584,39 +541,39 @@ class EditorController {
                 };
 
                 // Multiple elements can share the same key (groups inside templates)
-                const existing = this.editableElements.get(key);
+                const existing = this.state.editableElements.get(key);
                 if (existing) {
                     existing.push(elementInfo);
                     // Sync the new element with existing content (e.g., group inside template)
-                    const content = this.currentContent.get(key);
+                    const content = this.state.currentContent.get(key);
                     if (content) {
                         this.applyElementContent(key, elementInfo, content);
                     }
                 } else {
-                    this.editableElements.set(key, [elementInfo]);
+                    this.state.editableElements.set(key, [elementInfo]);
 
                     // Initialize content state from DOM (first element for this key)
                     // Type must be set before getElementContent is called
-                    this.editableTypes.set(key, info.type);
+                    this.state.editableTypes.set(key, info.type);
 
                     // For elements without saved content, normalize whitespace in the DOM
                     // (to clean up DOM formatting from source HTML, but preserve user intent)
-                    const hasSavedContent = this.savedContentKeys.has(key);
+                    const hasSavedContent = this.state.savedContentKeys.has(key);
                     if (!hasSavedContent) {
                         this.normalizeDomWhitespace(elementInfo.element, info.type);
                     }
 
                     const content = this.getElementContent(key, elementInfo);
-                    this.originalContent.set(key, content);
-                    this.currentContent.set(key, content);
+                    this.state.originalContent.set(key, content);
+                    this.state.currentContent.set(key, content);
                 }
 
                 // Reverse lookup for click handling
                 this.elementToKey.set(element, key);
 
                 // Type is the same for all elements sharing a key (may already be set above)
-                if (!this.editableTypes.has(key)) {
-                    this.editableTypes.set(key, info.type);
+                if (!this.state.editableTypes.has(key)) {
+                    this.state.editableTypes.set(key, info.type);
                 }
             }
         });
@@ -649,7 +606,7 @@ class EditorController {
     }
 
     private getEditableType(key: string): EditableType {
-        return this.editableTypes.get(key) || "html";
+        return this.state.editableTypes.get(key) || "html";
     }
 
     /**
@@ -732,7 +689,7 @@ class EditorController {
      * and validating structure.
      */
     private scanTemplates(): void {
-        this.templates.clear();
+        this.state.templates.clear();
         document.querySelectorAll<HTMLElement>("[data-scms-template]").forEach((container) => {
             const templateId = container.getAttribute("data-scms-template");
             if (!templateId) return;
@@ -793,7 +750,7 @@ class EditorController {
                 });
             }
 
-            this.templates.set(templateId, {
+            this.state.templates.set(templateId, {
                 templateId,
                 container,
                 templateElement,
@@ -807,11 +764,11 @@ class EditorController {
             const orderKey = `${templateId}._order`;
             const contentKey = groupId ? `${groupId}:${orderKey}` : orderKey;
             const orderContent = JSON.stringify({ type: "order", value: instanceIds });
-            this.originalContent.set(contentKey, orderContent);
-            this.currentContent.set(contentKey, orderContent);
+            this.state.originalContent.set(contentKey, orderContent);
+            this.state.currentContent.set(contentKey, orderContent);
         });
 
-        this.log.debug("Scanned templates", { count: this.templates.size });
+        this.log.debug("Scanned templates", { count: this.state.templates.size });
     }
 
     private async setupAuthUI(): Promise<void> {
@@ -827,13 +784,13 @@ class EditorController {
                 return;
             }
 
-            this.apiKey = storedKey;
+            this.state.apiKey = storedKey;
             this.updateMediaManagerApiKey();
 
             // Set up all custom triggers as sign-out
             const customTriggers = document.querySelectorAll("[data-scms-signin]");
             customTriggers.forEach((trigger) => {
-                this.customSignInTriggers.set(trigger, trigger.textContent || "");
+                this.state.customSignInTriggers.set(trigger, trigger.textContent || "");
                 trigger.textContent = "Sign Out";
                 trigger.addEventListener("click", this.handleSignOutClick);
             });
@@ -848,7 +805,7 @@ class EditorController {
                 }
             }
             this.log.debug("Restored auth state", {
-                mode: this.currentMode,
+                mode: this.state.currentMode,
                 triggerCount: customTriggers.length,
             });
         } else {
@@ -890,11 +847,11 @@ class EditorController {
         if (customTriggers.length > 0) {
             customTriggers.forEach((trigger) => {
                 // Store original text if not already stored
-                if (!this.customSignInTriggers.has(trigger)) {
-                    this.customSignInTriggers.set(trigger, trigger.textContent || "");
+                if (!this.state.customSignInTriggers.has(trigger)) {
+                    this.state.customSignInTriggers.set(trigger, trigger.textContent || "");
                 }
                 // Restore original text
-                const originalText = this.customSignInTriggers.get(trigger);
+                const originalText = this.state.customSignInTriggers.get(trigger);
                 if (originalText) {
                     trigger.textContent = originalText;
                 }
@@ -929,14 +886,14 @@ class EditorController {
         const clickedInstance = (target as Element).closest?.("[data-scms-instance]") as HTMLElement | null;
 
         // Deselect instance if clicking outside all instances
-        if (this.selectedInstance && !clickedInstance) {
+        if (this.state.selectedInstance && !clickedInstance) {
             this.deselectInstance();
         }
 
-        if (!this.editingKey && !this.selectedKey) return;
+        if (!this.state.editingKey && !this.state.selectedKey) return;
 
         // Don't deselect if clicking inside an editable element
-        for (const infos of this.editableElements.values()) {
+        for (const infos of this.state.editableElements.values()) {
             for (const info of infos) {
                 if (info.element.contains(target)) {
                     return;
@@ -945,7 +902,7 @@ class EditorController {
         }
 
         // Don't deselect if clicking inside the toolbar
-        if (this.toolbar?.contains(target)) {
+        if (this.state.toolbar?.contains(target)) {
             return;
         }
 
@@ -954,9 +911,9 @@ class EditorController {
         this.deselectElement();
 
         // Clear toolbar
-        if (this.toolbar) {
-            this.toolbar.activeElement = null;
-            this.toolbar.activeElementType = null;
+        if (this.state.toolbar) {
+            this.state.toolbar.activeElement = null;
+            this.state.toolbar.activeElementType = null;
         }
         this.updateToolbarTemplateContext();
     };
@@ -966,7 +923,7 @@ class EditorController {
 
         const key = await this.popupManager.openLoginPopup();
         if (key) {
-            this.apiKey = key;
+            this.state.apiKey = key;
             this.updateMediaManagerApiKey();
             this.keyStorage.storeKey(key);
 
@@ -975,7 +932,7 @@ class EditorController {
             if (signInLink) signInLink.remove();
 
             // Convert all custom triggers to sign-out
-            this.customSignInTriggers.forEach((_, trigger) => {
+            this.state.customSignInTriggers.forEach((_, trigger) => {
                 trigger.removeEventListener("click", this.handleSignInClick);
                 trigger.textContent = "Sign Out";
                 trigger.addEventListener("click", this.handleSignOutClick);
@@ -994,7 +951,7 @@ class EditorController {
     }
 
     private setMode(mode: EditorMode): void {
-        this.currentMode = mode;
+        this.state.currentMode = mode;
         this.keyStorage.storeMode(mode);
 
         if (mode === "author") {
@@ -1017,7 +974,7 @@ class EditorController {
 
         if (!element.dataset.scmsClickHandler) {
             element.addEventListener("click", (e) => {
-                if (this.editingEnabled) {
+                if (this.state.editingEnabled) {
                     e.preventDefault();
                     e.stopPropagation();
 
@@ -1026,7 +983,7 @@ class EditorController {
                     // Check for double-tap (mobile) on images and links
                     const now = Date.now();
                     const isDoubleTap =
-                        this.lastTapKey === key && now - this.lastTapTime < this.doubleTapDelay;
+                        this.state.lastTapKey === key && now - this.state.lastTapTime < this.doubleTapDelay;
 
                     if (isDoubleTap && isMobile) {
                         // Mobile double-tap: open media manager for images, navigate for links
@@ -1036,22 +993,22 @@ class EditorController {
                         } else if (elementType === "link") {
                             this.handleGoToLink();
                         }
-                        this.lastTapKey = null;
-                        this.lastTapTime = 0;
+                        this.state.lastTapKey = null;
+                        this.state.lastTapTime = 0;
                     } else if (isMobile) {
                         // Mobile two-step: first tap selects, second tap edits
-                        if (this.selectedKey === key && this.editingKey !== key) {
+                        if (this.state.selectedKey === key && this.state.editingKey !== key) {
                             this.startEditing(key, element);
                         } else {
                             this.selectElement(key, element);
                         }
-                        this.lastTapKey = key;
-                        this.lastTapTime = now;
+                        this.state.lastTapKey = key;
+                        this.state.lastTapTime = now;
                     } else {
                         // Desktop: edit immediately
                         this.startEditing(key, element);
-                        this.lastTapKey = key;
-                        this.lastTapTime = now;
+                        this.state.lastTapKey = key;
+                        this.state.lastTapTime = now;
                     }
                 }
             });
@@ -1061,7 +1018,7 @@ class EditorController {
         // Double-click handler for images to open media manager (desktop)
         if (elementType === "image" && !element.dataset.scmsDblClickHandler) {
             element.addEventListener("dblclick", (e) => {
-                if (this.editingEnabled) {
+                if (this.state.editingEnabled) {
                     e.preventDefault();
                     e.stopPropagation();
                     this.handleChangeImage();
@@ -1073,7 +1030,7 @@ class EditorController {
         // Double-click handler for links to navigate (desktop)
         if (elementType === "link" && !element.dataset.scmsDblClickHandler) {
             element.addEventListener("dblclick", (e) => {
-                if (this.editingEnabled) {
+                if (this.state.editingEnabled) {
                     e.preventDefault();
                     e.stopPropagation();
                     this.handleGoToLink();
@@ -1087,10 +1044,10 @@ class EditorController {
      * Enable editing on elements - adds classes, handlers, template controls
      */
     private enableEditing(): void {
-        if (this.editingEnabled) return;
-        this.editingEnabled = true;
+        if (this.state.editingEnabled) return;
+        this.state.editingEnabled = true;
 
-        this.editableElements.forEach((infos, key) => {
+        this.state.editableElements.forEach((infos, key) => {
             for (const info of infos) {
                 info.element.classList.add("streamlined-editable");
                 this.setupElementClickHandler(info.element, key);
@@ -1108,9 +1065,9 @@ class EditorController {
      * Disable editing on elements - removes classes, contenteditable, template controls
      */
     private disableEditing(): void {
-        this.editingEnabled = false;
+        this.state.editingEnabled = false;
 
-        this.editableElements.forEach((infos) => {
+        this.state.editableElements.forEach((infos) => {
             for (const info of infos) {
                 info.element.classList.remove(
                     "streamlined-editable",
@@ -1137,8 +1094,8 @@ class EditorController {
      */
     private showTemplateControls(): void {
         // Add "Add" button to each template container
-        this.templates.forEach((templateInfo, templateId) => {
-            if (this.templateAddButtons.has(templateId)) return;
+        this.state.templates.forEach((templateInfo, templateId) => {
+            if (this.state.templateAddButtons.has(templateId)) return;
 
             const addBtn = document.createElement("button");
             addBtn.className = "scms-template-add";
@@ -1155,12 +1112,12 @@ class EditorController {
             });
 
             templateInfo.container.appendChild(addBtn);
-            this.templateAddButtons.set(templateId, addBtn);
+            this.state.templateAddButtons.set(templateId, addBtn);
         });
 
         // Add delete buttons and drag handles to existing instances
         // (skip if instance element IS the editable element - use toolbar controls instead)
-        this.templates.forEach((templateInfo, templateId) => {
+        this.state.templates.forEach((templateInfo, templateId) => {
             const { container } = templateInfo;
             const instances = container.querySelectorAll<HTMLElement>("[data-scms-instance]");
             let hasInlineControls = false;
@@ -1189,7 +1146,7 @@ class EditorController {
             // Initialize SortableJS for drag-and-drop reordering (only if we have drag handles)
             if (
                 hasInlineControls &&
-                !this.sortableInstances.has(templateId) &&
+                !this.state.sortableInstances.has(templateId) &&
                 templateInfo.instanceCount > 1
             ) {
                 this.initializeSortable(templateId, container);
@@ -1202,13 +1159,13 @@ class EditorController {
      */
     private hideTemplateControls(): void {
         // Remove all add buttons
-        this.templateAddButtons.forEach((btn) => {
+        this.state.templateAddButtons.forEach((btn) => {
             btn.remove();
         });
-        this.templateAddButtons.clear();
+        this.state.templateAddButtons.clear();
 
         // Remove all delete buttons and drag handles (query DOM directly to catch any stragglers)
-        this.templates.forEach((templateInfo) => {
+        this.state.templates.forEach((templateInfo) => {
             const { container } = templateInfo;
             container
                 .querySelectorAll<HTMLElement>("[data-scms-instance]")
@@ -1229,25 +1186,25 @@ class EditorController {
         this.instanceDeleteButtons = new WeakMap();
 
         // Destroy all sortable instances
-        this.sortableInstances.forEach((sortable) => {
+        this.state.sortableInstances.forEach((sortable) => {
             sortable.destroy();
         });
-        this.sortableInstances.clear();
+        this.state.sortableInstances.clear();
     }
 
     private showToolbar(): void {
         // Update existing toolbar if present
-        if (this.toolbar) {
-            this.toolbar.mode = this.currentMode;
-            this.toolbar.activeElement = this.editingKey;
+        if (this.state.toolbar) {
+            this.state.toolbar.mode = this.state.currentMode;
+            this.state.toolbar.activeElement = this.state.editingKey;
             return;
         }
 
         // Create new toolbar
         const toolbar = document.createElement("scms-toolbar") as Toolbar;
         toolbar.id = "scms-toolbar";
-        toolbar.mode = this.currentMode;
-        toolbar.activeElement = this.editingKey;
+        toolbar.mode = this.state.currentMode;
+        toolbar.activeElement = this.state.editingKey;
         toolbar.appUrl = this.config.appUrl;
         toolbar.appId = this.config.appId;
         toolbar.mockAuth = this.config.mockAuth?.enabled ?? false;
@@ -1313,7 +1270,7 @@ class EditorController {
         });
 
         document.body.appendChild(toolbar);
-        this.toolbar = toolbar;
+        this.state.toolbar = toolbar;
 
         // Set initial hasChanges state (may be true if there are orphaned saved elements)
         this.updateToolbarHasChanges();
@@ -1330,9 +1287,9 @@ class EditorController {
     };
 
     private removeToolbar(): void {
-        if (this.toolbar) {
-            this.toolbar.remove();
-            this.toolbar = null;
+        if (this.state.toolbar) {
+            this.state.toolbar.remove();
+            this.state.toolbar = null;
             document.body.style.paddingBottom = "";
             window.removeEventListener("resize", this.updateBodyPadding);
         }
@@ -1347,14 +1304,14 @@ class EditorController {
         this.log.info("Signing out");
 
         this.keyStorage.clearStoredKey();
-        this.apiKey = null;
+        this.state.apiKey = null;
         this.updateMediaManagerApiKey();
-        this.currentMode = "viewer";
+        this.state.currentMode = "viewer";
 
         this.disableEditing();
 
         // Convert all custom triggers back to sign-in
-        this.customSignInTriggers.forEach((originalText, trigger) => {
+        this.state.customSignInTriggers.forEach((originalText, trigger) => {
             trigger.removeEventListener("click", this.handleSignOutClick);
             trigger.textContent = originalText;
             trigger.addEventListener("click", this.handleSignInClick);
@@ -1363,7 +1320,7 @@ class EditorController {
         this.removeToolbar();
 
         // Only show default sign-in link if no custom triggers
-        if (this.customSignInTriggers.size === 0) {
+        if (this.state.customSignInTriggers.size === 0) {
             this.showSignInLink();
         }
     }
@@ -1578,7 +1535,7 @@ class EditorController {
      * Shows visual selection and updates toolbar, but doesn't make contenteditable or focus.
      */
     private selectElement(key: string, clickedElement?: HTMLElement): void {
-        const infos = this.editableElements.get(key);
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) {
             this.log.warn("Element not found for selection", { key });
             return;
@@ -1598,16 +1555,16 @@ class EditorController {
         });
 
         // Deselect previous element if different
-        if (this.selectedKey && this.selectedKey !== key) {
+        if (this.state.selectedKey && this.state.selectedKey !== key) {
             this.deselectElement();
         }
 
         // Stop editing if we're editing a different element
-        if (this.editingKey && this.editingKey !== key) {
+        if (this.state.editingKey && this.state.editingKey !== key) {
             this.stopEditing();
         }
 
-        this.selectedKey = key;
+        this.state.selectedKey = key;
 
         // Also select parent instance if element is inside one
         const parentInstance = primaryInfo.element.closest("[data-scms-instance]") as HTMLElement | null;
@@ -1626,9 +1583,9 @@ class EditorController {
         }
 
         // Update toolbar
-        if (this.toolbar) {
-            this.toolbar.activeElement = key;
-            this.toolbar.activeElementType = elementType;
+        if (this.state.toolbar) {
+            this.state.toolbar.activeElement = key;
+            this.state.toolbar.activeElementType = elementType;
         }
 
         // Update template context on toolbar
@@ -1639,9 +1596,9 @@ class EditorController {
      * Deselect the currently selected element without starting editing.
      */
     private deselectElement(): void {
-        if (!this.selectedKey) return;
+        if (!this.state.selectedKey) return;
 
-        const infos = this.editableElements.get(this.selectedKey);
+        const infos = this.state.editableElements.get(this.state.selectedKey);
         if (infos) {
             for (const info of infos) {
                 info.element.classList.remove("streamlined-selected");
@@ -1649,12 +1606,12 @@ class EditorController {
             }
         }
 
-        this.selectedKey = null;
+        this.state.selectedKey = null;
 
         // Clear toolbar if not editing
-        if (!this.editingKey && this.toolbar) {
-            this.toolbar.activeElement = null;
-            this.toolbar.activeElementType = null;
+        if (!this.state.editingKey && this.state.toolbar) {
+            this.state.toolbar.activeElement = null;
+            this.state.toolbar.activeElementType = null;
         }
     }
 
@@ -1662,14 +1619,14 @@ class EditorController {
      * Select a template instance (for mobile controls visibility).
      */
     private selectInstance(instanceElement: HTMLElement): void {
-        if (this.selectedInstance === instanceElement) return;
+        if (this.state.selectedInstance === instanceElement) return;
 
         // Deselect previous instance
-        if (this.selectedInstance) {
-            this.selectedInstance.classList.remove("scms-instance-selected");
+        if (this.state.selectedInstance) {
+            this.state.selectedInstance.classList.remove("scms-instance-selected");
         }
 
-        this.selectedInstance = instanceElement;
+        this.state.selectedInstance = instanceElement;
         instanceElement.classList.add("scms-instance-selected");
     }
 
@@ -1677,14 +1634,14 @@ class EditorController {
      * Deselect the currently selected template instance.
      */
     private deselectInstance(): void {
-        if (!this.selectedInstance) return;
+        if (!this.state.selectedInstance) return;
 
-        this.selectedInstance.classList.remove("scms-instance-selected");
-        this.selectedInstance = null;
+        this.state.selectedInstance.classList.remove("scms-instance-selected");
+        this.state.selectedInstance = null;
     }
 
     private startEditing(key: string, clickedElement?: HTMLElement): void {
-        const infos = this.editableElements.get(key);
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) {
             this.log.warn("Element not found", { key });
             return;
@@ -1708,16 +1665,16 @@ class EditorController {
         this.selectElement(key, clickedElement);
 
         // Stop editing previous element if any (different from current)
-        if (this.editingKey && this.editingKey !== key) {
+        if (this.state.editingKey && this.state.editingKey !== key) {
             this.stopEditing();
         }
 
         // Already editing this element - nothing more to do
-        if (this.editingKey === key) {
+        if (this.state.editingKey === key) {
             return;
         }
 
-        this.editingKey = key;
+        this.state.editingKey = key;
 
         // Transition from selected to editing state
         for (const info of infos) {
@@ -1815,7 +1772,7 @@ class EditorController {
      * This is the authoritative flow: DOM edit -> currentContent -> sync all DOM elements.
      */
     private updateContentFromElement(key: string, sourceElement: HTMLElement): void {
-        const infos = this.editableElements.get(key);
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) return;
 
         // Find the info for the source element to get proper content
@@ -1824,7 +1781,7 @@ class EditorController {
 
         // Update currentContent from the source element
         const content = this.getElementContent(key, sourceInfo);
-        this.currentContent.set(key, content);
+        this.state.currentContent.set(key, content);
 
         // Sync all other DOM elements from currentContent
         this.syncAllElementsFromContent(key, sourceElement);
@@ -1835,10 +1792,10 @@ class EditorController {
      * Optionally skip a source element (to avoid overwriting what user just typed).
      */
     private syncAllElementsFromContent(key: string, skipElement?: HTMLElement): void {
-        const infos = this.editableElements.get(key);
+        const infos = this.state.editableElements.get(key);
         if (!infos) return;
 
-        const content = this.currentContent.get(key);
+        const content = this.state.currentContent.get(key);
         if (content === undefined) return;
 
         for (const info of infos) {
@@ -1852,18 +1809,18 @@ class EditorController {
      * Then sync all DOM elements.
      */
     private setContent(key: string, content: string): void {
-        this.currentContent.set(key, content);
+        this.state.currentContent.set(key, content);
         this.syncAllElementsFromContent(key);
     }
 
     private stopEditing(): void {
-        if (!this.editingKey) {
+        if (!this.state.editingKey) {
             return;
         }
 
         this.log.trace("Stopping edit");
 
-        const infos = this.editableElements.get(this.editingKey);
+        const infos = this.state.editableElements.get(this.state.editingKey);
         if (infos) {
             for (const info of infos) {
                 info.element.classList.remove("streamlined-editing");
@@ -1872,12 +1829,12 @@ class EditorController {
             }
         }
 
-        this.editingKey = null;
+        this.state.editingKey = null;
 
         // Only clear toolbar if nothing is selected (mobile two-step mode keeps selection)
-        if (!this.selectedKey && this.toolbar) {
-            this.toolbar.activeElement = null;
-            this.toolbar.activeElementType = null;
+        if (!this.state.selectedKey && this.state.toolbar) {
+            this.state.toolbar.activeElement = null;
+            this.state.toolbar.activeElementType = null;
             this.updateToolbarTemplateContext();
         }
     }
@@ -1890,7 +1847,7 @@ class EditorController {
      */
     private getElementContent(key: string, info: EditableElementInfo): string {
         const elementType = this.getEditableType(key);
-        const attributes = this.elementAttributes.get(key);
+        const attributes = this.state.elementAttributes.get(key);
 
         if (elementType === "image" && info.element instanceof HTMLImageElement) {
             const data: ImageContentData = {
@@ -1940,7 +1897,7 @@ class EditorController {
 
             // Extract and store attributes if present
             if (data.attributes && Object.keys(data.attributes).length > 0) {
-                this.elementAttributes.set(key, data.attributes);
+                this.state.elementAttributes.set(key, data.attributes);
                 this.applyAttributesToElement(info.element, data.attributes);
             }
 
@@ -1993,11 +1950,11 @@ class EditorController {
     private getDirtyElements(): Map<string, { content: string; info: EditableElementInfo }> {
         const dirty = new Map<string, { content: string; info: EditableElementInfo }>();
         // Compare currentContent vs originalContent (not DOM)
-        this.currentContent.forEach((current, key) => {
-            const original = this.originalContent.get(key);
+        this.state.currentContent.forEach((current, key) => {
+            const original = this.state.originalContent.get(key);
             if (original !== undefined && current !== original) {
                 // Get info for the key (need it for save metadata)
-                const infos = this.editableElements.get(key);
+                const infos = this.state.editableElements.get(key);
                 const info = infos?.[0];
                 if (info) {
                     dirty.set(key, { content: current, info });
@@ -2014,8 +1971,8 @@ class EditorController {
      */
     private getPendingDeletes(): string[] {
         const deletes: string[] = [];
-        this.savedContentKeys.forEach((key) => {
-            if (!this.currentContent.has(key)) {
+        this.state.savedContentKeys.forEach((key) => {
+            if (!this.state.currentContent.has(key)) {
                 deletes.push(key);
             }
         });
@@ -2043,7 +2000,7 @@ class EditorController {
         }
 
         // Check each editable element
-        this.editableElements.forEach((infos, key) => {
+        this.state.editableElements.forEach((infos, key) => {
             const info = infos[0];
             if (!info || !info.templateId || !info.instanceId) {
                 return; // Not a template element
@@ -2055,12 +2012,12 @@ class EditorController {
             }
 
             // Skip if already saved to API
-            if (this.savedContentKeys.has(key)) {
+            if (this.state.savedContentKeys.has(key)) {
                 return;
             }
 
             // Get the current content
-            const content = this.currentContent.get(key);
+            const content = this.state.currentContent.get(key);
             if (content !== undefined) {
                 unsaved.set(key, { content, info });
             }
@@ -2081,8 +2038,8 @@ class EditorController {
     }
 
     private updateToolbarHasChanges(): void {
-        if (this.toolbar) {
-            this.toolbar.hasChanges = this.hasUnsavedChanges();
+        if (this.state.toolbar) {
+            this.state.toolbar.hasChanges = this.hasUnsavedChanges();
         }
         this.saveDraftToLocalStorage();
     }
@@ -2103,9 +2060,9 @@ class EditorController {
         // instances get new random IDs on reload and we need full content to restore
         const templatesWithUnsavedInstances = new Set<string>();
         const groupsInAffectedTemplates = new Set<string>();
-        this.currentContent.forEach((current, key) => {
+        this.state.currentContent.forEach((current, key) => {
             if (key.endsWith("._order")) {
-                const original = this.originalContent.get(key);
+                const original = this.state.originalContent.get(key);
 
                 // Only consider templates where order has actually changed
                 if (current === original) {
@@ -2130,10 +2087,10 @@ class EditorController {
                 // These are HTML-derived instances whose IDs will change on reload
                 const hasUnsavedInstances = instanceIds.some((instanceId) => {
                     const instancePrefix = `${prefix}.${instanceId}.`;
-                    for (const [contentKey] of this.currentContent) {
+                    for (const [contentKey] of this.state.currentContent) {
                         if (
                             contentKey.startsWith(instancePrefix) &&
-                            !this.savedContentKeys.has(contentKey)
+                            !this.state.savedContentKeys.has(contentKey)
                         ) {
                             return true;
                         }
@@ -2146,7 +2103,7 @@ class EditorController {
 
                     // Also find groups inside this template - their content needs saving too
                     const templateId = prefix.includes(":") ? prefix.split(":")[1] : prefix;
-                    const templateInfo = this.templates.get(templateId);
+                    const templateInfo = this.state.templates.get(templateId);
                     if (templateInfo) {
                         templateInfo.container
                             .querySelectorAll<HTMLElement>("[data-scms-group]")
@@ -2160,8 +2117,8 @@ class EditorController {
         });
 
         // Collect content to save
-        this.currentContent.forEach((current, key) => {
-            const original = this.originalContent.get(key);
+        this.state.currentContent.forEach((current, key) => {
+            const original = this.state.originalContent.get(key);
 
             // Always save if content differs from original
             if (current !== original) {
@@ -2172,7 +2129,7 @@ class EditorController {
             // For unchanged content: also save if it belongs to a template with unsaved instances
             // AND is not already saved to the API (saved content will be restored from API)
             // This ensures HTML-derived instance content is preserved across reloads
-            if (!key.endsWith("._order") && !this.savedContentKeys.has(key)) {
+            if (!key.endsWith("._order") && !this.state.savedContentKeys.has(key)) {
                 // Check template content keys (templateId.instanceId.elementId)
                 for (const prefix of templatesWithUnsavedInstances) {
                     if (key.startsWith(prefix + ".")) {
@@ -2253,13 +2210,13 @@ class EditorController {
                 continue;
             }
 
-            this.currentContent.set(key, value);
+            this.state.currentContent.set(key, value);
             this.syncAllElementsFromContent(key);
         }
 
         // Step 3: Apply deletes
         for (const key of draft.deleted) {
-            this.currentContent.delete(key);
+            this.state.currentContent.delete(key);
         }
 
         this.log.info("Draft restored successfully");
@@ -2287,7 +2244,7 @@ class EditorController {
                 continue; // Not an order key
             }
 
-            const templateInfo = this.templates.get(templateId);
+            const templateInfo = this.state.templates.get(templateId);
             if (!templateInfo) {
                 this.log.warn("Template not found for draft order key", { templateId, key });
                 continue;
@@ -2342,7 +2299,7 @@ class EditorController {
             this.reorderInstances(templateId, draftInstanceIds);
 
             // Update order content to match draft
-            this.currentContent.set(key, value);
+            this.state.currentContent.set(key, value);
         }
     }
 
@@ -2351,7 +2308,7 @@ class EditorController {
      * Similar to addInstance() but uses a provided ID instead of generating one.
      */
     private addInstanceWithId(templateId: string, instanceId: string): void {
-        const templateInfo = this.templates.get(templateId);
+        const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo) {
             this.log.error("Template not found", { templateId });
             return;
@@ -2386,7 +2343,7 @@ class EditorController {
         }
 
         // Insert at end of container (will be reordered later)
-        const addButton = this.templateAddButtons.get(templateId);
+        const addButton = this.state.templateAddButtons.get(templateId);
         if (addButton && addButton.parentElement === container) {
             container.insertBefore(clone, addButton);
         } else {
@@ -2408,7 +2365,7 @@ class EditorController {
      * Similar to removeInstance() but without async operations.
      */
     private removeInstanceSync(templateId: string, instanceId: string): void {
-        const templateInfo = this.templates.get(templateId);
+        const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo) return;
 
         if (templateInfo.instanceCount <= 1) return;
@@ -2441,15 +2398,15 @@ class EditorController {
 
         // Update tracking
         keysToDelete.forEach((key) => {
-            const infos = this.editableElements.get(key);
+            const infos = this.state.editableElements.get(key);
             if (infos) {
                 const remaining = infos.filter((info) => info.instanceId !== instanceId);
                 if (remaining.length > 0) {
-                    this.editableElements.set(key, remaining);
+                    this.state.editableElements.set(key, remaining);
                 } else {
-                    this.editableElements.delete(key);
-                    this.editableTypes.delete(key);
-                    this.currentContent.delete(key);
+                    this.state.editableElements.delete(key);
+                    this.state.editableTypes.delete(key);
+                    this.state.currentContent.delete(key);
                 }
             }
         });
@@ -2465,7 +2422,7 @@ class EditorController {
      * Reorder template instances to match a specific order.
      */
     private reorderInstances(templateId: string, targetOrder: string[]): void {
-        const templateInfo = this.templates.get(templateId);
+        const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo) return;
 
         const { container } = templateInfo;
@@ -2478,7 +2435,7 @@ class EditorController {
         });
 
         // Find insertion point (before add button or at end)
-        const addButton = this.templateAddButtons.get(templateId);
+        const addButton = this.state.templateAddButtons.get(templateId);
         const insertBefore = addButton?.parentElement === container ? addButton : null;
 
         // Reorder by removing and re-inserting in correct order
@@ -2510,7 +2467,7 @@ class EditorController {
         if (dirtyElements.size === 0 && pendingDeletes.length === 0 && !hasOrderChanges) {
             return;
         }
-        if (this.saving) {
+        if (this.state.saving) {
             return;
         }
 
@@ -2521,16 +2478,16 @@ class EditorController {
             orderChanges: hasOrderChanges,
         });
 
-        this.saving = true;
-        if (this.toolbar) {
-            this.toolbar.saving = true;
+        this.state.saving = true;
+        if (this.state.toolbar) {
+            this.state.toolbar.saving = true;
         }
 
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
         };
-        if (this.apiKey) {
-            headers["Authorization"] = `Bearer ${this.apiKey}`;
+        if (this.state.apiKey) {
+            headers["Authorization"] = `Bearer ${this.state.apiKey}`;
         }
 
         const errors: string[] = [];
@@ -2570,7 +2527,7 @@ class EditorController {
 
             // 3. Collect order array operations
             for (const templateId of templatesWithOrderChanges) {
-                const templateInfo = this.templates.get(templateId);
+                const templateInfo = this.state.templates.get(templateId);
                 if (!templateInfo) continue;
 
                 const orderKey = `${templateId}._order`;
@@ -2624,8 +2581,8 @@ class EditorController {
                 // Process saved elements from response
                 for (const [elementId, element] of Object.entries(result.elements ?? {})) {
                     const key = elementId;
-                    this.originalContent.set(key, element.content);
-                    this.savedContentKeys.add(key);
+                    this.state.originalContent.set(key, element.content);
+                    this.state.savedContentKeys.add(key);
                     saved.push(key);
                 }
 
@@ -2633,8 +2590,8 @@ class EditorController {
                 for (const [groupId, group] of Object.entries(result.groups ?? {})) {
                     for (const [elementId, element] of Object.entries(group.elements)) {
                         const key = `${groupId}:${elementId}`;
-                        this.originalContent.set(key, element.content);
-                        this.savedContentKeys.add(key);
+                        this.state.originalContent.set(key, element.content);
+                        this.state.savedContentKeys.add(key);
                         saved.push(key);
                     }
                 }
@@ -2642,8 +2599,8 @@ class EditorController {
                 // Process deleted elements from response
                 for (const elementId of result.deleted?.elements ?? []) {
                     const key = elementId;
-                    this.originalContent.delete(key);
-                    this.savedContentKeys.delete(key);
+                    this.state.originalContent.delete(key);
+                    this.state.savedContentKeys.delete(key);
                     deleted.push(key);
                 }
 
@@ -2651,15 +2608,15 @@ class EditorController {
                 for (const [groupId, elementIds] of Object.entries(result.deleted?.groups ?? {})) {
                     for (const elementId of elementIds) {
                         const key = `${groupId}:${elementId}`;
-                        this.originalContent.delete(key);
-                        this.savedContentKeys.delete(key);
+                        this.state.originalContent.delete(key);
+                        this.state.savedContentKeys.delete(key);
                         deleted.push(key);
                     }
                 }
 
                 // Update currentContent for order arrays
                 for (const templateId of templatesWithOrderChanges) {
-                    const templateInfo = this.templates.get(templateId);
+                    const templateInfo = this.state.templates.get(templateId);
                     if (!templateInfo) continue;
 
                     const orderKey = `${templateId}._order`;
@@ -2670,7 +2627,7 @@ class EditorController {
                         type: "order",
                         value: templateInfo.instanceIds,
                     });
-                    this.currentContent.set(orderContentKey, orderContent);
+                    this.state.currentContent.set(orderContentKey, orderContent);
                 }
             }
 
@@ -2703,9 +2660,9 @@ class EditorController {
             this.log.error("Failed to save content", error);
             alert(`Failed to save: ${errorMessage}\n\nCheck console for details.`);
         } finally {
-            this.saving = false;
-            if (this.toolbar) {
-                this.toolbar.saving = false;
+            this.state.saving = false;
+            if (this.state.toolbar) {
+                this.state.toolbar.saving = false;
             }
         }
     }
@@ -2717,7 +2674,7 @@ class EditorController {
         const orderKey = `${templateId}._order`;
         const contentKey = templateInfo.groupId ? `${templateInfo.groupId}:${orderKey}` : orderKey;
         const orderContent = JSON.stringify({ type: "order", value: templateInfo.instanceIds });
-        this.currentContent.set(contentKey, orderContent);
+        this.state.currentContent.set(contentKey, orderContent);
     }
 
     /**
@@ -2725,13 +2682,13 @@ class EditorController {
      */
     private getTemplatesWithOrderChanges(): string[] {
         const changed: string[] = [];
-        this.templates.forEach((templateInfo, templateId) => {
+        this.state.templates.forEach((templateInfo, templateId) => {
             const orderKey = `${templateId}._order`;
             const contentKey = templateInfo.groupId
                 ? `${templateInfo.groupId}:${orderKey}`
                 : orderKey;
-            const currentOrder = this.currentContent.get(contentKey);
-            const originalOrder = this.originalContent.get(contentKey);
+            const currentOrder = this.state.currentContent.get(contentKey);
+            const originalOrder = this.state.originalContent.get(contentKey);
             if (currentOrder !== originalOrder) {
                 changed.push(templateId);
             }
@@ -2740,31 +2697,31 @@ class EditorController {
     }
 
     private handleReset(): void {
-        if (!this.selectedKey) {
+        if (!this.state.selectedKey) {
             return;
         }
 
-        const key = this.selectedKey;
-        const originalContent = this.originalContent.get(key);
+        const key = this.state.selectedKey;
+        const originalContent = this.state.originalContent.get(key);
         const elementType = this.getEditableType(key);
 
         if (originalContent !== undefined) {
             this.log.debug("Resetting element", { key, elementType });
             // Restore currentContent from originalContent, then sync DOM
-            this.currentContent.set(key, originalContent);
+            this.state.currentContent.set(key, originalContent);
             this.syncAllElementsFromContent(key);
             this.updateToolbarHasChanges();
         }
     }
 
     private async handleChangeImage(): Promise<void> {
-        if (!this.selectedKey) {
+        if (!this.state.selectedKey) {
             this.log.debug("No element selected for image change");
             return;
         }
 
-        const key = this.selectedKey;
-        const infos = this.editableElements.get(key);
+        const key = this.state.selectedKey;
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0 || !(infos[0].element instanceof HTMLImageElement)) {
             this.log.warn("Selected element is not an image");
             return;
@@ -2778,7 +2735,7 @@ class EditorController {
         const file = await this.openMediaManager();
         if (file) {
             // Build new content with updated src
-            const attributes = this.elementAttributes.get(key);
+            const attributes = this.state.elementAttributes.get(key);
             const data: ImageContentData = {
                 type: "image",
                 src: file.publicUrl,
@@ -2797,19 +2754,19 @@ class EditorController {
     }
 
     private handleEditHtml(): void {
-        if (!this.selectedKey) {
+        if (!this.state.selectedKey) {
             this.log.debug("No element selected for HTML editing");
             return;
         }
 
         // Prevent opening multiple modals
-        if (this.htmlEditorModal) {
+        if (this.state.htmlEditorModal) {
             this.log.debug("HTML editor already open");
             return;
         }
 
-        const key = this.selectedKey;
-        const infos = this.editableElements.get(key);
+        const key = this.state.selectedKey;
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) {
             return;
         }
@@ -2819,7 +2776,7 @@ class EditorController {
 
         // Get content from currentContent (already normalized) rather than DOM
         let htmlValue = primaryInfo.element.innerHTML;
-        const storedContent = this.currentContent.get(key);
+        const storedContent = this.state.currentContent.get(key);
         if (storedContent) {
             try {
                 const data = JSON.parse(storedContent) as { type?: string; value?: string };
@@ -2843,7 +2800,7 @@ class EditorController {
 
         modal.addEventListener("apply", ((e: CustomEvent<{ content: string }>) => {
             // Build content and update via setContent
-            const attributes = this.elementAttributes.get(key);
+            const attributes = this.state.elementAttributes.get(key);
             const data: HtmlContentData = {
                 type: "html",
                 value: e.detail.content,
@@ -2864,30 +2821,30 @@ class EditorController {
         });
 
         document.body.appendChild(modal);
-        this.htmlEditorModal = modal;
+        this.state.htmlEditorModal = modal;
     }
 
     private closeHtmlEditor(): void {
-        if (this.htmlEditorModal) {
-            this.htmlEditorModal.remove();
-            this.htmlEditorModal = null;
+        if (this.state.htmlEditorModal) {
+            this.state.htmlEditorModal.remove();
+            this.state.htmlEditorModal = null;
         }
     }
 
     private handleEditLink(): void {
-        if (!this.selectedKey) {
+        if (!this.state.selectedKey) {
             this.log.debug("No element selected for link editing");
             return;
         }
 
         // Prevent opening multiple modals
-        if (this.linkEditorModal) {
+        if (this.state.linkEditorModal) {
             this.log.debug("Link editor already open");
             return;
         }
 
-        const key = this.selectedKey;
-        const infos = this.editableElements.get(key);
+        const key = this.state.selectedKey;
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0 || !(infos[0].element instanceof HTMLAnchorElement)) {
             this.log.warn("Selected element is not a link");
             return;
@@ -2913,7 +2870,7 @@ class EditorController {
 
         modal.addEventListener("apply", ((e: CustomEvent<{ linkData: LinkData }>) => {
             // Build content and update via setContent
-            const attributes = this.elementAttributes.get(key);
+            const attributes = this.state.elementAttributes.get(key);
             const data: LinkContentData = {
                 type: "link",
                 href: e.detail.linkData.href,
@@ -2937,24 +2894,24 @@ class EditorController {
         });
 
         document.body.appendChild(modal);
-        this.linkEditorModal = modal;
+        this.state.linkEditorModal = modal;
     }
 
     private closeLinkEditor(): void {
-        if (this.linkEditorModal) {
-            this.linkEditorModal.remove();
-            this.linkEditorModal = null;
+        if (this.state.linkEditorModal) {
+            this.state.linkEditorModal.remove();
+            this.state.linkEditorModal = null;
         }
     }
 
     private handleGoToLink(): void {
-        if (!this.selectedKey) {
+        if (!this.state.selectedKey) {
             this.log.debug("No element selected for go to link");
             return;
         }
 
-        const key = this.selectedKey;
-        const infos = this.editableElements.get(key);
+        const key = this.state.selectedKey;
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0 || !(infos[0].element instanceof HTMLAnchorElement)) {
             this.log.warn("Selected element is not a link");
             return;
@@ -2974,7 +2931,7 @@ class EditorController {
     }
 
     private getElementAttributes(key: string): ElementAttributes {
-        return this.elementAttributes.get(key) || {};
+        return this.state.elementAttributes.get(key) || {};
     }
 
     /**
@@ -3101,18 +3058,18 @@ class EditorController {
     ];
 
     private handleEditSeo(): void {
-        if (!this.selectedKey) {
+        if (!this.state.selectedKey) {
             this.log.debug("No element selected for SEO editing");
             return;
         }
 
-        if (this.seoModal) {
+        if (this.state.seoModal) {
             this.log.debug("SEO modal already open");
             return;
         }
 
-        const key = this.selectedKey;
-        const infos = this.editableElements.get(key);
+        const key = this.state.selectedKey;
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) return;
 
         const primaryInfo = infos[0];
@@ -3132,7 +3089,7 @@ class EditorController {
         modal.addEventListener("click", (e: Event) => e.stopPropagation());
 
         modal.addEventListener("apply", ((e: CustomEvent<{ attributes: ElementAttributes }>) => {
-            this.elementAttributes.set(key, e.detail.attributes);
+            this.state.elementAttributes.set(key, e.detail.attributes);
             // Apply attributes to all elements sharing this key
             for (const info of infos) {
                 this.applyAttributesToElement(info.element, e.detail.attributes);
@@ -3149,29 +3106,29 @@ class EditorController {
         modal.addEventListener("cancel", () => this.closeSeoModal());
 
         document.body.appendChild(modal);
-        this.seoModal = modal;
+        this.state.seoModal = modal;
     }
 
     private closeSeoModal(): void {
-        if (this.seoModal) {
-            this.seoModal.remove();
-            this.seoModal = null;
+        if (this.state.seoModal) {
+            this.state.seoModal.remove();
+            this.state.seoModal = null;
         }
     }
 
     private handleEditAccessibility(): void {
-        if (!this.selectedKey) {
+        if (!this.state.selectedKey) {
             this.log.debug("No element selected for accessibility editing");
             return;
         }
 
-        if (this.accessibilityModal) {
+        if (this.state.accessibilityModal) {
             this.log.debug("Accessibility modal already open");
             return;
         }
 
-        const key = this.selectedKey;
-        const infos = this.editableElements.get(key);
+        const key = this.state.selectedKey;
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) return;
 
         const primaryInfo = infos[0];
@@ -3195,7 +3152,7 @@ class EditorController {
         modal.addEventListener("click", (e: Event) => e.stopPropagation());
 
         modal.addEventListener("apply", ((e: CustomEvent<{ attributes: ElementAttributes }>) => {
-            this.elementAttributes.set(key, e.detail.attributes);
+            this.state.elementAttributes.set(key, e.detail.attributes);
             // Apply attributes to all elements sharing this key
             for (const info of infos) {
                 this.applyAttributesToElement(info.element, e.detail.attributes);
@@ -3212,29 +3169,29 @@ class EditorController {
         modal.addEventListener("cancel", () => this.closeAccessibilityModal());
 
         document.body.appendChild(modal);
-        this.accessibilityModal = modal;
+        this.state.accessibilityModal = modal;
     }
 
     private closeAccessibilityModal(): void {
-        if (this.accessibilityModal) {
-            this.accessibilityModal.remove();
-            this.accessibilityModal = null;
+        if (this.state.accessibilityModal) {
+            this.state.accessibilityModal.remove();
+            this.state.accessibilityModal = null;
         }
     }
 
     private handleEditAttributes(): void {
-        if (!this.selectedKey) {
+        if (!this.state.selectedKey) {
             this.log.debug("No element selected for attributes editing");
             return;
         }
 
-        if (this.attributesModal) {
+        if (this.state.attributesModal) {
             this.log.debug("Attributes modal already open");
             return;
         }
 
-        const key = this.selectedKey;
-        const infos = this.editableElements.get(key);
+        const key = this.state.selectedKey;
+        const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) return;
 
         const primaryInfo = infos[0];
@@ -3253,7 +3210,7 @@ class EditorController {
         modal.addEventListener("click", (e: Event) => e.stopPropagation());
 
         modal.addEventListener("apply", ((e: CustomEvent<{ attributes: ElementAttributes }>) => {
-            this.elementAttributes.set(key, e.detail.attributes);
+            this.state.elementAttributes.set(key, e.detail.attributes);
             // Apply attributes to all elements sharing this key
             for (const info of infos) {
                 this.applyAttributesToElement(info.element, e.detail.attributes);
@@ -3270,13 +3227,13 @@ class EditorController {
         modal.addEventListener("cancel", () => this.closeAttributesModal());
 
         document.body.appendChild(modal);
-        this.attributesModal = modal;
+        this.state.attributesModal = modal;
     }
 
     private closeAttributesModal(): void {
-        if (this.attributesModal) {
-            this.attributesModal.remove();
-            this.attributesModal = null;
+        if (this.state.attributesModal) {
+            this.state.attributesModal.remove();
+            this.state.attributesModal = null;
         }
     }
 
@@ -3298,17 +3255,17 @@ class EditorController {
         const modal = document.createElement("scms-media-manager-modal") as MediaManagerModal;
         modal.appUrl = this.config.appUrl;
         modal.appId = this.config.appId;
-        if (this.apiKey) {
-            modal.apiKey = this.apiKey;
+        if (this.state.apiKey) {
+            modal.apiKey = this.state.apiKey;
         }
         document.body.appendChild(modal);
-        this.mediaManagerModal = modal;
+        this.state.mediaManagerModal = modal;
         this.log.debug("Media manager modal initialized");
     }
 
     private updateMediaManagerApiKey(): void {
-        if (this.mediaManagerModal) {
-            this.mediaManagerModal.apiKey = this.apiKey || "";
+        if (this.state.mediaManagerModal) {
+            this.state.mediaManagerModal.apiKey = this.state.apiKey || "";
         }
     }
 
@@ -3317,13 +3274,13 @@ class EditorController {
      * Returns selected file on success, null if user cancels or closes
      */
     public async openMediaManager(): Promise<MediaFile | null> {
-        if (!this.mediaManagerModal) {
+        if (!this.state.mediaManagerModal) {
             this.log.warn("Media manager modal not initialized");
             return null;
         }
 
         this.log.debug("Opening media manager");
-        const file = await this.mediaManagerModal.selectMedia();
+        const file = await this.state.mediaManagerModal.selectMedia();
         if (file) {
             this.log.debug("Media file selected", { fileId: file.fileId, filename: file.filename });
         } else {
@@ -3335,44 +3292,44 @@ class EditorController {
     // ==================== Template Toolbar Handlers ====================
 
     private handleAddInstance(): void {
-        if (!this.toolbar?.templateId) {
+        if (!this.state.toolbar?.templateId) {
             this.log.debug("No template context for add instance");
             return;
         }
-        this.addInstance(this.toolbar.templateId);
+        this.addInstance(this.state.toolbar.templateId);
     }
 
     private handleDeleteInstance(): void {
-        if (!this.toolbar?.templateId || !this.toolbar?.instanceId) {
+        if (!this.state.toolbar?.templateId || !this.state.toolbar?.instanceId) {
             this.log.debug("No template context for delete instance");
             return;
         }
-        this.removeInstance(this.toolbar.templateId, this.toolbar.instanceId);
+        this.removeInstance(this.state.toolbar.templateId, this.state.toolbar.instanceId);
     }
 
     private handleMoveInstanceUp(): void {
-        if (!this.toolbar?.templateId || this.toolbar?.instanceIndex === null) {
+        if (!this.state.toolbar?.templateId || this.state.toolbar?.instanceIndex === null) {
             this.log.debug("No template context for move up");
             return;
         }
-        const fromIndex = this.toolbar.instanceIndex;
+        const fromIndex = this.state.toolbar.instanceIndex;
         if (fromIndex > 0) {
-            this.reorderInstance(this.toolbar.templateId, fromIndex, fromIndex - 1);
+            this.reorderInstance(this.state.toolbar.templateId, fromIndex, fromIndex - 1);
         }
     }
 
     private handleMoveInstanceDown(): void {
         if (
-            !this.toolbar?.templateId ||
-            this.toolbar?.instanceIndex === null ||
-            this.toolbar?.instanceCount === null
+            !this.state.toolbar?.templateId ||
+            this.state.toolbar?.instanceIndex === null ||
+            this.state.toolbar?.instanceCount === null
         ) {
             this.log.debug("No template context for move down");
             return;
         }
-        const fromIndex = this.toolbar.instanceIndex;
-        if (fromIndex < this.toolbar.instanceCount - 1) {
-            this.reorderInstance(this.toolbar.templateId, fromIndex, fromIndex + 1);
+        const fromIndex = this.state.toolbar.instanceIndex;
+        if (fromIndex < this.state.toolbar.instanceCount - 1) {
+            this.reorderInstance(this.state.toolbar.templateId, fromIndex, fromIndex + 1);
         }
     }
 
@@ -3382,7 +3339,7 @@ class EditorController {
      * Add a new instance to a template
      */
     public addInstance(templateId: string): void {
-        const templateInfo = this.templates.get(templateId);
+        const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo) {
             this.log.error("Template not found", { templateId });
             return;
@@ -3421,7 +3378,7 @@ class EditorController {
         }
 
         // Insert before the add button (which is the last child)
-        const addButton = this.templateAddButtons.get(templateId);
+        const addButton = this.state.templateAddButtons.get(templateId);
         if (addButton && addButton.parentElement === container) {
             container.insertBefore(clone, addButton);
         } else {
@@ -3437,7 +3394,7 @@ class EditorController {
         this.registerInstanceElements(clone, templateId, newInstanceId, groupId);
 
         // If in author mode, set up click handlers and styles for new elements
-        if (this.currentMode === "author") {
+        if (this.state.currentMode === "author") {
             this.setupInstanceForAuthorMode(clone, templateId, newInstanceId);
         }
 
@@ -3445,7 +3402,7 @@ class EditorController {
 
         // If we now have 2+ instances, add delete buttons and drag handles to all instances
         // (skip if instance element IS the editable element - use toolbar controls instead)
-        if (templateInfo.instanceCount >= 2 && this.currentMode === "author") {
+        if (templateInfo.instanceCount >= 2 && this.state.currentMode === "author") {
             let hasInlineControls = false;
             container
                 .querySelectorAll<HTMLElement>("[data-scms-instance]")
@@ -3455,7 +3412,7 @@ class EditorController {
                     this.addInstanceDeleteButton(instanceElement);
                     this.addInstanceDragHandle(instanceElement);
                 });
-            if (hasInlineControls && !this.sortableInstances.has(templateId)) {
+            if (hasInlineControls && !this.state.sortableInstances.has(templateId)) {
                 this.initializeSortable(templateId, container);
             }
         }
@@ -3476,7 +3433,7 @@ class EditorController {
      * Remove a template instance
      */
     public async removeInstance(templateId: string, instanceId: string): Promise<void> {
-        const templateInfo = this.templates.get(templateId);
+        const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo) {
             this.log.error("Template not found", { templateId });
             return;
@@ -3517,7 +3474,7 @@ class EditorController {
         });
 
         // Stop editing if we're editing something in this instance
-        if (this.editingKey && keysToDelete.includes(this.editingKey)) {
+        if (this.state.editingKey && keysToDelete.includes(this.state.editingKey)) {
             this.stopEditing();
         }
 
@@ -3527,18 +3484,18 @@ class EditorController {
         // Update tracking - remove from currentContent to mark for deletion
         // (deletion is derived from: key in originalContent but not in currentContent)
         keysToDelete.forEach((key) => {
-            const infos = this.editableElements.get(key);
+            const infos = this.state.editableElements.get(key);
             if (infos) {
                 // Remove elements that were in this instance
                 const remaining = infos.filter((info) => info.instanceId !== instanceId);
                 if (remaining.length > 0) {
-                    this.editableElements.set(key, remaining);
+                    this.state.editableElements.set(key, remaining);
                 } else {
                     // No more DOM elements for this key
-                    this.editableElements.delete(key);
-                    this.editableTypes.delete(key);
+                    this.state.editableElements.delete(key);
+                    this.state.editableTypes.delete(key);
                     // Remove from currentContent (will be detected as pending delete)
-                    this.currentContent.delete(key);
+                    this.state.currentContent.delete(key);
                 }
             }
         });
@@ -3562,10 +3519,10 @@ class EditorController {
                 if (dragHandle) dragHandle.remove();
             });
             // Destroy sortable instance
-            const sortable = this.sortableInstances.get(templateId);
+            const sortable = this.state.sortableInstances.get(templateId);
             if (sortable) {
                 sortable.destroy();
-                this.sortableInstances.delete(templateId);
+                this.state.sortableInstances.delete(templateId);
             }
         }
 
@@ -3577,7 +3534,7 @@ class EditorController {
      * Reorder a template instance by moving it from one index to another
      */
     public reorderInstance(templateId: string, fromIndex: number, toIndex: number): void {
-        const templateInfo = this.templates.get(templateId);
+        const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo) {
             this.log.error("Template not found", { templateId });
             return;
@@ -3623,7 +3580,7 @@ class EditorController {
         // Find the element at the target position (after array update)
         if (toIndex === instanceIds.length - 1) {
             // Moving to last position - insert before the add button
-            const addButton = this.templateAddButtons.get(templateId);
+            const addButton = this.state.templateAddButtons.get(templateId);
             if (addButton && addButton.parentElement === container) {
                 container.insertBefore(instanceElement, addButton);
             } else {
@@ -3704,11 +3661,11 @@ class EditorController {
             };
 
             // Add to tracking
-            const existing = this.editableElements.get(key);
+            const existing = this.state.editableElements.get(key);
             if (existing) {
                 existing.push(elementInfo);
                 // Sync the new element with existing shared content (e.g., group inside template)
-                let content = this.currentContent.get(key);
+                let content = this.state.currentContent.get(key);
                 if (!content && existing.length > 0) {
                     // No saved content yet - get content from an existing element
                     content = this.getElementContent(key, existing[0]);
@@ -3717,24 +3674,24 @@ class EditorController {
                     this.applyElementContent(key, elementInfo, content);
                 }
             } else {
-                this.editableElements.set(key, [elementInfo]);
+                this.state.editableElements.set(key, [elementInfo]);
 
                 // Initialize content state from DOM (first element for this key)
                 // This mirrors what scanEditableElements does for initial elements
-                this.editableTypes.set(key, info.type);
+                this.state.editableTypes.set(key, info.type);
 
                 // For new instance elements, normalize whitespace (no saved content exists yet)
                 this.normalizeDomWhitespace(element, info.type);
 
                 const content = this.getElementContent(key, elementInfo);
-                this.originalContent.set(key, content);
-                this.currentContent.set(key, content);
+                this.state.originalContent.set(key, content);
+                this.state.currentContent.set(key, content);
             }
 
             this.elementToKey.set(element, key);
             // Type may already be set above or from existing registration
-            if (!this.editableTypes.has(key)) {
-                this.editableTypes.set(key, info.type);
+            if (!this.state.editableTypes.has(key)) {
+                this.state.editableTypes.set(key, info.type);
             }
         });
     }
@@ -3785,7 +3742,7 @@ class EditorController {
         if (!templateId) return;
 
         // Don't add delete button if it's the only instance
-        const templateInfo = this.templates.get(templateId);
+        const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo || templateInfo.instanceCount <= 1) {
             return;
         }
@@ -3857,7 +3814,7 @@ class EditorController {
                 }
 
                 // SortableJS already moved the DOM element, but we need to update our tracking
-                const templateInfo = this.templates.get(templateId);
+                const templateInfo = this.state.templates.get(templateId);
                 if (!templateInfo) return;
 
                 // Update the instanceIds array to match the new DOM order
@@ -3877,7 +3834,7 @@ class EditorController {
             },
         });
 
-        this.sortableInstances.set(templateId, sortable);
+        this.state.sortableInstances.set(templateId, sortable);
     }
 
     /**
@@ -3885,27 +3842,27 @@ class EditorController {
      * Shows add/remove/reorder controls when editing an element inside a template
      */
     private updateToolbarTemplateContext(): void {
-        if (!this.toolbar) return;
+        if (!this.state.toolbar) return;
 
         // Get template context from currently editing or selected element
-        const activeKey = this.editingKey || this.selectedKey;
+        const activeKey = this.state.editingKey || this.state.selectedKey;
         if (!activeKey) {
             // Clear template context when nothing is active
-            this.toolbar.templateId = null;
-            this.toolbar.instanceId = null;
-            this.toolbar.instanceIndex = null;
-            this.toolbar.instanceCount = null;
-            this.toolbar.structureMismatch = false;
+            this.state.toolbar.templateId = null;
+            this.state.toolbar.instanceId = null;
+            this.state.toolbar.instanceIndex = null;
+            this.state.toolbar.instanceCount = null;
+            this.state.toolbar.structureMismatch = false;
             return;
         }
 
-        const infos = this.editableElements.get(activeKey);
+        const infos = this.state.editableElements.get(activeKey);
         if (!infos || infos.length === 0) {
-            this.toolbar.templateId = null;
-            this.toolbar.instanceId = null;
-            this.toolbar.instanceIndex = null;
-            this.toolbar.instanceCount = null;
-            this.toolbar.structureMismatch = false;
+            this.state.toolbar.templateId = null;
+            this.state.toolbar.instanceId = null;
+            this.state.toolbar.instanceIndex = null;
+            this.state.toolbar.instanceCount = null;
+            this.state.toolbar.structureMismatch = false;
             return;
         }
 
@@ -3913,35 +3870,35 @@ class EditorController {
         const info = infos[0];
         if (!info.templateId || !info.instanceId) {
             // Element is not in a template
-            this.toolbar.templateId = null;
-            this.toolbar.instanceId = null;
-            this.toolbar.instanceIndex = null;
-            this.toolbar.instanceCount = null;
-            this.toolbar.structureMismatch = false;
+            this.state.toolbar.templateId = null;
+            this.state.toolbar.instanceId = null;
+            this.state.toolbar.instanceIndex = null;
+            this.state.toolbar.instanceCount = null;
+            this.state.toolbar.structureMismatch = false;
             return;
         }
 
-        const templateInfo = this.templates.get(info.templateId);
+        const templateInfo = this.state.templates.get(info.templateId);
         if (!templateInfo) {
-            this.toolbar.templateId = null;
-            this.toolbar.instanceId = null;
-            this.toolbar.instanceIndex = null;
-            this.toolbar.instanceCount = null;
-            this.toolbar.structureMismatch = false;
+            this.state.toolbar.templateId = null;
+            this.state.toolbar.instanceId = null;
+            this.state.toolbar.instanceIndex = null;
+            this.state.toolbar.instanceCount = null;
+            this.state.toolbar.structureMismatch = false;
             return;
         }
 
         // Set template context on toolbar
-        this.toolbar.templateId = info.templateId;
-        this.toolbar.instanceId = info.instanceId;
-        this.toolbar.instanceIndex = templateInfo.instanceIds.indexOf(info.instanceId);
-        this.toolbar.instanceCount = templateInfo.instanceIds.length;
+        this.state.toolbar.templateId = info.templateId;
+        this.state.toolbar.instanceId = info.instanceId;
+        this.state.toolbar.instanceIndex = templateInfo.instanceIds.indexOf(info.instanceId);
+        this.state.toolbar.instanceCount = templateInfo.instanceIds.length;
 
         // Check if this instance has a structure mismatch
         const instanceElement = templateInfo.container.querySelector(
             `[data-scms-instance="${info.instanceId}"]`,
         );
-        this.toolbar.structureMismatch =
+        this.state.toolbar.structureMismatch =
             instanceElement?.hasAttribute("data-scms-structure-mismatch") ?? false;
     }
 
@@ -3949,14 +3906,14 @@ class EditorController {
      * Get info about a template (for toolbar use)
      */
     public getTemplateInfo(templateId: string): TemplateInfo | undefined {
-        return this.templates.get(templateId);
+        return this.state.templates.get(templateId);
     }
 
     /**
      * Get all templates
      */
     public getTemplates(): Map<string, TemplateInfo> {
-        return this.templates;
+        return this.state.templates;
     }
 }
 
