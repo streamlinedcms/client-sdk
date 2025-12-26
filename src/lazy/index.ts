@@ -81,6 +81,7 @@ import { TemplateManager } from "./template-manager.js";
 import { EditingManager } from "./editing-manager.js";
 import { ModalManager } from "./modal-manager.js";
 import { SaveManager } from "./save-manager.js";
+import { AuthManager } from "./auth-manager.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -112,6 +113,7 @@ class EditorController {
     private editingManager: EditingManager;
     private modalManager: ModalManager;
     private saveManager: SaveManager;
+    private authManager: AuthManager;
     // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Double-tap delay constant
@@ -206,7 +208,7 @@ class EditorController {
                 buildTemplateKey: this.buildTemplateKey.bind(this),
                 parseStorageKey: this.parseStorageKey.bind(this),
                 getEditableType: this.getEditableType.bind(this),
-                signOut: this.signOut.bind(this),
+                signOut: (skip) => this.authManager.signOut(skip),
                 fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
             },
         );
@@ -217,6 +219,25 @@ class EditorController {
             appId: config.appId,
             appUrl: config.appUrl,
         });
+
+        // Initialize auth manager
+        this.authManager = new AuthManager(
+            this.state,
+            this.log,
+            this.keyStorage,
+            this.popupManager,
+            { apiUrl: config.apiUrl, appId: config.appId },
+            {
+                setMode: this.setMode.bind(this),
+                enableEditing: this.enableEditing.bind(this),
+                disableEditing: this.disableEditing.bind(this),
+                fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
+                showToolbar: this.showToolbar.bind(this),
+                removeToolbar: this.removeToolbar.bind(this),
+                updateMediaManagerApiKey: () => this.modalManager.updateMediaManagerApiKey(),
+                hasUnsavedChanges: () => this.saveManager.hasUnsavedChanges(),
+            },
+        );
     }
 
     /**
@@ -327,7 +348,7 @@ class EditorController {
 
         // Set up auth UI based on stored state
         // This validates stored API key and sets this.state.apiKey if valid
-        await this.setupAuthUI();
+        await this.authManager.setupAuthUI();
 
         // Initialize media manager modal (persistent, reused across selections)
         this.modalManager.initMediaManagerModal();
@@ -532,114 +553,6 @@ class EditorController {
         return null;
     }
 
-    private async setupAuthUI(): Promise<void> {
-        const storedKey = this.keyStorage.getStoredKey();
-
-        if (storedKey) {
-            // Validate the stored key before trusting it
-            const isValid = await this.validateApiKey(storedKey);
-            if (!isValid) {
-                this.log.info("Stored API key is no longer valid, clearing");
-                this.keyStorage.clearStoredKey();
-                this.showSignInLink();
-                return;
-            }
-
-            this.state.apiKey = storedKey;
-            this.modalManager.updateMediaManagerApiKey();
-
-            // Set up all custom triggers as sign-out
-            const customTriggers = document.querySelectorAll("[data-scms-signin]");
-            customTriggers.forEach((trigger) => {
-                this.state.customSignInTriggers.set(trigger, trigger.textContent || "");
-                trigger.textContent = "Sign Out";
-                trigger.addEventListener("click", this.handleSignOutClick);
-            });
-
-            const storedMode = this.keyStorage.getStoredMode();
-            const mode = storedMode === "author" ? "author" : "viewer";
-            this.setMode(mode);
-            if (mode === "author") {
-                const success = await this.fetchSavedContentKeys();
-                if (!success) {
-                    this.disableEditing();
-                }
-            }
-            this.log.debug("Restored auth state", {
-                mode: this.state.currentMode,
-                triggerCount: customTriggers.length,
-            });
-        } else {
-            this.showSignInLink();
-            this.log.debug("No valid API key, showing sign-in link");
-        }
-    }
-
-    /**
-     * Validate an API key by making a request to the keys/@me endpoint
-     * Returns true if valid, false if invalid (401/403) or on network error
-     */
-    private async validateApiKey(apiKey: string): Promise<boolean> {
-        try {
-            const response = await fetch(
-                `${this.config.apiUrl}/apps/${this.config.appId}/keys/@me`,
-                {
-                    headers: { Authorization: `Bearer ${apiKey}` },
-                },
-            );
-
-            if (response.status === 401 || response.status === 403) {
-                return false;
-            }
-
-            return response.ok;
-        } catch (error) {
-            this.log.warn("Failed to validate API key", error);
-            // On network error, assume key is still valid to avoid logging user out
-            return true;
-        }
-    }
-
-    private showSignInLink(): void {
-        this.removeToolbar();
-
-        // Check for custom triggers
-        const customTriggers = document.querySelectorAll("[data-scms-signin]");
-        if (customTriggers.length > 0) {
-            customTriggers.forEach((trigger) => {
-                // Store original text if not already stored
-                if (!this.state.customSignInTriggers.has(trigger)) {
-                    this.state.customSignInTriggers.set(trigger, trigger.textContent || "");
-                }
-                // Restore original text
-                const originalText = this.state.customSignInTriggers.get(trigger);
-                if (originalText) {
-                    trigger.textContent = originalText;
-                }
-                trigger.addEventListener("click", this.handleSignInClick);
-            });
-            return;
-        }
-
-        // Use Lit component (fallback when no custom triggers)
-        const signInLink = document.createElement("scms-sign-in-link");
-        signInLink.id = "scms-signin-link";
-        signInLink.addEventListener("sign-in-click", () => {
-            this.handleSignIn();
-        });
-        document.body.appendChild(signInLink);
-    }
-
-    private handleSignInClick = (e: Event): void => {
-        e.preventDefault();
-        this.handleSignIn();
-    };
-
-    private handleSignOutClick = (e: Event): void => {
-        e.preventDefault();
-        this.signOut();
-    };
-
     private handleDocumentClick = (e: Event): void => {
         const target = e.target as Node;
 
@@ -678,38 +591,6 @@ class EditorController {
         }
         this.templateManager.updateToolbarTemplateContext();
     };
-
-    private async handleSignIn(): Promise<void> {
-        this.log.debug("Opening login popup");
-
-        const key = await this.popupManager.openLoginPopup();
-        if (key) {
-            this.state.apiKey = key;
-            this.modalManager.updateMediaManagerApiKey();
-            this.keyStorage.storeKey(key);
-
-            // Remove default sign-in link if present
-            const signInLink = document.getElementById("scms-signin-link");
-            if (signInLink) signInLink.remove();
-
-            // Convert all custom triggers to sign-out
-            this.state.customSignInTriggers.forEach((_, trigger) => {
-                trigger.removeEventListener("click", this.handleSignInClick);
-                trigger.textContent = "Sign Out";
-                trigger.addEventListener("click", this.handleSignOutClick);
-            });
-
-            this.setMode("author");
-            const success = await this.fetchSavedContentKeys();
-            if (!success) {
-                this.disableEditing();
-            }
-
-            this.log.info("User authenticated via popup, entering author mode");
-        } else {
-            this.log.debug("Login popup closed without authentication");
-        }
-    }
 
     private setMode(mode: EditorMode): void {
         this.state.currentMode = mode;
@@ -896,7 +777,7 @@ class EditorController {
         });
 
         toolbar.addEventListener("sign-out", () => {
-            this.signOut();
+            this.authManager.signOut();
         });
 
         toolbar.addEventListener("edit-seo", () => {
@@ -950,36 +831,6 @@ class EditorController {
             this.state.toolbar = null;
             document.body.style.paddingBottom = "";
             window.removeEventListener("resize", this.updateBodyPadding);
-        }
-    }
-
-    private signOut(skipConfirmation = false): void {
-        if (!skipConfirmation && this.saveManager.hasUnsavedChanges()) {
-            const confirmed = confirm("You have unsaved changes. Sign out anyway?");
-            if (!confirmed) return;
-        }
-
-        this.log.info("Signing out");
-
-        this.keyStorage.clearStoredKey();
-        this.state.apiKey = null;
-        this.modalManager.updateMediaManagerApiKey();
-        this.state.currentMode = "viewer";
-
-        this.disableEditing();
-
-        // Convert all custom triggers back to sign-in
-        this.state.customSignInTriggers.forEach((originalText, trigger) => {
-            trigger.removeEventListener("click", this.handleSignOutClick);
-            trigger.textContent = originalText;
-            trigger.addEventListener("click", this.handleSignInClick);
-        });
-
-        this.removeToolbar();
-
-        // Only show default sign-in link if no custom triggers
-        if (this.state.customSignInTriggers.size === 0) {
-            this.showSignInLink();
         }
     }
 
