@@ -239,6 +239,7 @@ import {
 import { DraftManager } from "./draft-manager.js";
 import { ContentManager } from "./content-manager.js";
 import { TemplateManager } from "./template-manager.js";
+import { EditingManager } from "./editing-manager.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -267,6 +268,7 @@ class EditorController {
     private draftManager: DraftManager;
     private contentManager: ContentManager;
     private templateManager: TemplateManager;
+    private editingManager: EditingManager;
     // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Double-tap delay constant
@@ -301,6 +303,14 @@ class EditorController {
             applyAttributesToElement: this.applyAttributesToElement.bind(this),
         });
 
+        // Initialize editing manager
+        this.editingManager = new EditingManager(this.state, this.log, this.contentManager, {
+            getEditableType: this.getEditableType.bind(this),
+            updateToolbarHasChanges: this.updateToolbarHasChanges.bind(this),
+            updateToolbarTemplateContext: () => this.templateManager.updateToolbarTemplateContext(),
+            getElementToKeyMap: () => this.elementToKey,
+        });
+
         // Initialize template manager
         this.templateManager = new TemplateManager(this.state, this.log, this.contentManager, {
             getGroupIdFromElement: this.getGroupIdFromElement.bind(this),
@@ -310,8 +320,8 @@ class EditorController {
             normalizeDomWhitespace: this.normalizeDomWhitespace.bind(this),
             isInstanceAlsoEditable: this.isInstanceAlsoEditable.bind(this),
             setupElementClickHandler: this.setupElementClickHandler.bind(this),
-            selectInstance: this.selectInstance.bind(this),
-            stopEditing: this.stopEditing.bind(this),
+            selectInstance: (el) => this.editingManager.selectInstance(el),
+            stopEditing: () => this.editingManager.stopEditing(),
             updateToolbarHasChanges: this.updateToolbarHasChanges.bind(this),
             getElementToKeyMap: () => this.elementToKey,
         });
@@ -763,7 +773,7 @@ class EditorController {
 
         // Deselect instance if clicking outside all instances
         if (this.state.selectedInstance && !clickedInstance) {
-            this.deselectInstance();
+            this.editingManager.deselectInstance();
         }
 
         if (!this.state.editingKey && !this.state.selectedKey) return;
@@ -783,8 +793,8 @@ class EditorController {
         }
 
         // Stop editing and deselect
-        this.stopEditing();
-        this.deselectElement();
+        this.editingManager.stopEditing();
+        this.editingManager.deselectElement();
 
         // Clear toolbar
         if (this.state.toolbar) {
@@ -874,15 +884,15 @@ class EditorController {
                     } else if (isMobile) {
                         // Mobile two-step: first tap selects, second tap edits
                         if (this.state.selectedKey === key && this.state.editingKey !== key) {
-                            this.startEditing(key, element);
+                            this.editingManager.startEditing(key, element);
                         } else {
-                            this.selectElement(key, element);
+                            this.editingManager.selectElement(key, element);
                         }
                         this.state.lastTapKey = key;
                         this.state.lastTapTime = now;
                     } else {
                         // Desktop: edit immediately
-                        this.startEditing(key, element);
+                        this.editingManager.startEditing(key, element);
                         this.state.lastTapKey = key;
                         this.state.lastTapTime = now;
                     }
@@ -960,9 +970,9 @@ class EditorController {
         document.removeEventListener("click", this.handleDocumentClick);
 
         this.templateManager.hideTemplateControls();
-        this.deselectInstance();
-        this.deselectElement();
-        this.stopEditing();
+        this.editingManager.deselectInstance();
+        this.editingManager.deselectElement();
+        this.editingManager.stopEditing();
     }
 
     private showToolbar(): void {
@@ -1304,269 +1314,6 @@ class EditorController {
     }
 
     /**
-     * Select an element without starting editing (mobile two-step flow).
-     * Shows visual selection and updates toolbar, but doesn't make contenteditable or focus.
-     */
-    private selectElement(key: string, clickedElement?: HTMLElement): void {
-        const infos = this.state.editableElements.get(key);
-        if (!infos || infos.length === 0) {
-            this.log.warn("Element not found for selection", { key });
-            return;
-        }
-
-        // Use the clicked element, or first element if not specified
-        const primaryInfo = clickedElement
-            ? infos.find((i) => i.element === clickedElement) || infos[0]
-            : infos[0];
-
-        const elementType = this.getEditableType(key);
-        this.log.trace("Selecting element", {
-            key,
-            elementId: primaryInfo.elementId,
-            groupId: primaryInfo.groupId,
-            elementType,
-        });
-
-        // Deselect previous element if different
-        if (this.state.selectedKey && this.state.selectedKey !== key) {
-            this.deselectElement();
-        }
-
-        // Stop editing if we're editing a different element
-        if (this.state.editingKey && this.state.editingKey !== key) {
-            this.stopEditing();
-        }
-
-        this.state.selectedKey = key;
-
-        // Also select parent instance if element is inside one
-        const parentInstance = primaryInfo.element.closest("[data-scms-instance]") as HTMLElement | null;
-        if (parentInstance) {
-            this.selectInstance(parentInstance);
-        }
-
-        // Add selection classes
-        for (const info of infos) {
-            const isPrimary = info.element === primaryInfo.element;
-            if (isPrimary) {
-                info.element.classList.add("streamlined-selected");
-            } else {
-                info.element.classList.add("streamlined-selected-sibling");
-            }
-        }
-
-        // Update toolbar
-        if (this.state.toolbar) {
-            this.state.toolbar.activeElement = key;
-            this.state.toolbar.activeElementType = elementType;
-        }
-
-        // Update template context on toolbar
-        this.templateManager.updateToolbarTemplateContext();
-    }
-
-    /**
-     * Deselect the currently selected element without starting editing.
-     */
-    private deselectElement(): void {
-        if (!this.state.selectedKey) return;
-
-        const infos = this.state.editableElements.get(this.state.selectedKey);
-        if (infos) {
-            for (const info of infos) {
-                info.element.classList.remove("streamlined-selected");
-                info.element.classList.remove("streamlined-selected-sibling");
-            }
-        }
-
-        this.state.selectedKey = null;
-
-        // Clear toolbar if not editing
-        if (!this.state.editingKey && this.state.toolbar) {
-            this.state.toolbar.activeElement = null;
-            this.state.toolbar.activeElementType = null;
-        }
-    }
-
-    /**
-     * Select a template instance (for mobile controls visibility).
-     */
-    private selectInstance(instanceElement: HTMLElement): void {
-        if (this.state.selectedInstance === instanceElement) return;
-
-        // Deselect previous instance
-        if (this.state.selectedInstance) {
-            this.state.selectedInstance.classList.remove("scms-instance-selected");
-        }
-
-        this.state.selectedInstance = instanceElement;
-        instanceElement.classList.add("scms-instance-selected");
-    }
-
-    /**
-     * Deselect the currently selected template instance.
-     */
-    private deselectInstance(): void {
-        if (!this.state.selectedInstance) return;
-
-        this.state.selectedInstance.classList.remove("scms-instance-selected");
-        this.state.selectedInstance = null;
-    }
-
-    private startEditing(key: string, clickedElement?: HTMLElement): void {
-        const infos = this.state.editableElements.get(key);
-        if (!infos || infos.length === 0) {
-            this.log.warn("Element not found", { key });
-            return;
-        }
-
-        // Use the clicked element, or first element if not specified
-        const primaryInfo = clickedElement
-            ? infos.find((i) => i.element === clickedElement) || infos[0]
-            : infos[0];
-
-        const elementType = this.getEditableType(key);
-        this.log.trace("Starting edit", {
-            key,
-            elementId: primaryInfo.elementId,
-            groupId: primaryInfo.groupId,
-            elementType,
-            sharedCount: infos.length,
-        });
-
-        // Ensure element is selected first (handles deselecting previous, updating toolbar)
-        this.selectElement(key, clickedElement);
-
-        // Stop editing previous element if any (different from current)
-        if (this.state.editingKey && this.state.editingKey !== key) {
-            this.stopEditing();
-        }
-
-        // Already editing this element - nothing more to do
-        if (this.state.editingKey === key) {
-            return;
-        }
-
-        this.state.editingKey = key;
-
-        // Transition from selected to editing state
-        for (const info of infos) {
-            const isPrimary = info.element === primaryInfo.element;
-
-            // Remove selected classes, add editing classes
-            info.element.classList.remove("streamlined-selected");
-            info.element.classList.remove("streamlined-selected-sibling");
-
-            if (isPrimary) {
-                info.element.classList.add("streamlined-editing");
-            } else {
-                info.element.classList.add("streamlined-editing-sibling");
-            }
-
-            // Add input listener to all elements for change tracking and synchronization
-            if (
-                (elementType === "text" || elementType === "html") &&
-                !info.element.dataset.scmsInputHandler
-            ) {
-                info.element.addEventListener("input", () => {
-                    // Update currentContent from DOM, then sync all elements
-                    this.contentManager.updateContentFromElement(key, info.element);
-                    this.updateToolbarHasChanges();
-                });
-                info.element.dataset.scmsInputHandler = "true";
-            }
-
-            // Add keydown listener for Tab navigation (all element types)
-            if (!info.element.dataset.scmsKeydownHandler) {
-                info.element.addEventListener("keydown", (e: KeyboardEvent) => {
-                    if (e.key === "Tab") {
-                        e.preventDefault();
-                        this.navigateToNextEditable(info.element, e.shiftKey);
-                    }
-                });
-                info.element.dataset.scmsKeydownHandler = "true";
-            }
-
-            // Make text and html elements contenteditable (not images or links)
-            // Only the primary element is focused, but all are editable for consistency
-            if (elementType === "text" || elementType === "html") {
-                info.element.setAttribute("contenteditable", "true");
-            }
-
-            // Make images and links focusable for keyboard navigation
-            if (elementType === "image" || elementType === "link") {
-                info.element.setAttribute("tabindex", "-1");
-            }
-        }
-
-        // Focus the primary element (all types need focus for keyboard navigation)
-        primaryInfo.element.focus();
-
-        // On mobile, scroll the element into view after keyboard opens
-        if (window.innerWidth < 640) {
-            setTimeout(() => {
-                primaryInfo.element.scrollIntoView({ block: "center", behavior: "smooth" });
-            }, 300);
-        }
-    }
-
-    /**
-     * Navigate to the next or previous editable element from the current one.
-     * Uses DOM order to determine sequence. Includes all scms element types.
-     */
-    private navigateToNextEditable(currentElement: HTMLElement, reverse: boolean): void {
-        // Get all editable elements in DOM order (all scms types)
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
-        const allEditables = Array.from(document.querySelectorAll<HTMLElement>(selector));
-
-        if (allEditables.length === 0) return;
-
-        const currentIndex = allEditables.indexOf(currentElement);
-        if (currentIndex === -1) return;
-
-        // Calculate next index with wrapping
-        let nextIndex: number;
-        if (reverse) {
-            nextIndex = currentIndex === 0 ? allEditables.length - 1 : currentIndex - 1;
-        } else {
-            nextIndex = currentIndex === allEditables.length - 1 ? 0 : currentIndex + 1;
-        }
-
-        const nextElement = allEditables[nextIndex];
-        const nextKey = this.elementToKey.get(nextElement);
-
-        if (nextKey) {
-            this.startEditing(nextKey, nextElement);
-        }
-    }
-
-    private stopEditing(): void {
-        if (!this.state.editingKey) {
-            return;
-        }
-
-        this.log.trace("Stopping edit");
-
-        const infos = this.state.editableElements.get(this.state.editingKey);
-        if (infos) {
-            for (const info of infos) {
-                info.element.classList.remove("streamlined-editing");
-                info.element.classList.remove("streamlined-editing-sibling");
-                info.element.setAttribute("contenteditable", "false");
-            }
-        }
-
-        this.state.editingKey = null;
-
-        // Only clear toolbar if nothing is selected (mobile two-step mode keeps selection)
-        if (!this.state.selectedKey && this.state.toolbar) {
-            this.state.toolbar.activeElement = null;
-            this.state.toolbar.activeElementType = null;
-            this.templateManager.updateToolbarTemplateContext();
-        }
-    }
-
-    /**
      * Check if there are any unsaved changes (dirty elements, pending deletes, or order changes)
      */
     private hasUnsavedChanges(): boolean {
@@ -1769,7 +1516,7 @@ class EditorController {
                     saved: saved.length,
                     deleted: deleted.length,
                 });
-                this.stopEditing();
+                this.editingManager.stopEditing();
 
                 // Refresh saved content keys after successful save
                 await this.fetchSavedContentKeys();
