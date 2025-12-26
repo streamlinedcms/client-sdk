@@ -5,14 +5,14 @@
  * Note: 401 errors trigger sign-out, so we test non-auth errors separately.
  */
 
-import { test, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeAll, beforeEach } from "vitest";
 import {
     initializeSDK,
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
 } from "~/@browser-support/sdk-helpers.js";
-import { setNextPatchError, clearNextPatchError } from "~/@browser-support/test-helpers.js";
+import { ERROR_TRIGGERS } from "~/@browser-support/test-helpers.js";
 import type { Toolbar } from "~/src/components/toolbar.js";
 
 // Mock window.alert to capture the error message
@@ -31,12 +31,6 @@ beforeEach(async () => {
     // Deselect any element
     document.body.click();
     await new Promise((r) => setTimeout(r, 100));
-    // Clear any pending errors
-    await clearNextPatchError();
-});
-
-afterEach(async () => {
-    await clearNextPatchError();
 });
 
 /**
@@ -50,7 +44,7 @@ function getToolbar(): Toolbar | null {
  * Helper to get the test element
  */
 function getTestElement(): HTMLElement {
-    return document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
+    return document.querySelector('[data-scms-html="save-error-title"]') as HTMLElement;
 }
 
 /**
@@ -75,14 +69,11 @@ test("500 error during save shows error alert", async () => {
     const element = getTestElement();
     const toolbar = getToolbar();
 
-    // Make a change
-    await editContent(element, "Content that will fail to save - 500");
+    // Make a change with error trigger in content
+    await editContent(element, `${ERROR_TRIGGERS.SERVER_ERROR} Content that will fail to save`);
     expect(toolbar?.hasChanges).toBe(true);
 
-    // Set up the server to return 500 on next PATCH
-    await setNextPatchError(500, "Internal Server Error");
-
-    // Try to save
+    // Try to save - server will see trigger and return 500
     await clickToolbarButton("Save");
 
     // Wait for error to be processed
@@ -97,14 +88,11 @@ test("hasChanges remains true after 500 error", async () => {
     const element = getTestElement();
     const toolbar = getToolbar();
 
-    // Make a change
-    await editContent(element, "Content that will fail - changes persist");
+    // Make a change with error trigger
+    await editContent(element, `${ERROR_TRIGGERS.SERVER_ERROR} Content that will fail - changes persist`);
     expect(toolbar?.hasChanges).toBe(true);
 
-    // Set up the server to return 500 on next PATCH
-    await setNextPatchError(500, "Server Error");
-
-    // Try to save
+    // Try to save - server will return 500
     await clickToolbarButton("Save");
 
     // Wait for error to be processed
@@ -116,15 +104,12 @@ test("hasChanges remains true after 500 error", async () => {
 
 test("content is preserved after 500 error", async () => {
     const element = getTestElement();
-    const editedContent = "Preserved content after error - " + Date.now();
+    const editedContent = `${ERROR_TRIGGERS.SERVER_ERROR} Preserved content after error - ` + Date.now();
 
-    // Make a change
+    // Make a change with error trigger
     await editContent(element, editedContent);
 
-    // Set up the server to return 500 on next PATCH
-    await setNextPatchError(500, "Server Error");
-
-    // Try to save
+    // Try to save - server will return 500
     await clickToolbarButton("Save");
 
     // Wait for error to be processed
@@ -137,19 +122,19 @@ test("content is preserved after 500 error", async () => {
 test("can retry save after 500 error", async () => {
     const element = getTestElement();
     const toolbar = getToolbar();
-    const editedContent = "Retry save content - " + Date.now();
+    const timestamp = Date.now();
 
-    // Make a change
-    await editContent(element, editedContent);
+    // Make a change with error trigger - first save will fail
+    await editContent(element, `${ERROR_TRIGGERS.SERVER_ERROR} Retry save content - ${timestamp}`);
 
-    // First attempt fails
-    await setNextPatchError(500, "Temporary Error");
     await clickToolbarButton("Save");
     await new Promise((r) => setTimeout(r, 500));
 
     expect(toolbar?.hasChanges).toBe(true);
 
-    // Second attempt should succeed (no error set)
+    // Remove the trigger and retry - second save should succeed
+    await editContent(element, `Retry save content - ${timestamp}`);
+
     await clickToolbarButton("Save");
     await waitForCondition(() => !toolbar?.hasChanges, 5000);
 
@@ -162,14 +147,11 @@ test("401 error during save shows session expired alert", async () => {
     const element = getTestElement();
     const toolbar = getToolbar();
 
-    // Make a change
-    await editContent(element, "Content that will fail to save - 401");
+    // Make a change with 401 error trigger
+    await editContent(element, `${ERROR_TRIGGERS.UNAUTHORIZED} Content that will fail to save`);
     expect(toolbar?.hasChanges).toBe(true);
 
-    // Set up the server to return 401 on next PATCH
-    await setNextPatchError(401, "Unauthorized");
-
-    // Try to save
+    // Try to save - server will return 401
     await clickToolbarButton("Save");
 
     // Wait for error to be processed

@@ -12,20 +12,22 @@ import { setContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     setupTestHelpers,
-
+    generateTestAppId,
+    getController,
 } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Set up content that will be loaded
     await setContent(
-        "test-app",
+        appId,
         "test-title",
         JSON.stringify({ type: "html", value: "Content from API" }),
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 });
 
 
@@ -61,6 +63,7 @@ test("SDK is initialized and elements are editable", async () => {
 
 test("loader complete event was dispatched", async () => {
     // The loader script should have the expected attributes
-    const loaderScript = document.querySelector('script[data-app-id="test-app"]');
+    const appId = getController()!.appId;
+    const loaderScript = document.querySelector(`script[data-app-id="${appId}"]`);
     expect(loaderScript).not.toBeNull();
 });

@@ -10,29 +10,30 @@ import {
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
-
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Set up team with 3 members for move/reorder tests
-    await setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    await setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
+    await setContent(appId, "team-controls.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    await setContent(appId, "team-controls.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    await setContent(appId, "team-controls.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
     await setContent(
-        "test-app",
-        "team._order",
+        appId,
+        "team-controls._order",
         JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 });
 
 
 test("toolbar shows template controls when editing element inside template", async () => {
     // Click on a template element
-    const teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    const teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
     const firstName = teamMembers[0].querySelector('[data-scms-text="name"]') as HTMLElement;
     firstName.click();
 
@@ -70,7 +71,7 @@ test("toolbar template controls are hidden when editing non-template element", a
 
 test("toolbar move up button is disabled for first instance", async () => {
     // Click on first instance
-    const teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    const teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
     const firstName = teamMembers[0].querySelector('[data-scms-text="name"]') as HTMLElement;
     firstName.click();
 
@@ -86,7 +87,7 @@ test("toolbar move up button is disabled for first instance", async () => {
 
 test("toolbar move down button is disabled for last instance", async () => {
     // Click on last instance
-    const teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    const teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
     const lastName = teamMembers[teamMembers.length - 1].querySelector('[data-scms-text="name"]') as HTMLElement;
     lastName.click();
 
@@ -101,7 +102,7 @@ test("toolbar move down button is disabled for last instance", async () => {
 });
 
 test("toolbar move up button reorders instance", async () => {
-    let teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    let teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
 
     // Click on second instance to select it
     const secondName = teamMembers[1].querySelector('[data-scms-text="name"]') as HTMLElement;
@@ -117,13 +118,13 @@ test("toolbar move up button reorders instance", async () => {
     await new Promise((r) => setTimeout(r, 100));
 
     // Order should now have second item first
-    teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
     // The element that was second should now be first
     expect(teamMembers[0].querySelector('[data-scms-text="name"]')?.textContent).toBe("Bob");
 });
 
 test("toolbar move down button reorders instance", async () => {
-    let teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    let teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
 
     // Click on first instance to select it (which is now Bob after previous test)
     const firstName = teamMembers[0].querySelector('[data-scms-text="name"]') as HTMLElement;
@@ -141,12 +142,12 @@ test("toolbar move down button reorders instance", async () => {
     await new Promise((r) => setTimeout(r, 100));
 
     // Bob should now be second again
-    teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
     expect(teamMembers[1].querySelector('[data-scms-text="name"]')?.textContent).toBe("Bob");
 });
 
 test("toolbar add button creates new instance", async () => {
-    const teamContainer = document.querySelector('[data-scms-template="team"]');
+    const teamContainer = document.querySelector('[data-scms-template="team-controls"]');
     const initialCount = teamContainer?.querySelectorAll(".team-member").length ?? 0;
 
     // Click on an instance to select it
@@ -170,7 +171,7 @@ test("toolbar add button creates new instance", async () => {
 });
 
 test("toolbar delete button removes current instance", async () => {
-    const teamContainer = document.querySelector('[data-scms-template="team"]');
+    const teamContainer = document.querySelector('[data-scms-template="team-controls"]');
     const initialCount = teamContainer?.querySelectorAll(".team-member").length ?? 0;
 
     // Click on last instance to select it
@@ -196,7 +197,7 @@ test("toolbar delete button removes current instance", async () => {
 });
 
 test("reorder is saved and persists after save", async () => {
-    let teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    let teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
     const firstMemberName = teamMembers[0].querySelector('[data-scms-text="name"]')?.textContent;
 
     // Click on second instance and move up
@@ -211,7 +212,7 @@ test("reorder is saved and persists after save", async () => {
     await new Promise((r) => setTimeout(r, 100));
 
     // Verify new order
-    teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
     const newFirstName = teamMembers[0].querySelector('[data-scms-text="name"]')?.textContent;
 
     // First name should have changed (second is now first)
@@ -224,6 +225,6 @@ test("reorder is saved and persists after save", async () => {
     await new Promise((r) => setTimeout(r, 500));
 
     // Order should still be the new order
-    teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
     expect(teamMembers[0].querySelector('[data-scms-text="name"]')?.textContent).toBe(newFirstName);
 });

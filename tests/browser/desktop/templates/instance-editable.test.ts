@@ -10,52 +10,53 @@ import {
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
-
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Set up checklist with 2 items
     await setContent(
-        "test-app",
+        appId,
         "checklist.task1.item",
         JSON.stringify({ type: "text", value: "Buy groceries" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "checklist.task2.item",
         JSON.stringify({ type: "text", value: "Walk the dog" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "checklist._order",
         JSON.stringify({ type: "order", value: ["task1", "task2"] }),
     );
 
     // Features template: 3 items from API for the "adding saves existing" test
     await setContent(
-        "test-app",
+        appId,
         "features.feat1.feature",
         JSON.stringify({ type: "text", value: "Feature One" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "features.feat2.feature",
         JSON.stringify({ type: "text", value: "Feature Two" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "features.feat3.feature",
         JSON.stringify({ type: "text", value: "Feature Three" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "features._order",
         JSON.stringify({ type: "order", value: ["feat1", "feat2", "feat3"] }),
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 });
 
 

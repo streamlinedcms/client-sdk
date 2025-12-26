@@ -8,49 +8,50 @@ import {
     initializeSDK,
     waitForCondition,
     setupTestHelpers,
-
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Set up 3 product instances with shared company info
     await setContent(
-        "test-app",
+        appId,
         "products.abc12.product-name",
         JSON.stringify({ type: "text", value: "Widget A" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "products.def34.product-name",
         JSON.stringify({ type: "text", value: "Widget B" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "products.ghi56.product-name",
         JSON.stringify({ type: "text", value: "Widget C" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "products._order",
         JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
     );
     // Shared company info (group content)
-    await setContent("test-app", "company:name", JSON.stringify({ type: "text", value: "Acme Corp" }));
+    await setContent(appId, "company:name", JSON.stringify({ type: "text", value: "Acme Corp" }));
     await setContent(
-        "test-app",
+        appId,
         "company:tagline",
         JSON.stringify({ type: "text", value: "Quality Products" }),
     );
 
     // Inline group content
     await setContent(
-        "test-app",
+        appId,
         "company-name:name",
         JSON.stringify({ type: "text", value: "Acme Corporation" }),
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 });
 
 

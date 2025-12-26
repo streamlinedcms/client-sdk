@@ -190,6 +190,8 @@ interface ViewerConfig {
         enabled: boolean;
         userId?: string;
     };
+    /** Custom localStorage key for draft persistence. Defaults to `scms_draft_${appId}` */
+    draftStorageKey?: string;
 }
 
 /**
@@ -242,9 +244,6 @@ import type { ElementAttributes } from "../types.js";
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
 const TOOLBAR_HEIGHT_MOBILE = 56;
-
-// localStorage key for draft persistence
-const DRAFT_STORAGE_KEY = "scms_draft";
 
 interface EditableElementInfo {
     element: HTMLElement;
@@ -324,9 +323,22 @@ class EditorController {
     private savedContentKeys: Set<string> = new Set();
     // Track if domain warning has been shown (only show once)
     private domainWarningShown = false;
+    // localStorage key for draft persistence (namespaced by app ID by default)
+    private _draftStorageKey: string;
+
+    /** The app ID for this SDK instance */
+    get appId(): string {
+        return this.config.appId;
+    }
+
+    /** The localStorage key used for draft persistence */
+    get draftStorageKey(): string {
+        return this._draftStorageKey;
+    }
 
     constructor(config: ViewerConfig) {
         this.config = config;
+        this._draftStorageKey = config.draftStorageKey ?? `scms_draft_${config.appId}`;
 
         // Create logger with configured level
         const logLevel = config.logLevel || "error";
@@ -2183,13 +2195,13 @@ class EditorController {
 
         // If no changes, remove draft from storage
         if (Object.keys(draft.content).length === 0 && draft.deleted.length === 0) {
-            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            localStorage.removeItem(this.draftStorageKey);
             return;
         }
 
         // Save draft to localStorage
         try {
-            localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+            localStorage.setItem(this.draftStorageKey, JSON.stringify(draft));
         } catch (error) {
             this.log.warn("Failed to save draft to localStorage", error);
         }
@@ -2203,7 +2215,7 @@ class EditorController {
         let draft: { content: Record<string, string>; deleted: string[] };
 
         try {
-            const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+            const stored = localStorage.getItem(this.draftStorageKey);
             if (!stored) return;
             draft = JSON.parse(stored);
         } catch (error) {
@@ -2214,7 +2226,7 @@ class EditorController {
         // Validate draft structure
         if (!draft || typeof draft.content !== "object" || !Array.isArray(draft.deleted)) {
             this.log.warn("Invalid draft structure in localStorage");
-            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            localStorage.removeItem(this.draftStorageKey);
             return;
         }
 
@@ -2222,7 +2234,7 @@ class EditorController {
         const hasDeletes = draft.deleted.length > 0;
 
         if (!hasContent && !hasDeletes) {
-            localStorage.removeItem(DRAFT_STORAGE_KEY);
+            localStorage.removeItem(this.draftStorageKey);
             return;
         }
 
@@ -2676,7 +2688,7 @@ class EditorController {
                 await this.fetchSavedContentKeys();
 
                 // Clear draft from localStorage after successful save
-                localStorage.removeItem(DRAFT_STORAGE_KEY);
+                localStorage.removeItem(this.draftStorageKey);
             }
 
             this.updateToolbarHasChanges();

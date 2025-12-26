@@ -9,6 +9,63 @@ interface ContentElement {
     updatedAt: string;
 }
 
+interface TriggerError {
+    status: number;
+    message: string;
+}
+
+/**
+ * Error triggers that can be embedded in content to simulate server errors.
+ * When the server sees content containing these strings, it returns the corresponding error.
+ */
+const ERROR_TRIGGERS: Record<string, TriggerError> = {
+    "__TRIGGER_500__": { status: 500, message: "Internal Server Error" },
+    "__TRIGGER_401__": { status: 401, message: "Unauthorized" },
+    "__TRIGGER_403__": { status: 403, message: "Forbidden" },
+    "__TRIGGER_404__": { status: 404, message: "Not Found" },
+    "__TRIGGER_429__": { status: 429, message: "Too Many Requests" },
+};
+
+/**
+ * Check if a string contains an error trigger and return the corresponding error.
+ * This function can be used by any endpoint to check for triggers in request content.
+ * @param content - The content string to check
+ * @returns The error to return, or null if no trigger found
+ */
+function checkForErrorTrigger(content: string): TriggerError | null {
+    for (const [trigger, error] of Object.entries(ERROR_TRIGGERS)) {
+        if (content.includes(trigger)) {
+            return error;
+        }
+    }
+    return null;
+}
+
+/**
+ * Check if any value in an object (recursively) contains an error trigger.
+ * Useful for checking request bodies with nested content.
+ * @param obj - The object to search
+ * @returns The error to return, or null if no trigger found
+ */
+function checkObjectForErrorTrigger(obj: unknown): TriggerError | null {
+    if (typeof obj === "string") {
+        return checkForErrorTrigger(obj);
+    }
+    if (Array.isArray(obj)) {
+        for (const item of obj) {
+            const error = checkObjectForErrorTrigger(item);
+            if (error) return error;
+        }
+    }
+    if (obj && typeof obj === "object") {
+        for (const value of Object.values(obj)) {
+            const error = checkObjectForErrorTrigger(value);
+            if (error) return error;
+        }
+    }
+    return null;
+}
+
 /**
  * Simple HTTP server for browser tests
  * Serves test fixtures, the built SDK, and mock API endpoints
@@ -21,8 +78,6 @@ export class TestServer {
     private contentStore: Map<string, ContentElement> = new Map();
     // Set of API keys that should be rejected with 401
     private invalidApiKeys: Set<string> = new Set();
-    // Next error to return for PATCH /content (for testing error handling)
-    private nextPatchError: { status: number; message: string } | null = null;
 
     constructor(private preferredPort?: number) {
         // If preferredPort is specified, we'll use it; otherwise use getPort()
@@ -40,21 +95,6 @@ export class TestServer {
      */
     clearInvalidApiKeys(): void {
         this.invalidApiKeys.clear();
-    }
-
-    /**
-     * Set the next error to return for PATCH /content
-     * The error will be returned once and then cleared
-     */
-    setNextPatchError(status: number, message: string): void {
-        this.nextPatchError = { status, message };
-    }
-
-    /**
-     * Clear the next patch error
-     */
-    clearNextPatchError(): void {
-        this.nextPatchError = null;
     }
 
     /**
@@ -163,24 +203,6 @@ export class TestServer {
             return true;
         }
 
-        // POST /test/patch-error - Set next PATCH error
-        if (pathname === "/test/patch-error" && req.method === "POST") {
-            const body = await this.readBody(req);
-            const { status, message } = JSON.parse(body);
-            this.setNextPatchError(status, message);
-            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: true }));
-            return true;
-        }
-
-        // DELETE /test/patch-error - Clear next PATCH error
-        if (pathname === "/test/patch-error" && req.method === "DELETE") {
-            this.clearNextPatchError();
-            res.writeHead(200, { ...corsHeaders, "Content-Type": "application/json" });
-            res.end(JSON.stringify({ success: true }));
-            return true;
-        }
-
         return false;
     }
 
@@ -258,23 +280,22 @@ export class TestServer {
 
             // PATCH request - batch update
             if (req.method === "PATCH") {
-                // Check if we should return a simulated error
-                if (this.nextPatchError) {
-                    const error = this.nextPatchError;
-                    this.nextPatchError = null; // Clear after use
-                    res.writeHead(error.status, {
-                        "Content-Type": "application/json",
-                        "Access-Control-Allow-Origin": "*",
-                    });
-                    res.end(JSON.stringify({ error: error.message }));
-                    return true;
-                }
-
                 const body = await this.readBody(req);
                 const data = JSON.parse(body) as {
                     elements?: Record<string, { content: string } | null>;
                     groups?: Record<string, { elements: Record<string, { content: string } | null> }>;
                 };
+
+                // Check for error triggers in the request content
+                const triggerError = checkObjectForErrorTrigger(data);
+                if (triggerError) {
+                    res.writeHead(triggerError.status, {
+                        "Content-Type": "application/json",
+                        "Access-Control-Allow-Origin": "*",
+                    });
+                    res.end(JSON.stringify({ error: triggerError.message }));
+                    return true;
+                }
 
                 const responseElements: Record<string, ContentElement> = {};
                 const responseGroups: Record<string, { elements: Record<string, ContentElement> }> = {};

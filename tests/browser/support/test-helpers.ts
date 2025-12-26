@@ -71,30 +71,23 @@ export async function clearInvalidApiKeys(): Promise<void> {
 }
 
 /**
- * Set the next PATCH /content error on the test server.
- * The error will be returned once and then cleared.
- * @param status - HTTP status code (e.g., 401, 403, 500)
- * @param message - Error message to include in response
+ * Error trigger strings that can be embedded in content to simulate server errors.
+ * When the test server sees content containing these strings, it returns the corresponding error.
+ *
+ * Usage:
+ *   await editContent(element, `${ERROR_TRIGGERS.SERVER_ERROR} Some content`);
+ *   await clickToolbarButton("Save");
+ *   // Server will return 500 error
  */
-export async function setNextPatchError(status: number, message: string): Promise<void> {
-    const response = await fetch(`${serverUrl}/test/patch-error`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status, message }),
-    });
-    if (!response.ok) {
-        throw new Error(`Failed to set patch error: ${response.statusText}`);
-    }
-}
-
-/**
- * Clear the next PATCH error on the test server.
- */
-export async function clearNextPatchError(): Promise<void> {
-    const response = await fetch(`${serverUrl}/test/patch-error`, {
-        method: "DELETE",
-    });
-    if (!response.ok) {
-        throw new Error(`Failed to clear patch error: ${response.statusText}`);
-    }
-}
+export const ERROR_TRIGGERS = {
+    /** Triggers a 500 Internal Server Error */
+    SERVER_ERROR: "__TRIGGER_500__",
+    /** Triggers a 401 Unauthorized error */
+    UNAUTHORIZED: "__TRIGGER_401__",
+    /** Triggers a 403 Forbidden error */
+    FORBIDDEN: "__TRIGGER_403__",
+    /** Triggers a 404 Not Found error */
+    NOT_FOUND: "__TRIGGER_404__",
+    /** Triggers a 429 Too Many Requests error */
+    RATE_LIMITED: "__TRIGGER_429__",
+} as const;

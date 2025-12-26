@@ -13,26 +13,28 @@ import {
     initializeSDK,
     waitForCondition,
     setupTestHelpers,
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Set up multiple team members for reorder testing
-    await setContent("test-app", "team.member1.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent("test-app", "team.member1.role", JSON.stringify({ type: "text", value: "CEO" }));
-    await setContent("test-app", "team.member2.name", JSON.stringify({ type: "text", value: "Bob" }));
-    await setContent("test-app", "team.member2.role", JSON.stringify({ type: "text", value: "CTO" }));
-    await setContent("test-app", "team.member3.name", JSON.stringify({ type: "text", value: "Charlie" }));
-    await setContent("test-app", "team.member3.role", JSON.stringify({ type: "text", value: "CFO" }));
+    await setContent(appId, "team.member1.name", JSON.stringify({ type: "text", value: "Alice" }));
+    await setContent(appId, "team.member1.role", JSON.stringify({ type: "text", value: "CEO" }));
+    await setContent(appId, "team.member2.name", JSON.stringify({ type: "text", value: "Bob" }));
+    await setContent(appId, "team.member2.role", JSON.stringify({ type: "text", value: "CTO" }));
+    await setContent(appId, "team.member3.name", JSON.stringify({ type: "text", value: "Charlie" }));
+    await setContent(appId, "team.member3.role", JSON.stringify({ type: "text", value: "CFO" }));
     await setContent(
-        "test-app",
+        appId,
         "team._order",
         JSON.stringify({ type: "order", value: ["member1", "member2", "member3"] })
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 
     // Wait for toolbar to detect mobile viewport and re-render
     const toolbar = document.querySelector("scms-toolbar");

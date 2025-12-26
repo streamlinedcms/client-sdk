@@ -11,26 +11,28 @@ import {
     initializeSDK,
     waitForCondition,
     setupTestHelpers,
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Set up team members for reorder testing
-    await setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent("test-app", "team.abc12.role", JSON.stringify({ type: "text", value: "CEO" }));
-    await setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    await setContent("test-app", "team.def34.role", JSON.stringify({ type: "text", value: "CTO" }));
-    await setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Charlie" }));
-    await setContent("test-app", "team.ghi56.role", JSON.stringify({ type: "text", value: "CFO" }));
+    await setContent(appId, "team-reorder.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    await setContent(appId, "team-reorder.abc12.role", JSON.stringify({ type: "text", value: "CEO" }));
+    await setContent(appId, "team-reorder.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    await setContent(appId, "team-reorder.def34.role", JSON.stringify({ type: "text", value: "CTO" }));
+    await setContent(appId, "team-reorder.ghi56.name", JSON.stringify({ type: "text", value: "Charlie" }));
+    await setContent(appId, "team-reorder.ghi56.role", JSON.stringify({ type: "text", value: "CFO" }));
     await setContent(
-        "test-app",
-        "team._order",
+        appId,
+        "team-reorder._order",
         JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] })
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 
     // Wait for toolbar to detect mobile viewport and re-render
     const toolbar = document.querySelector("scms-toolbar");
@@ -64,7 +66,7 @@ afterAll(async () => {
     document.body.click();
     await new Promise((r) => setTimeout(r, 200));
 
-    // Restore original order [abc12, def34, ghi56] for other tests
+    // Restore original order for other tests
     const targetOrder = ["abc12", "def34", "ghi56"];
 
     // Keep reordering until we match target order
@@ -107,7 +109,7 @@ function getToolbar(): Toolbar {
  * Helper to get team members
  */
 function getTeamMembers(): NodeListOf<Element> {
-    return document.querySelectorAll('[data-scms-template="team"] .team-member');
+    return document.querySelectorAll('[data-scms-template="team-reorder"] .team-member');
 }
 
 /**

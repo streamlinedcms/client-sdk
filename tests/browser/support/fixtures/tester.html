@@ -31,10 +31,99 @@
             <a href="https://example.com" data-scms-link="test-link">Default Link Text</a>
         </div>
 
+        <!-- Elements for content-parsing tests (isolated) -->
+        <div class="test-section">
+            <a href="https://example.com" data-scms-link="test-link-parsing">Default Link Text</a>
+            <h1 data-scms-html="test-title-parsing">Parsing Title</h1>
+            <p data-scms-html="test-paragraph-parsing">Parsing paragraph.</p>
+        </div>
+
+        <!-- Elements for save/basic tests (isolated) -->
+        <div class="test-section">
+            <h1 data-scms-html="save-basic-title">Save Basic Title</h1>
+            <p data-scms-html="save-basic-paragraph">Save basic paragraph.</p>
+        </div>
+
+        <!-- Elements for save/error-handling tests (isolated) -->
+        <div class="test-section">
+            <h1 data-scms-html="save-error-title">Save Error Title</h1>
+        </div>
+
+        <!-- Elements for drafts tests (isolated) -->
+        <div class="test-section">
+            <h1 data-scms-html="draft-test-title">Draft Test Title</h1>
+        </div>
+
         <!-- Template test section -->
         <div class="test-section">
             <h2>Team Members (Template Test)</h2>
             <div data-scms-template="team" class="team-container">
+                <div class="team-member">
+                    <h3 data-scms-text="name">Default Name</h3>
+                    <p data-scms-text="role">Default Role</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template for deletion tests (isolated from other tests) -->
+        <div class="test-section">
+            <h2>Team Deletion Test</h2>
+            <div data-scms-template="team-delete" class="team-container">
+                <div class="team-member">
+                    <h3 data-scms-text="name">Default Name</h3>
+                    <p data-scms-text="role">Default Role</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template for reordering tests (isolated from other tests) -->
+        <div class="test-section">
+            <h2>Team Reorder Test</h2>
+            <div data-scms-template="team-reorder" class="team-container">
+                <div class="team-member">
+                    <h3 data-scms-text="name">Default Name</h3>
+                    <p data-scms-text="role">Default Role</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template for desktop rendering tests (isolated) -->
+        <div class="test-section">
+            <h2>Team Rendering Test</h2>
+            <div data-scms-template="team-rendering" class="team-container">
+                <div class="team-member">
+                    <h3 data-scms-text="name">Default Name</h3>
+                    <p data-scms-text="role">Default Role</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template for desktop drag-handles tests (isolated) -->
+        <div class="test-section">
+            <h2>Team Drag Test</h2>
+            <div data-scms-template="team-drag" class="team-container">
+                <div class="team-member">
+                    <h3 data-scms-text="name">Default Name</h3>
+                    <p data-scms-text="role">Default Role</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template for desktop instance-crud tests (isolated) -->
+        <div class="test-section">
+            <h2>Team CRUD Test</h2>
+            <div data-scms-template="team-crud" class="team-container">
+                <div class="team-member">
+                    <h3 data-scms-text="name">Default Name</h3>
+                    <p data-scms-text="role">Default Role</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template for desktop toolbar template-controls tests (isolated) -->
+        <div class="test-section">
+            <h2>Team Controls Test</h2>
+            <div data-scms-template="team-controls" class="team-container">
                 <div class="team-member">
                     <h3 data-scms-text="name">Default Name</h3>
                     <p data-scms-text="role">Default Role</p>

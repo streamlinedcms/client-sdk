@@ -10,72 +10,76 @@ import { setContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     setupTestHelpers,
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
 
+    // Generate unique app ID for test isolation
+    const appId = generateTestAppId();
+
     // Set up content for all templates that will be tested
     // Team template: 3 instances with known IDs
-    await setContent("test-app", "team.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent("test-app", "team.abc12.role", JSON.stringify({ type: "text", value: "CEO" }));
-    await setContent("test-app", "team.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    await setContent("test-app", "team.def34.role", JSON.stringify({ type: "text", value: "CTO" }));
-    await setContent("test-app", "team.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
-    await setContent("test-app", "team.ghi56.role", JSON.stringify({ type: "text", value: "Designer" }));
+    await setContent(appId, "team-rendering.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
+    await setContent(appId, "team-rendering.abc12.role", JSON.stringify({ type: "text", value: "CEO" }));
+    await setContent(appId, "team-rendering.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
+    await setContent(appId, "team-rendering.def34.role", JSON.stringify({ type: "text", value: "CTO" }));
+    await setContent(appId, "team-rendering.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
+    await setContent(appId, "team-rendering.ghi56.role", JSON.stringify({ type: "text", value: "Designer" }));
     await setContent(
-        "test-app",
-        "team._order",
+        appId,
+        "team-rendering._order",
         JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
     );
 
     // Testimonials template (inside sidebar group): 2 instances
     await setContent(
-        "test-app",
+        appId,
         "sidebar:testimonials.test1.quote",
         JSON.stringify({ type: "text", value: "Great product!" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "sidebar:testimonials.test1.author",
         JSON.stringify({ type: "text", value: "John Doe" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "sidebar:testimonials.test2.quote",
         JSON.stringify({ type: "text", value: "Love it!" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "sidebar:testimonials.test2.author",
         JSON.stringify({ type: "text", value: "Jane Smith" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "sidebar:testimonials._order",
         JSON.stringify({ type: "order", value: ["test1", "test2"] }),
     );
 
     // Features template: 2 instances from API (will replace 3 HTML children)
     await setContent(
-        "test-app",
+        appId,
         "features.feat1.feature",
         JSON.stringify({ type: "text", value: "API Feature A" }),
     );
     await setContent(
-        "test-app",
+        appId,
         "features.feat2.feature",
         JSON.stringify({ type: "text", value: "API Feature B" }),
     );
-    await setContent("test-app", "features._order", JSON.stringify({ type: "order", value: ["feat1", "feat2"] }));
+    await setContent(appId, "features._order", JSON.stringify({ type: "order", value: ["feat1", "feat2"] }));
 
     // Initialize SDK once for all tests
-    await initializeSDK();
+    await initializeSDK({ appId });
 });
 
 
 test("template clones instances based on stored content", async () => {
-    const teamContainer = document.querySelector('[data-scms-template="team"]');
+    const teamContainer = document.querySelector('[data-scms-template="team-rendering"]');
     const teamMembers = teamContainer?.querySelectorAll(".team-member");
 
     // Should have 3 instances from API
@@ -91,7 +95,7 @@ test("template clones instances based on stored content", async () => {
 });
 
 test("template instances have correct data-scms-instance attributes", async () => {
-    const teamContainer = document.querySelector('[data-scms-template="team"]');
+    const teamContainer = document.querySelector('[data-scms-template="team-rendering"]');
     const teamMembers = teamContainer?.querySelectorAll(".team-member");
 
     // Each instance should have data-scms-instance attribute with stable ID

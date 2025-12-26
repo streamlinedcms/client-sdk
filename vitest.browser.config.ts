@@ -58,6 +58,8 @@ export default defineConfig({
         __SDK_API_URL__: JSON.stringify(`http://localhost:${port}/v1`),
         __SDK_APP_URL__: JSON.stringify("http://unused-in-tests"),
         __SDK_VERSION__: JSON.stringify("0.0.0-test"),
+        // SDK_LOG_LEVEL=debug npm run test:browser
+        __SDK_LOG_LEVEL__: JSON.stringify(process.env.SDK_LOG_LEVEL || false),
     },
     // Pre-bundle dependencies to avoid reload during tests
     optimizeDeps: {
@@ -84,7 +86,9 @@ export default defineConfig({
         globals: true,
         globalSetup: ["./tests/browser/support/globalSetup.ts"],
         testTimeout: 10000, // 10 second max per test
-        fileParallelism: false, // Run files sequentially to avoid shared API state conflicts
+        // If tests interfere with each other, use unique element IDs in tester.html
+        // rather than disabling parallelism
+        fileParallelism: true,
         projects: [
             {
                 extends: true,

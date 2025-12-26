@@ -10,6 +10,7 @@ import type { EditorController } from "../../../src/lazy/index.js";
 // Declare global variables injected by vitest config
 declare const __SDK_API_URL__: string;
 declare const __SDK_APP_URL__: string;
+declare const __SDK_LOG_LEVEL__: string | false;
 
 let controller: EditorController | null = null;
 
@@ -21,14 +22,23 @@ export function getController(): EditorController | null {
 }
 
 /**
+ * Generate a unique app ID for this test file.
+ * Call this before setContent() and pass the same appId to initializeSDK({ appId }).
+ */
+export function generateTestAppId(): string {
+    const counter = initCounter++;
+    return `test-app-${Date.now()}-${counter}`;
+}
+
+/**
  * Run the loader script to fetch content and populate DOM.
  * Returns a promise that resolves when the loader completes.
  */
-export async function runLoader(): Promise<void> {
+async function runLoader(appId: string): Promise<void> {
     const TIMEOUT_MS = 5000;
 
-    // Remove any existing loader script
-    document.querySelectorAll('script[data-app-id="test-app"]').forEach((el) => el.remove());
+    // Remove any existing loader script for this appId
+    document.querySelectorAll(`script[data-app-id="${appId}"]`).forEach((el) => el.remove());
 
     // Create promise that resolves when loader dispatches complete event
     const loaderComplete = new Promise<void>((resolve, reject) => {
@@ -49,7 +59,7 @@ export async function runLoader(): Promise<void> {
     // Inject the loader script
     const script = document.createElement("script");
     script.src = "/dist/streamlined-cms.min.js";
-    script.dataset.appId = "test-app";
+    script.dataset.appId = appId;
     // Use full URL instead of relative (avoids Vite proxy issues with dynamic ports)
     script.dataset.apiUrl = __SDK_API_URL__;
     script.dataset.skipEsm = "true";
@@ -61,19 +71,34 @@ export async function runLoader(): Promise<void> {
 }
 
 /**
- * Initialize the SDK.
- * Each test file gets a fresh browser context, so no DOM reset is needed.
+ * Options for initializing the SDK in tests
  */
-export async function initializeSDK(): Promise<EditorController> {
-    // Run the loader to fetch content and populate DOM
-    await runLoader();
+interface InitializeSDKOptions {
+    /** Custom app ID. Defaults to a unique ID per initialization for API isolation. */
+    appId?: string;
+}
 
-    // Initialize the SDK
+// Counter to generate unique draft keys across multiple initializeSDK calls
+let initCounter = 0;
+
+/**
+ * Initialize the SDK.
+ * Each initialization gets a unique app ID to avoid interference between
+ * parallel test files that share the mock server and localStorage.
+ * The draft storage key defaults to `scms_draft_${appId}`.
+ */
+export async function initializeSDK(options?: InitializeSDKOptions): Promise<EditorController> {
+    const appId = options?.appId ?? generateTestAppId();
+
+    // Run the loader to fetch content and populate DOM
+    await runLoader(appId);
+
+    // Initialize the SDK (draftStorageKey defaults to scms_draft_${appId})
     controller = await initLazy({
         apiUrl: __SDK_API_URL__,
         appUrl: __SDK_APP_URL__,
-        appId: "test-app",
-        logLevel: "none",
+        appId,
+        logLevel: __SDK_LOG_LEVEL__,
         mockAuth: {
             enabled: true,
             userId: "test-user",

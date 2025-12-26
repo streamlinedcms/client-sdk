@@ -14,34 +14,35 @@ import {
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
-
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Start with 1 team member
-    await setContent("test-app", "team.alice1.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent("test-app", "team.alice1.role", JSON.stringify({ type: "text", value: "CEO" }));
+    await setContent(appId, "team-crud.alice1.name", JSON.stringify({ type: "text", value: "Alice" }));
+    await setContent(appId, "team-crud.alice1.role", JSON.stringify({ type: "text", value: "CEO" }));
     await setContent(
-        "test-app",
-        "team._order",
+        appId,
+        "team-crud._order",
         JSON.stringify({ type: "order", value: ["alice1"] }),
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 });
 
 
 test("add button appears in author mode for templates", async () => {
     // Add button should be visible in author mode
-    const addButton = document.querySelector('[data-scms-template="team"] .scms-template-add');
+    const addButton = document.querySelector('[data-scms-template="team-crud"] .scms-template-add');
     expect(addButton).not.toBeNull();
     expect(addButton?.textContent).toContain("Add item");
 });
 
 test("cannot delete last instance", async () => {
-    const teamContainer = document.querySelector('[data-scms-template="team"]');
+    const teamContainer = document.querySelector('[data-scms-template="team-crud"]');
     let teamMembers = teamContainer?.querySelectorAll(".team-member");
 
     // Delete instances until only 1 remains (to handle shared API state)
@@ -72,7 +73,7 @@ test("cannot delete last instance", async () => {
 });
 
 test("clicking add button creates new template instance", async () => {
-    const teamContainer = document.querySelector('[data-scms-template="team"]');
+    const teamContainer = document.querySelector('[data-scms-template="team-crud"]');
     const initialCount = teamContainer?.querySelectorAll(".team-member").length ?? 0;
 
     // Click add button
@@ -98,7 +99,7 @@ test("clicking add button creates new template instance", async () => {
 
 test("delete button appears on instance hover", async () => {
     // Should have at least 2 instances after previous test added one
-    const teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    const teamMembers = document.querySelectorAll('[data-scms-template="team-crud"] .team-member');
     expect(teamMembers.length).toBeGreaterThanOrEqual(2);
 
     // The delete button exists but is hidden until hover
@@ -107,7 +108,7 @@ test("delete button appears on instance hover", async () => {
 });
 
 test("new instance elements are editable", async () => {
-    const teamContainer = document.querySelector('[data-scms-template="team"]');
+    const teamContainer = document.querySelector('[data-scms-template="team-crud"]');
     const initialCount = teamContainer?.querySelectorAll(".team-member").length ?? 0;
 
     // Add a new instance
@@ -138,7 +139,7 @@ test("new instance elements are editable", async () => {
 });
 
 test("clicking delete button removes instance", async () => {
-    const teamContainer = document.querySelector('[data-scms-template="team"]');
+    const teamContainer = document.querySelector('[data-scms-template="team-crud"]');
     const initialCount = teamContainer?.querySelectorAll(".team-member").length ?? 0;
 
     // Should have multiple instances
@@ -160,7 +161,7 @@ test("clicking delete button removes instance", async () => {
 
 test("editing template instance element saves with correct key", async () => {
     // Edit the first team member's name (Alice)
-    const teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    const teamMembers = document.querySelectorAll('[data-scms-template="team-crud"] .team-member');
     const firstName = teamMembers[0].querySelector('[data-scms-text="name"]') as HTMLElement;
 
     firstName.click();

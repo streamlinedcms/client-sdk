@@ -6,31 +6,33 @@
  */
 
 import { test, expect, beforeAll, beforeEach } from "vitest";
-import { setContent, clearContent } from "~/@browser-support/test-helpers.js";
+import { setContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Set up some grouped content
     await setContent(
-        "test-app",
+        appId,
         "sidebar:quote",
         JSON.stringify({ type: "text", value: "Initial sidebar quote" })
     );
     await setContent(
-        "test-app",
+        appId,
         "company-name:name",
         JSON.stringify({ type: "text", value: "Acme Corp" })
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 });
 
 beforeEach(async () => {

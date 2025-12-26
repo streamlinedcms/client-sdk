@@ -11,22 +11,27 @@ import {
     waitForCondition,
     clickToolbarButton,
     setupTestHelpers,
+    getController,
 } from "~/@browser-support/sdk-helpers.js";
 import type { Toolbar } from "~/src/components/toolbar.js";
 
-const DRAFT_STORAGE_KEY = "scms_draft";
+/** Helper to get draft storage key from the controller */
+function getDraftKey(): string {
+    return getController()!.draftStorageKey;
+}
 
 beforeAll(async () => {
     setupTestHelpers();
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
     await initializeSDK();
+    // Clear any existing draft
+    localStorage.removeItem(getDraftKey());
 });
 
 afterEach(async () => {
     // Reset editing state
     document.body.click();
     await new Promise((r) => setTimeout(r, 100));
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    localStorage.removeItem(getDraftKey());
 });
 
 /**
@@ -40,7 +45,7 @@ function getToolbar(): Toolbar | null {
  * Helper to get the HTML test element
  */
 function getHtmlElement(): HTMLElement {
-    return document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
+    return document.querySelector('[data-scms-html="save-basic-title"]') as HTMLElement;
 }
 
 /**
@@ -76,18 +81,19 @@ test("clicking Save button triggers save", async () => {
 
 test("save clears draft from localStorage", async () => {
     const element = getHtmlElement();
+    const toolbar = getToolbar();
 
     await editContent(element, "Draft that will be saved");
 
     // Verify draft exists
-    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).not.toBeNull();
+    expect(localStorage.getItem(getDraftKey())).not.toBeNull();
 
     // Save
     await clickToolbarButton("Save");
     await waitForCondition(() => !getToolbar()!.hasChanges, 5000);
 
     // Draft should be cleared
-    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(getDraftKey())).toBeNull();
 });
 
 test("saved content persists in element after save", async () => {
@@ -119,7 +125,7 @@ test("hasChanges is false after successful save", async () => {
 
 test("multiple elements can be edited and saved together", async () => {
     const htmlElement = getHtmlElement();
-    const paragraphElement = document.querySelector('[data-scms-html="test-paragraph"]') as HTMLElement;
+    const paragraphElement = document.querySelector('[data-scms-html="save-basic-paragraph"]') as HTMLElement;
     const toolbar = getToolbar();
 
     // Edit first element

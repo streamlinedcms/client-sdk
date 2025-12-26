@@ -7,27 +7,28 @@ import { setContent } from "~/@browser-support/test-helpers.js";
 import {
     initializeSDK,
     setupTestHelpers,
-
+    generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
+    const appId = generateTestAppId();
 
     // Set up team with 2 members for drag handle tests
-    await setContent("test-app", "team.drag1.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent("test-app", "team.drag2.name", JSON.stringify({ type: "text", value: "Bob" }));
+    await setContent(appId, "team-drag.drag1.name", JSON.stringify({ type: "text", value: "Alice" }));
+    await setContent(appId, "team-drag.drag2.name", JSON.stringify({ type: "text", value: "Bob" }));
     await setContent(
-        "test-app",
-        "team._order",
+        appId,
+        "team-drag._order",
         JSON.stringify({ type: "order", value: ["drag1", "drag2"] }),
     );
 
-    await initializeSDK();
+    await initializeSDK({ appId });
 });
 
 
 test("drag handle appears on instance hover when multiple instances exist", async () => {
-    const teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    const teamMembers = document.querySelectorAll('[data-scms-template="team-drag"] .team-member');
 
     // Should have 2 instances
     expect(teamMembers.length).toBe(2);
@@ -38,7 +39,7 @@ test("drag handle appears on instance hover when multiple instances exist", asyn
 });
 
 test("drag handle exists for second instance too", async () => {
-    const teamMembers = document.querySelectorAll('[data-scms-template="team"] .team-member');
+    const teamMembers = document.querySelectorAll('[data-scms-template="team-drag"] .team-member');
 
     // Second instance should also have drag handle
     const dragHandle = teamMembers[1].querySelector(".scms-instance-drag-handle");

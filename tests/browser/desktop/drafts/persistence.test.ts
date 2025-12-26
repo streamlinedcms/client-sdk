@@ -14,13 +14,16 @@ import {
 } from "~/@browser-support/sdk-helpers.js";
 import type { Toolbar } from "~/src/components/toolbar.js";
 
-const DRAFT_STORAGE_KEY = "scms_draft";
+/** Helper to get draft storage key from the controller */
+function getDraftKey(): string {
+    return getController()!.draftStorageKey;
+}
 
 beforeAll(async () => {
     setupTestHelpers();
-    // Clear any existing draft before tests
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
     await initializeSDK();
+    // Clear any existing draft before tests
+    localStorage.removeItem(getDraftKey());
 });
 
 afterEach(async () => {
@@ -28,7 +31,7 @@ afterEach(async () => {
     document.body.click();
     await new Promise((r) => setTimeout(r, 100));
     // Clear draft
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    localStorage.removeItem(getDraftKey());
 });
 
 /**
@@ -42,7 +45,7 @@ function getToolbar(): Toolbar | null {
  * Helper to get the HTML test element
  */
 function getHtmlElement(): HTMLElement {
-    return document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
+    return document.querySelector('[data-scms-html="draft-test-title"]') as HTMLElement;
 }
 
 /**
@@ -65,7 +68,7 @@ test("draft is saved to localStorage when content changes", async () => {
     await editContent(element, "Draft test content");
 
     // Check localStorage has draft
-    const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+    const stored = localStorage.getItem(getDraftKey());
     expect(stored).not.toBeNull();
 
     const draft = JSON.parse(stored!);
@@ -84,7 +87,7 @@ test("draft contains the edited content", async () => {
 
     await editContent(element, "<strong>Unique draft content</strong>");
 
-    const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+    const stored = localStorage.getItem(getDraftKey());
     const draft = JSON.parse(stored!);
 
     // The draft should contain our edited content
@@ -106,7 +109,7 @@ test("draft is removed when content matches original", async () => {
     await editContent(element, "Temporary change");
 
     // Verify draft exists
-    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).not.toBeNull();
+    expect(localStorage.getItem(getDraftKey())).not.toBeNull();
 
     // Revert to original
     element.innerHTML = originalContent;
@@ -114,7 +117,7 @@ test("draft is removed when content matches original", async () => {
     await new Promise((r) => setTimeout(r, 100));
 
     // Draft should be removed
-    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(getDraftKey())).toBeNull();
 });
 
 test("toolbar hasChanges reflects unsaved state", async () => {
@@ -148,7 +151,7 @@ test("draft structure includes content and deleted arrays", async () => {
 
     await editContent(element, "Draft structure test");
 
-    const stored = localStorage.getItem(DRAFT_STORAGE_KEY);
+    const stored = localStorage.getItem(getDraftKey());
     const draft = JSON.parse(stored!);
 
     // Validate structure
@@ -166,14 +169,14 @@ test("multiple edits update the same draft", async () => {
 
     // First edit
     await editContent(element, "First edit");
-    const firstDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+    const firstDraft = localStorage.getItem(getDraftKey());
 
     // Second edit
     element.innerHTML = "Second edit";
     element.dispatchEvent(new Event("input", { bubbles: true }));
     await new Promise((r) => setTimeout(r, 100));
 
-    const secondDraft = localStorage.getItem(DRAFT_STORAGE_KEY);
+    const secondDraft = localStorage.getItem(getDraftKey());
 
     // Draft should be updated, not duplicated
     expect(secondDraft).not.toBeNull();
@@ -190,22 +193,22 @@ test("multiple edits update the same draft", async () => {
 
 test("invalid draft JSON in localStorage is handled gracefully", async () => {
     // Store invalid JSON
-    localStorage.setItem(DRAFT_STORAGE_KEY, "not valid json");
+    localStorage.setItem(getDraftKey(), "not valid json");
 
     // Re-init SDK should not throw
     await expect(initializeSDK()).resolves.not.toThrow();
 
     // Invalid draft should be removed
-    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(getDraftKey())).toBeNull();
 });
 
 test("malformed draft structure is handled gracefully", async () => {
     // Store valid JSON but wrong structure
-    localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ wrong: "structure" }));
+    localStorage.setItem(getDraftKey(), JSON.stringify({ wrong: "structure" }));
 
     // Re-init SDK should not throw
     await expect(initializeSDK()).resolves.not.toThrow();
 
     // Invalid draft should be removed
-    expect(localStorage.getItem(DRAFT_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(getDraftKey())).toBeNull();
 });
