@@ -16,7 +16,7 @@ import type { DraftManager } from "./draft-manager.js";
 import type { TemplateManager } from "./template-manager.js";
 import type { EditingManager } from "./editing-manager.js";
 import type { BatchUpdateRequest, BatchUpdateResponse, EditableType } from "../types.js";
-import { parseTemplateKey } from "../types.js";
+import { parseTemplateKey, buildTemplateKey, parseStorageKey } from "../types.js";
 
 /**
  * Error thrown when an API request fails due to authentication issues (401/403)
@@ -64,8 +64,6 @@ export interface SaveManagerConfig {
  */
 export interface SaveManagerHelpers {
     apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
-    buildTemplateKey: (templateId: string, instanceId: string, elementId: string) => string;
-    parseStorageKey: (key: string) => { elementId: string; groupId: string | null };
     getEditableType: (key: string) => EditableType;
     signOut: (skipConfirmation: boolean) => void;
     fetchSavedContentKeys: () => Promise<boolean>;
@@ -272,7 +270,7 @@ export class SaveManager {
             for (const [, { content, info }] of elementsToSave) {
                 const storageElementId =
                     info.templateId !== null && info.instanceId !== null
-                        ? this.helpers.buildTemplateKey(info.templateId, info.instanceId, info.elementId)
+                        ? buildTemplateKey(info.templateId, info.instanceId, info.elementId)
                         : info.elementId;
 
                 operations.push({
@@ -284,7 +282,7 @@ export class SaveManager {
 
             // 2. Collect delete operations
             for (const key of pendingDeletes) {
-                const { elementId, groupId } = this.helpers.parseStorageKey(key);
+                const { elementId, groupId } = parseStorageKey(key);
                 operations.push({
                     groupId,
                     elementId,

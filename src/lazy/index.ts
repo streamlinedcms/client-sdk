@@ -13,6 +13,7 @@ import { Logger } from "loganite";
 import { KeyStorage, type EditorMode } from "../key-storage.js";
 import { PopupManager, type MediaFile } from "../popup-manager.js";
 import type { EditableType } from "../types.js";
+import { buildTemplateKey } from "../types.js";
 
 /**
  * Configuration for StreamlinedCMS
@@ -83,6 +84,7 @@ import { ModalManager } from "./modal-manager.js";
 import { SaveManager } from "./save-manager.js";
 import { AuthManager } from "./auth-manager.js";
 import { injectEditStyles } from "./styles.js";
+import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -206,8 +208,6 @@ class EditorController {
             { apiUrl: config.apiUrl, appId: config.appId },
             {
                 apiFetch: this.apiFetch.bind(this),
-                buildTemplateKey: this.buildTemplateKey.bind(this),
-                parseStorageKey: this.parseStorageKey.bind(this),
                 getEditableType: this.getEditableType.bind(this),
                 signOut: (skip) => this.authManager.signOut(skip),
                 fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
@@ -419,13 +419,6 @@ class EditorController {
     }
 
     /**
-     * Build a template element key from components
-     */
-    private buildTemplateKey(templateId: string, instanceId: string, elementId: string): string {
-        return `${templateId}.${instanceId}.${elementId}`;
-    }
-
-    /**
      * Build storage key from context and element ID
      */
     private buildStorageKey(
@@ -433,7 +426,7 @@ class EditorController {
         elementId: string,
     ): string {
         if (context.templateId !== null && context.instanceId !== null) {
-            const templateKey = this.buildTemplateKey(
+            const templateKey = buildTemplateKey(
                 context.templateId,
                 context.instanceId,
                 elementId,
@@ -442,18 +435,6 @@ class EditorController {
         } else {
             return context.groupId ? `${context.groupId}:${elementId}` : elementId;
         }
-    }
-
-    /**
-     * Parse a storage key back into groupId and elementId
-     * Used to build API URLs for DELETE requests
-     */
-    private parseStorageKey(key: string): { elementId: string; groupId: string | null } {
-        const colonIndex = key.indexOf(":");
-        if (colonIndex !== -1) {
-            return { groupId: key.slice(0, colonIndex), elementId: key.slice(colonIndex + 1) };
-        }
-        return { groupId: null, elementId: key };
     }
 
     private scanEditableElements(): void {
@@ -836,24 +817,6 @@ class EditorController {
     }
 
     /**
-     * Normalize whitespace in text content from DOM.
-     * Collapses multiple whitespace characters (including newlines from HTML formatting)
-     * into single spaces and trims leading/trailing whitespace.
-     */
-    private normalizeWhitespace(text: string): string {
-        return text.replace(/\s+/g, " ").trim();
-    }
-
-    /**
-     * Normalize HTML whitespace from DOM innerHTML.
-     * Collapses runs of whitespace between tags into single spaces,
-     * and trims leading/trailing whitespace.
-     */
-    private normalizeHtmlWhitespace(html: string): string {
-        return html.replace(/>\s+</g, "> <").replace(/\s+/g, " ").trim();
-    }
-
-    /**
      * Normalize whitespace directly in the DOM for an element.
      * Called on load for elements without saved content to clean up source HTML formatting.
      */
@@ -870,11 +833,11 @@ class EditorController {
                     { innerHTML: element.innerHTML },
                 );
             }
-            element.textContent = this.normalizeWhitespace(element.textContent || "");
+            element.textContent = normalizeWhitespace(element.textContent || "");
         } else if (type === "html") {
-            element.innerHTML = this.normalizeHtmlWhitespace(element.innerHTML);
+            element.innerHTML = normalizeHtmlWhitespace(element.innerHTML);
         } else if (type === "link" && element instanceof HTMLAnchorElement) {
-            element.innerHTML = this.normalizeHtmlWhitespace(element.innerHTML);
+            element.innerHTML = normalizeHtmlWhitespace(element.innerHTML);
         }
         // image type doesn't need whitespace normalization
     }

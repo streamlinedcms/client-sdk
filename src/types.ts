@@ -262,6 +262,26 @@ export function serializeOrderArray(instanceIds: string[]): string {
 }
 
 /**
+ * Parsed storage key components
+ */
+export interface ParsedStorageKey {
+    elementId: string;
+    groupId: string | null;
+}
+
+/**
+ * Parse a storage key into groupId and elementId components.
+ * Storage keys have format: "elementId" or "groupId:elementId"
+ */
+export function parseStorageKey(key: string): ParsedStorageKey {
+    const colonIndex = key.indexOf(":");
+    if (colonIndex !== -1) {
+        return { groupId: key.slice(0, colonIndex), elementId: key.slice(colonIndex + 1) };
+    }
+    return { groupId: null, elementId: key };
+}
+
+/**
  * Known SEO attribute names
  */
 export const SEO_ATTRIBUTES = ["alt", "title", "rel"] as const;
