@@ -21,6 +21,12 @@ import type {
     ImageContentData,
     LinkContentData,
 } from "../types.js";
+import {
+    ELEMENT_ATTRIBUTES,
+    RESERVED_ATTRIBUTES,
+    SEO_ATTRIBUTES,
+    ACCESSIBILITY_ATTRIBUTES,
+} from "../types.js";
 import type { MediaFile } from "../popup-manager.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
 import type { LinkEditorModal, LinkData } from "../components/link-editor-modal.js";
@@ -46,17 +52,13 @@ export interface ModalManagerHelpers {
     applyAttributesToElement: (element: HTMLElement, attributes: ElementAttributes) => void;
 }
 
-/** Element attributes that define what the element is (src, href, target) */
-const ELEMENT_ATTRIBUTES = ["src", "href", "target"];
-
-/** Reserved attributes that should be shown but not editable */
-const RESERVED_ATTRIBUTES = ["class", "id", "style"];
-
-/** SEO-related attribute names */
-const SEO_ATTRIBUTES = ["alt", "title", "rel"];
-
-/** Accessibility-related attribute names */
-const ACCESSIBILITY_ATTRIBUTES = ["aria-label", "aria-describedby", "role", "tabindex"];
+/** Modal state property names that can be closed */
+type ModalKey =
+    | "htmlEditorModal"
+    | "linkEditorModal"
+    | "seoModal"
+    | "accessibilityModal"
+    | "attributesModal";
 
 export class ModalManager {
     constructor(
@@ -66,6 +68,17 @@ export class ModalManager {
         private config: ModalManagerConfig,
         private helpers: ModalManagerHelpers,
     ) {}
+
+    /**
+     * Close a modal by its state property key
+     */
+    private closeModal(modalKey: ModalKey): void {
+        const modal = this.state[modalKey];
+        if (modal) {
+            modal.remove();
+            this.state[modalKey] = null;
+        }
+    }
 
     /**
      * Initialize the persistent media manager modal
@@ -210,7 +223,7 @@ export class ModalManager {
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             this.contentManager.setContent(key, JSON.stringify(data));
-            this.closeHtmlEditor();
+            this.closeModal("htmlEditorModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("HTML applied", {
                 key,
@@ -220,21 +233,11 @@ export class ModalManager {
         }) as EventListener);
 
         modal.addEventListener("cancel", () => {
-            this.closeHtmlEditor();
+            this.closeModal("htmlEditorModal");
         });
 
         document.body.appendChild(modal);
         this.state.htmlEditorModal = modal;
-    }
-
-    /**
-     * Close HTML editor modal
-     */
-    closeHtmlEditor(): void {
-        if (this.state.htmlEditorModal) {
-            this.state.htmlEditorModal.remove();
-            this.state.htmlEditorModal = null;
-        }
     }
 
     /**
@@ -288,7 +291,7 @@ export class ModalManager {
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             this.contentManager.setContent(key, JSON.stringify(data));
-            this.closeLinkEditor();
+            this.closeModal("linkEditorModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("Link updated", {
                 key,
@@ -299,21 +302,11 @@ export class ModalManager {
         }) as EventListener);
 
         modal.addEventListener("cancel", () => {
-            this.closeLinkEditor();
+            this.closeModal("linkEditorModal");
         });
 
         document.body.appendChild(modal);
         this.state.linkEditorModal = modal;
-    }
-
-    /**
-     * Close link editor modal
-     */
-    closeLinkEditor(): void {
-        if (this.state.linkEditorModal) {
-            this.state.linkEditorModal.remove();
-            this.state.linkEditorModal = null;
-        }
     }
 
     /**
@@ -375,9 +368,9 @@ export class ModalManager {
                 continue;
             }
             // Categorize attributes
-            if (ELEMENT_ATTRIBUTES.includes(attr.name)) {
+            if ((ELEMENT_ATTRIBUTES as readonly string[]).includes(attr.name)) {
                 elementAttrs[attr.name] = attr.value;
-            } else if (RESERVED_ATTRIBUTES.includes(attr.name)) {
+            } else if ((RESERVED_ATTRIBUTES as readonly string[]).includes(attr.name)) {
                 reservedAttrs[attr.name] = attr.value;
             } else {
                 otherAttrs[attr.name] = attr.value;
@@ -394,7 +387,7 @@ export class ModalManager {
     private getMergedAttributes(
         key: string,
         element: HTMLElement,
-        attributeFilter?: string[],
+        attributeFilter?: readonly string[],
     ): ElementAttributes {
         const { otherAttrs } = this.getDomAttributes(element);
         const storedAttrs = this.getElementAttributes(key);
@@ -447,7 +440,7 @@ export class ModalManager {
             for (const info of infos) {
                 this.helpers.applyAttributesToElement(info.element, e.detail.attributes);
             }
-            this.closeSeoModal();
+            this.closeModal("seoModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("SEO attributes applied", {
                 key,
@@ -456,20 +449,10 @@ export class ModalManager {
             });
         }) as EventListener);
 
-        modal.addEventListener("cancel", () => this.closeSeoModal());
+        modal.addEventListener("cancel", () => this.closeModal("seoModal"));
 
         document.body.appendChild(modal);
         this.state.seoModal = modal;
-    }
-
-    /**
-     * Close SEO modal
-     */
-    private closeSeoModal(): void {
-        if (this.state.seoModal) {
-            this.state.seoModal.remove();
-            this.state.seoModal = null;
-        }
     }
 
     /**
@@ -516,7 +499,7 @@ export class ModalManager {
             for (const info of infos) {
                 this.helpers.applyAttributesToElement(info.element, e.detail.attributes);
             }
-            this.closeAccessibilityModal();
+            this.closeModal("accessibilityModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("Accessibility attributes applied", {
                 key,
@@ -525,20 +508,10 @@ export class ModalManager {
             });
         }) as EventListener);
 
-        modal.addEventListener("cancel", () => this.closeAccessibilityModal());
+        modal.addEventListener("cancel", () => this.closeModal("accessibilityModal"));
 
         document.body.appendChild(modal);
         this.state.accessibilityModal = modal;
-    }
-
-    /**
-     * Close accessibility modal
-     */
-    private closeAccessibilityModal(): void {
-        if (this.state.accessibilityModal) {
-            this.state.accessibilityModal.remove();
-            this.state.accessibilityModal = null;
-        }
     }
 
     /**
@@ -580,7 +553,7 @@ export class ModalManager {
             for (const info of infos) {
                 this.helpers.applyAttributesToElement(info.element, e.detail.attributes);
             }
-            this.closeAttributesModal();
+            this.closeModal("attributesModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("Custom attributes applied", {
                 key,
@@ -589,19 +562,9 @@ export class ModalManager {
             });
         }) as EventListener);
 
-        modal.addEventListener("cancel", () => this.closeAttributesModal());
+        modal.addEventListener("cancel", () => this.closeModal("attributesModal"));
 
         document.body.appendChild(modal);
         this.state.attributesModal = modal;
-    }
-
-    /**
-     * Close attributes modal
-     */
-    private closeAttributesModal(): void {
-        if (this.state.attributesModal) {
-            this.state.attributesModal.remove();
-            this.state.attributesModal = null;
-        }
     }
 }

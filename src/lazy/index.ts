@@ -13,7 +13,7 @@ import { Logger } from "loganite";
 import { KeyStorage, type EditorMode } from "../key-storage.js";
 import { PopupManager, type MediaFile } from "../popup-manager.js";
 import type { EditableType } from "../types.js";
-import { buildTemplateKey } from "../types.js";
+import { buildTemplateKey, EDITABLE_SELECTOR } from "../types.js";
 
 /**
  * Configuration for StreamlinedCMS
@@ -438,7 +438,7 @@ class EditorController {
     }
 
     private scanEditableElements(): void {
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const selector = EDITABLE_SELECTOR;
         document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
             const info = this.getEditableInfo(element);
             if (info) {

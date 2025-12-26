@@ -12,13 +12,11 @@ import type { Logger } from "loganite";
 import Sortable from "sortablejs";
 import type { EditorState, TemplateInfo, EditableElementInfo } from "./state.js";
 import type { ContentManager } from "./content-manager.js";
-import type { EditableType } from "../types.js";
-
-/**
- * Placeholder image for new template instances
- */
-const IMAGE_PLACEHOLDER_DATA_URI =
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect fill='%23e5e7eb' width='48' height='48'/%3E%3Cg transform='translate(12,12)'%3E%3Cpath d='M18 20H4V6h9V4H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-9h-2v9zm-7.79-3.17l-1.96-2.36L5.5 18h11l-3.54-4.71zM20 4V1h-2v3h-3c.01.01 0 2 0 2h3v2.99c.01.01 2 0 2 0V6h3V4h-3z' fill='%239ca3af'/%3E%3C/g%3E%3C/svg%3E";
+import {
+    EDITABLE_SELECTOR,
+    IMAGE_PLACEHOLDER_DATA_URI,
+    type EditableType,
+} from "../types.js";
 
 /**
  * Helpers that TemplateManager needs from EditorController
@@ -83,8 +81,7 @@ export class TemplateManager {
 
         // For editable elements, strip all attributes except reserved ones
         // This handles src, href, alt, title, and any custom attributes set via modals
-        const editableSelector =
-            "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const editableSelector = EDITABLE_SELECTOR;
         div.querySelectorAll(editableSelector).forEach((el) => {
             const attributesToRemove: string[] = [];
             for (let i = 0; i < el.attributes.length; i++) {
@@ -510,7 +507,7 @@ export class TemplateManager {
 
         // Collect all element keys for this instance
         const keysToDelete: string[] = [];
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const selector = EDITABLE_SELECTOR;
         // Include instanceElement itself if it matches (e.g., <li data-scms-text="item">)
         const descendants = Array.from(instanceElement.querySelectorAll<HTMLElement>(selector));
         const elements = instanceElement.matches(selector)
@@ -677,7 +674,7 @@ export class TemplateManager {
         instanceId: string,
         groupId: string | null,
     ): void {
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const selector = EDITABLE_SELECTOR;
         // Include instanceElement itself if it matches (e.g., <li data-scms-text="item">)
         const descendants = Array.from(instanceElement.querySelectorAll<HTMLElement>(selector));
         const elements = instanceElement.matches(selector)
@@ -761,7 +758,7 @@ export class TemplateManager {
         _templateId: string,
         _instanceId: string,
     ): void {
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const selector = EDITABLE_SELECTOR;
         // Include instanceElement itself if it matches (e.g., <li data-scms-text="item">)
         const descendants = Array.from(instanceElement.querySelectorAll<HTMLElement>(selector));
         const elements = instanceElement.matches(selector)

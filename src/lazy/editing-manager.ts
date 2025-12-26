@@ -11,7 +11,7 @@
 import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
 import type { ContentManager } from "./content-manager.js";
-import type { EditableType } from "../types.js";
+import { EDITABLE_SELECTOR, type EditableType } from "../types.js";
 
 /**
  * Helpers that EditingManager needs from EditorController
@@ -247,7 +247,7 @@ export class EditingManager {
      */
     navigateToNextEditable(currentElement: HTMLElement, reverse: boolean): void {
         // Get all editable elements in DOM order (all scms types)
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const selector = EDITABLE_SELECTOR;
         const allEditables = Array.from(document.querySelectorAll<HTMLElement>(selector));
 
         if (allEditables.length === 0) return;

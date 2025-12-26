@@ -9,13 +9,11 @@
 
 import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
-import type { EditableType } from "../types.js";
-
-/**
- * Placeholder image for new template instances
- */
-const IMAGE_PLACEHOLDER_DATA_URI =
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect fill='%23e5e7eb' width='48' height='48'/%3E%3Cg transform='translate(12,12)'%3E%3Cpath d='M18 20H4V6h9V4H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-9h-2v9zm-7.79-3.17l-1.96-2.36L5.5 18h11l-3.54-4.71zM20 4V1h-2v3h-3c.01.01 0 2 0 2h3v2.99c.01.01 2 0 2 0V6h3V4h-3z' fill='%239ca3af'/%3E%3C/g%3E%3C/svg%3E";
+import {
+    EDITABLE_SELECTOR,
+    IMAGE_PLACEHOLDER_DATA_URI,
+    type EditableType,
+} from "../types.js";
 
 /**
  * Storage context for an element (used for building keys)
@@ -405,7 +403,7 @@ export class DraftManager {
 
         // Collect element keys for this instance
         const keysToDelete: string[] = [];
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const selector = EDITABLE_SELECTOR;
         const descendants = Array.from(instanceElement.querySelectorAll<HTMLElement>(selector));
         const elements = instanceElement.matches(selector)
             ? [instanceElement, ...descendants]

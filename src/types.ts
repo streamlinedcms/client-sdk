@@ -120,6 +120,18 @@ export interface BatchUpdateResponse {
 export type EditableType = "text" | "html" | "image" | "link";
 
 /**
+ * CSS selector for all editable elements
+ */
+export const EDITABLE_SELECTOR =
+    "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+
+/**
+ * Placeholder image for new template instances (SVG data URI)
+ */
+export const IMAGE_PLACEHOLDER_DATA_URI =
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect fill='%23e5e7eb' width='48' height='48'/%3E%3Cg transform='translate(12,12)'%3E%3Cpath d='M18 20H4V6h9V4H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-9h-2v9zm-7.79-3.17l-1.96-2.36L5.5 18h11l-3.54-4.71zM20 4V1h-2v3h-3c.01.01 0 2 0 2h3v2.99c.01.01 2 0 2 0V6h3V4h-3z' fill='%239ca3af'/%3E%3C/g%3E%3C/svg%3E";
+
+/**
  * Element attributes (applied as HTML attributes)
  * Keys are attribute names (lowercase, e.g., 'aria-label', 'data-custom')
  */
@@ -280,6 +292,18 @@ export function parseStorageKey(key: string): ParsedStorageKey {
     }
     return { groupId: null, elementId: key };
 }
+
+/**
+ * Element attributes that define what the element is (src, href, target)
+ */
+export const ELEMENT_ATTRIBUTES = ["src", "href", "target"] as const;
+export type ElementAttribute = (typeof ELEMENT_ATTRIBUTES)[number];
+
+/**
+ * Reserved attributes that should be shown but not editable
+ */
+export const RESERVED_ATTRIBUTES = ["class", "id", "style"] as const;
+export type ReservedAttribute = (typeof RESERVED_ATTRIBUTES)[number];
 
 /**
  * Known SEO attribute names
