@@ -36,10 +36,17 @@ interface AuthResult {
     error?: string;
 }
 
+/** Result from cancelCurrentRequest call */
+interface CancelRequestResult {
+    success: boolean;
+    error?: string;
+}
+
 /** Methods exposed by the media manager iframe */
 interface MediaManagerMethods {
     authenticate(apiKey: string): Promise<AuthResult>;
     selectFile(options?: SelectFileOptions): Promise<SelectFileResult>;
+    cancelCurrentRequest(): Promise<CancelRequestResult>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: (...args: any[]) => Promise<any>;
 }
@@ -75,6 +82,9 @@ export class MediaManagerModal extends LitElement {
 
     @state()
     private error: string | null = null;
+
+    @state()
+    private closing = false;
 
     static styles = [
         tailwindSheet,
@@ -342,6 +352,7 @@ export class MediaManagerModal extends LitElement {
      */
     async selectMedia(options?: SelectFileOptions): Promise<MediaFile | null> {
         this.open = true;
+        this.closing = false;
 
         // Wait for connection and authentication
         const ready = await this.waitForReady();
@@ -394,29 +405,35 @@ export class MediaManagerModal extends LitElement {
     // Pending promise resolver for error state close
     private pendingResolve: (() => void) | null = null;
 
-    private handleBackdropClick = (e: Event) => {
-        if (e.target === e.currentTarget) {
-            this.closeWithError();
-        }
-    };
-
     private handleKeydown = (e: KeyboardEvent) => {
         if (e.key === "Escape") {
-            this.closeWithError();
+            this.requestClose();
         }
     };
 
     private handleCloseClick = () => {
-        this.closeWithError();
+        this.requestClose();
     };
 
     /**
-     * Close modal when in error state (not connected or not authenticated).
-     * When a selectFile call is in progress, the iframe handles cancellation.
+     * Request the modal to close, cancelling any pending request.
      */
-    private closeWithError() {
-        // Only close if we're in an error state (not mid-selection)
-        if (this.error || !this.connectionReady || !this.authenticated) {
+    private async requestClose() {
+        if (this.mediaManager && this.connectionReady && this.authenticated) {
+            // Show closing spinner while we wait for the cancel to complete
+            this.closing = true;
+
+            try {
+                // Cancel the current request - the pending selectFile() promise will
+                // resolve with { cancelled: true }, which triggers modal close
+                await this.mediaManager.cancelCurrentRequest();
+            } catch {
+                // Penpal timed out or connection broken
+                this.closing = false;
+                this.error = "Connection to media manager lost. Please refresh the page.";
+            }
+        } else {
+            // Not connected or has error - close immediately
             this.open = false;
             if (this.pendingResolve) {
                 this.pendingResolve();
@@ -427,6 +444,7 @@ export class MediaManagerModal extends LitElement {
 
     private getStatusMessage(): string | null {
         if (this.error) return null; // Error shown separately
+        if (this.closing) return "Closing...";
         if (!this.connectionReady) return "Connecting...";
         if (!this.authenticated) return "Authenticating...";
         return null;
@@ -436,7 +454,7 @@ export class MediaManagerModal extends LitElement {
         const statusMessage = this.getStatusMessage();
 
         return html`
-            <div class="backdrop" @click=${this.handleBackdropClick}></div>
+            <div class="backdrop"></div>
             <div class="modal">
                 <div class="header">
                     <span class="title">Select Media</span>
