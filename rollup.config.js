@@ -44,6 +44,7 @@ if (!SDK_API_URL || !SDK_APP_URL) {
 const replacePlugin = replace({
     preventAssignment: true,
     values: {
+        "process.env.NODE_ENV": JSON.stringify("production"),
         __SDK_API_URL__: JSON.stringify(SDK_API_URL),
         __SDK_APP_URL__: JSON.stringify(SDK_APP_URL),
         __SDK_VERSION__: JSON.stringify(SDK_VERSION),

@@ -15,6 +15,7 @@
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "demo": "npm run build && ln -sfn ../dist demo/dist && vite --config vite.demo.config.ts --host",
+    "preview": "npm run build && npx serve demo",
     "cdn:upload:staging": "node scripts/cdn-upload.js staging",
     "cdn:upload:PRODUCTION": "echo '⚠️  UPLOADING TO PRODUCTION CDN' && read -p 'Type YES to continue: ' c && [ \"$c\" = 'YES' ] && node scripts/cdn-upload.js production",
     "cdn:publish:staging": "node scripts/cdn-publish.js staging",
