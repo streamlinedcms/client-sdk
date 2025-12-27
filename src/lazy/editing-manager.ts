@@ -11,13 +11,12 @@
 import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
 import type { ContentManager } from "./content-manager.js";
-import { EDITABLE_SELECTOR, type EditableType } from "../types.js";
+import { EDITABLE_SELECTOR } from "../types.js";
 
 /**
  * Helpers that EditingManager needs from EditorController
  */
 export interface EditingManagerHelpers {
-    getEditableType: (key: string) => EditableType;
     updateToolbarHasChanges: () => void;
     updateToolbarTemplateContext: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
@@ -47,7 +46,7 @@ export class EditingManager {
             ? infos.find((i) => i.element === clickedElement) || infos[0]
             : infos[0];
 
-        const elementType = this.helpers.getEditableType(key);
+        const elementType = this.state.editableTypes.get(key) || "html";
         this.log.trace("Selecting element", {
             key,
             elementId: primaryInfo.elementId,
@@ -156,7 +155,7 @@ export class EditingManager {
             ? infos.find((i) => i.element === clickedElement) || infos[0]
             : infos[0];
 
-        const elementType = this.helpers.getEditableType(key);
+        const elementType = this.state.editableTypes.get(key) || "html";
         this.log.trace("Starting edit", {
             key,
             elementId: primaryInfo.elementId,

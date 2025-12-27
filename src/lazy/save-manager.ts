@@ -15,7 +15,7 @@ import type { ContentManager } from "./content-manager.js";
 import type { DraftManager } from "./draft-manager.js";
 import type { TemplateManager } from "./template-manager.js";
 import type { EditingManager } from "./editing-manager.js";
-import type { BatchUpdateRequest, BatchUpdateResponse, EditableType } from "../types.js";
+import type { BatchUpdateRequest, BatchUpdateResponse } from "../types.js";
 import { parseTemplateKey, buildTemplateKey, parseStorageKey } from "../types.js";
 
 /**
@@ -64,7 +64,6 @@ export interface SaveManagerConfig {
  */
 export interface SaveManagerHelpers {
     apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
-    getEditableType: (key: string) => EditableType;
     signOut: (skipConfirmation: boolean) => void;
     fetchSavedContentKeys: () => Promise<boolean>;
 }
@@ -442,7 +441,7 @@ export class SaveManager {
 
         const key = this.state.selectedKey;
         const originalContent = this.state.originalContent.get(key);
-        const elementType = this.helpers.getEditableType(key);
+        const elementType = this.state.editableTypes.get(key) || "html";
 
         if (originalContent !== undefined) {
             this.log.debug("Resetting element", { key, elementType });

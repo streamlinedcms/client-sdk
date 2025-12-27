@@ -70,7 +70,6 @@ import "../components/accessibility-modal.js";
 import "../components/attributes-modal.js";
 import "../components/media-manager-modal.js";
 import type { Toolbar } from "../components/toolbar.js";
-import type { ElementAttributes } from "../types.js";
 import {
     createEditorState,
     type EditorState,
@@ -146,14 +145,10 @@ class EditorController {
         this.state = createEditorState();
 
         // Initialize content manager
-        this.contentManager = new ContentManager(this.state, {
-            getEditableType: this.getEditableType.bind(this),
-            applyAttributesToElement: this.applyAttributesToElement.bind(this),
-        });
+        this.contentManager = new ContentManager(this.state);
 
         // Initialize editing manager
         this.editingManager = new EditingManager(this.state, this.log, this.contentManager, {
-            getEditableType: this.getEditableType.bind(this),
             updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
             updateToolbarTemplateContext: () => this.templateManager.updateToolbarTemplateContext(),
             getElementToKeyMap: () => this.elementToKey,
@@ -166,9 +161,7 @@ class EditorController {
             this.contentManager,
             { appUrl: config.appUrl, appId: config.appId },
             {
-                getEditableType: this.getEditableType.bind(this),
                 updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
-                applyAttributesToElement: this.applyAttributesToElement.bind(this),
             },
         );
 
@@ -208,7 +201,6 @@ class EditorController {
             { apiUrl: config.apiUrl, appId: config.appId },
             {
                 apiFetch: this.apiFetch.bind(this),
-                getEditableType: this.getEditableType.bind(this),
                 signOut: (skip) => this.authManager.signOut(skip),
                 fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
             },
@@ -840,17 +832,6 @@ class EditorController {
             element.innerHTML = normalizeHtmlWhitespace(element.innerHTML);
         }
         // image type doesn't need whitespace normalization
-    }
-
-    private applyAttributesToElement(element: HTMLElement, attributes: ElementAttributes): void {
-        // Apply each attribute to the element
-        for (const [name, value] of Object.entries(attributes)) {
-            if (value) {
-                element.setAttribute(name, value);
-            } else {
-                element.removeAttribute(name);
-            }
-        }
     }
 
     /**

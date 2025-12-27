@@ -138,6 +138,23 @@ export const IMAGE_PLACEHOLDER_DATA_URI =
 export type ElementAttributes = Record<string, string>;
 
 /**
+ * Apply attributes to an HTML element.
+ * Sets attributes with truthy values, removes attributes with falsy values.
+ */
+export function applyAttributesToElement(
+    element: HTMLElement,
+    attributes: ElementAttributes,
+): void {
+    for (const [name, value] of Object.entries(attributes)) {
+        if (value) {
+            element.setAttribute(name, value);
+        } else {
+            element.removeAttribute(name);
+        }
+    }
+}
+
+/**
  * Base content data with optional attributes
  */
 interface BaseContentData {

@@ -15,7 +15,6 @@ import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
 import type { ContentManager } from "./content-manager.js";
 import type {
-    EditableType,
     ElementAttributes,
     HtmlContentData,
     ImageContentData,
@@ -26,6 +25,7 @@ import {
     RESERVED_ATTRIBUTES,
     SEO_ATTRIBUTES,
     ACCESSIBILITY_ATTRIBUTES,
+    applyAttributesToElement,
 } from "../types.js";
 import type { MediaFile } from "../popup-manager.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
@@ -47,9 +47,7 @@ export interface ModalManagerConfig {
  * Helpers that ModalManager needs from EditorController
  */
 export interface ModalManagerHelpers {
-    getEditableType: (key: string) => EditableType;
     updateToolbarHasChanges: () => void;
-    applyAttributesToElement: (element: HTMLElement, attributes: ElementAttributes) => void;
 }
 
 /** Modal state property names that can be closed */
@@ -423,7 +421,7 @@ export class ModalManager {
         if (!infos || infos.length === 0) return;
 
         const primaryInfo = infos[0];
-        const elementType = this.helpers.getEditableType(key);
+        const elementType = this.state.editableTypes.get(key) || "html";
         this.log.debug("Opening SEO modal", { key, elementId: primaryInfo.elementId, elementType });
 
         const modal = document.createElement("scms-seo-modal") as SeoModal;
@@ -438,7 +436,7 @@ export class ModalManager {
             this.state.elementAttributes.set(key, e.detail.attributes);
             // Apply attributes to all elements sharing this key
             for (const info of infos) {
-                this.helpers.applyAttributesToElement(info.element, e.detail.attributes);
+                applyAttributesToElement(info.element, e.detail.attributes);
             }
             this.closeModal("seoModal");
             this.helpers.updateToolbarHasChanges();
@@ -474,7 +472,7 @@ export class ModalManager {
         if (!infos || infos.length === 0) return;
 
         const primaryInfo = infos[0];
-        const elementType = this.helpers.getEditableType(key);
+        const elementType = this.state.editableTypes.get(key) || "html";
         this.log.debug("Opening accessibility modal", {
             key,
             elementId: primaryInfo.elementId,
@@ -497,7 +495,7 @@ export class ModalManager {
             this.state.elementAttributes.set(key, e.detail.attributes);
             // Apply attributes to all elements sharing this key
             for (const info of infos) {
-                this.helpers.applyAttributesToElement(info.element, e.detail.attributes);
+                applyAttributesToElement(info.element, e.detail.attributes);
             }
             this.closeModal("accessibilityModal");
             this.helpers.updateToolbarHasChanges();
@@ -551,7 +549,7 @@ export class ModalManager {
             this.state.elementAttributes.set(key, e.detail.attributes);
             // Apply attributes to all elements sharing this key
             for (const info of infos) {
-                this.helpers.applyAttributesToElement(info.element, e.detail.attributes);
+                applyAttributesToElement(info.element, e.detail.attributes);
             }
             this.closeModal("attributesModal");
             this.helpers.updateToolbarHasChanges();

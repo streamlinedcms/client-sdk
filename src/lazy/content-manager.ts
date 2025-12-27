@@ -9,7 +9,6 @@
 
 import type { EditorState, EditableElementInfo } from "./state.js";
 import type {
-    EditableType,
     ElementAttributes,
     ContentData,
     TextContentData,
@@ -17,20 +16,10 @@ import type {
     ImageContentData,
     LinkContentData,
 } from "../types.js";
-
-/**
- * Helpers that ContentManager needs from EditorController
- */
-export interface ContentManagerHelpers {
-    getEditableType: (key: string) => EditableType;
-    applyAttributesToElement: (element: HTMLElement, attributes: ElementAttributes) => void;
-}
+import { applyAttributesToElement } from "../types.js";
 
 export class ContentManager {
-    constructor(
-        private state: EditorState,
-        private helpers: ContentManagerHelpers,
-    ) {}
+    constructor(private state: EditorState) {}
 
     /**
      * Update currentContent from a DOM element, then sync other elements.
@@ -84,7 +73,7 @@ export class ContentManager {
      * Includes attributes if any have been set.
      */
     getElementContent(key: string, info: EditableElementInfo): string {
-        const elementType = this.helpers.getEditableType(key);
+        const elementType = this.state.editableTypes.get(key) || "html";
         const attributes = this.state.elementAttributes.get(key);
 
         if (elementType === "image" && info.element instanceof HTMLImageElement) {
@@ -126,7 +115,7 @@ export class ContentManager {
      * Also extracts and applies attributes if present.
      */
     applyElementContent(key: string, info: EditableElementInfo, content: string): void {
-        const elementType = this.helpers.getEditableType(key);
+        const elementType = this.state.editableTypes.get(key) || "html";
 
         try {
             const data = JSON.parse(content) as
@@ -136,7 +125,7 @@ export class ContentManager {
             // Extract and store attributes if present
             if (data.attributes && Object.keys(data.attributes).length > 0) {
                 this.state.elementAttributes.set(key, data.attributes);
-                this.helpers.applyAttributesToElement(info.element, data.attributes);
+                applyAttributesToElement(info.element, data.attributes);
             }
 
             if (data.type === "text") {
