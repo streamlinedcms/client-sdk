@@ -25,10 +25,12 @@ import {
     RESERVED_ATTRIBUTES,
     SEO_ATTRIBUTES,
     ACCESSIBILITY_ATTRIBUTES,
+    IMAGE_PLACEHOLDER_DATA_URI,
     applyAttributesToElement,
 } from "../types.js";
 import type { MediaFile } from "../popup-manager.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
+import type { Candidate, SelectFileOptions } from "../components/media-manager-modal.js";
 import type { LinkEditorModal, LinkData } from "../components/link-editor-modal.js";
 import type { SeoModal } from "../components/seo-modal.js";
 import type { AccessibilityModal } from "../components/accessibility-modal.js";
@@ -106,20 +108,75 @@ export class ModalManager {
      * Open media manager for file selection
      * Returns selected file on success, null if user cancels or closes
      */
-    async openMediaManager(): Promise<MediaFile | null> {
+    async openMediaManager(options?: SelectFileOptions): Promise<MediaFile | null> {
         if (!this.state.mediaManagerModal) {
             this.log.warn("Media manager modal not initialized");
             return null;
         }
 
-        this.log.debug("Opening media manager");
-        const file = await this.state.mediaManagerModal.selectMedia();
+        this.log.debug("Opening media manager", { options });
+        const file = await this.state.mediaManagerModal.selectMedia(options);
         if (file) {
             this.log.debug("Media file selected", { fileId: file.fileId, filename: file.filename });
         } else {
             this.log.debug("Media manager closed without selection");
         }
         return file;
+    }
+
+    /**
+     * Derive a filename for the image candidate.
+     * Priority: URL filename (if it has extension) > title > alt > empty (let server name it)
+     */
+    private deriveFilename(img: HTMLImageElement, contentType: string): string {
+        // Extract extension from content-type, stripping parameters (e.g., "image/svg+xml; charset=utf-8" -> "svg")
+        const mimeSubtype = contentType.split("/")[1]?.split(";")[0] || "jpg";
+        const ext = mimeSubtype.split("+")[0]; // "svg+xml" -> "svg"
+
+        // Try URL path first - only use if it looks like a real filename (has extension)
+        const urlPath = img.src.split("/").pop()?.split("?")[0] || "";
+        if (urlPath.includes(".")) {
+            return urlPath;
+        }
+
+        // Try title attribute
+        if (img.title) {
+            return `${img.title}.${ext}`;
+        }
+
+        // Try alt attribute
+        if (img.alt) {
+            return `${img.alt}.${ext}`;
+        }
+
+        // Let the server generate a name
+        return "";
+    }
+
+    private async fetchImageAsCandidate(img: HTMLImageElement): Promise<Candidate | null> {
+        const src = img.src;
+
+        // Skip our placeholder image
+        if (!src || src === IMAGE_PLACEHOLDER_DATA_URI) {
+            return null;
+        }
+
+        try {
+            const response = await fetch(src);
+            if (!response.ok) {
+                this.log.debug("Failed to fetch image for candidate", { src, status: response.status });
+                return null;
+            }
+
+            const data = await response.arrayBuffer();
+            const contentType = response.headers.get("content-type") || "image/jpeg";
+            const filename = this.deriveFilename(img, contentType);
+
+            return { data, filename, contentType };
+        } catch (err) {
+            this.log.debug("Error fetching image for candidate", { src, error: err });
+            return null;
+        }
     }
 
     /**
@@ -138,12 +195,22 @@ export class ModalManager {
             return;
         }
 
+        const img = infos[0].element as HTMLImageElement;
+
         this.log.debug("Opening media manager for image change", {
             key,
             elementId: infos[0].elementId,
         });
 
-        const file = await this.openMediaManager();
+        // Try to offer the current image as a candidate for upload
+        const options: SelectFileOptions = { accept: ["image/*"] };
+        const candidate = await this.fetchImageAsCandidate(img);
+        if (candidate) {
+            options.candidates = [candidate];
+            this.log.debug("Offering current image as candidate", { filename: candidate.filename });
+        }
+
+        const file = await this.openMediaManager(options);
         if (file) {
             // Build new content with updated src
             const attributes = this.state.elementAttributes.get(key);

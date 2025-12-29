@@ -17,10 +17,18 @@ import type { MediaFile } from "../popup-manager.js";
 // Re-export MediaFile for consumers
 export type { MediaFile } from "../popup-manager.js";
 
+/** A file candidate for upload */
+export interface Candidate {
+    data: ArrayBuffer;
+    filename: string;
+    contentType: string;
+}
+
 /** Options for single file selection */
-interface SelectFileOptions {
+export interface SelectFileOptions {
     accept?: string[];
     preselect?: string;
+    candidates?: Candidate[];
 }
 
 /** Result from selectFile call */
@@ -85,6 +93,9 @@ export class MediaManagerModal extends LitElement {
 
     @state()
     private closing = false;
+
+    @state()
+    private selectingMedia = false;
 
     static styles = [
         tailwindSheet,
@@ -172,6 +183,10 @@ export class MediaManagerModal extends LitElement {
                 width: 100%;
                 height: 100%;
                 border: none;
+            }
+
+            .iframe-container:not(.ready) iframe {
+                visibility: hidden;
             }
 
             .status {
@@ -351,6 +366,11 @@ export class MediaManagerModal extends LitElement {
      * Returns the selected MediaFile or null if cancelled or error.
      */
     async selectMedia(options?: SelectFileOptions): Promise<MediaFile | null> {
+        // Prevent double-calls (e.g., from double-tap on mobile)
+        if (this.selectingMedia) {
+            return null;
+        }
+        this.selectingMedia = true;
         this.open = true;
         this.closing = false;
 
@@ -359,7 +379,10 @@ export class MediaManagerModal extends LitElement {
         if (!ready) {
             // Error occurred, wait for user to close modal
             return new Promise((resolve) => {
-                this.pendingResolve = () => resolve(null);
+                this.pendingResolve = () => {
+                    this.selectingMedia = false;
+                    resolve(null);
+                };
             });
         }
 
@@ -367,6 +390,7 @@ export class MediaManagerModal extends LitElement {
             const result = await this.mediaManager!.selectFile(options);
 
             this.open = false;
+            this.selectingMedia = false;
 
             if (result.error) {
                 console.error("[MediaManagerModal] selectFile error:", result.error);
@@ -397,6 +421,7 @@ export class MediaManagerModal extends LitElement {
             return null;
         } catch (err) {
             this.open = false;
+            this.selectingMedia = false;
             console.error("[MediaManagerModal] selectMedia error:", err);
             return null;
         }
@@ -424,13 +449,20 @@ export class MediaManagerModal extends LitElement {
             this.closing = true;
 
             try {
-                // Cancel the current request - the pending selectFile() promise will
-                // resolve with { cancelled: true }, which triggers modal close
-                await this.mediaManager.cancelCurrentRequest();
+                // Cancel the current request with a timeout in case connection is broken
+                const timeout = new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error("Timeout")), 2000),
+                );
+                await Promise.race([this.mediaManager.cancelCurrentRequest(), timeout]);
             } catch {
-                // Penpal timed out or connection broken
+                // Penpal timed out or connection broken - force close and reset
+                this.cleanup();
                 this.closing = false;
-                this.error = "Connection to media manager lost. Please refresh the page.";
+                this.open = false;
+                if (this.pendingResolve) {
+                    this.pendingResolve();
+                    this.pendingResolve = null;
+                }
             }
         } else {
             // Not connected or has error - close immediately
@@ -473,7 +505,7 @@ export class MediaManagerModal extends LitElement {
                         </svg>
                     </button>
                 </div>
-                <div class="iframe-container">
+                <div class="iframe-container${this.connectionReady && this.authenticated && !this.error ? ' ready' : ''}">
                     ${statusMessage
                         ? html`<div class="status"><div class="spinner"></div><span class="status-text">${statusMessage}</span></div>`
                         : null}
