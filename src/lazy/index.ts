@@ -120,6 +120,8 @@ class EditorController {
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Double-tap delay constant
     private readonly doubleTapDelay = 400; // ms
+    // Spacer element to prevent toolbar from covering content
+    private spacerElement: HTMLElement | null = null;
     // localStorage key for draft persistence (namespaced by app ID by default)
     private _draftStorageKey: string;
 
@@ -796,15 +798,25 @@ class EditorController {
     private updateBodyPadding = (): void => {
         const isMobile = window.innerWidth < 640;
         const height = isMobile ? TOOLBAR_HEIGHT_MOBILE : TOOLBAR_HEIGHT_DESKTOP;
-        document.body.style.paddingBottom = `${height}px`;
+
+        if (!this.spacerElement) {
+            this.spacerElement = document.createElement("div");
+            this.spacerElement.setAttribute("data-scms-spacer", "");
+            this.spacerElement.style.cssText = "flex-shrink: 0; pointer-events: none;";
+            document.body.appendChild(this.spacerElement);
+        }
+        this.spacerElement.style.height = `${height}px`;
     };
 
     private removeToolbar(): void {
         if (this.state.toolbar) {
             this.state.toolbar.remove();
             this.state.toolbar = null;
-            document.body.style.paddingBottom = "";
             window.removeEventListener("resize", this.updateBodyPadding);
+        }
+        if (this.spacerElement) {
+            this.spacerElement.remove();
+            this.spacerElement = null;
         }
     }
 
