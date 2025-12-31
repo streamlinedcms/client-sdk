@@ -4,14 +4,18 @@ This guide explains how to integrate Streamlined CMS into an HTML website to ena
 
 ## Quick Start
 
-Add this script tag to your HTML `<head>`:
+Add this script tag to your HTML `<head>` (not at the end of `<body>`):
 
 ```html
-<script
-    src="https://cdn.streamlinedcms.com/client-sdk/v0.1/streamlined-cms.min.js"
-    data-app-id="YOUR_APP_ID"
-></script>
+<head>
+    <script
+        src="https://cdn.streamlinedcms.com/client-sdk/v0.1/streamlined-cms.min.js"
+        data-app-id="YOUR_APP_ID"
+    ></script>
+</head>
 ```
+
+The script must be in `<head>` so it can load and apply saved content before the page renders. Placing it at the end of `<body>` would cause a flash of default content.
 
 Get your App ID from your app details on [app.streamlinedcms.com](https://app.streamlinedcms.com).
 
@@ -32,16 +36,18 @@ Add `data-scms-*` attributes to HTML elements to make them editable. Each elemen
 
 ### Text (`data-scms-text`)
 
-For plain text content like headings, labels, and simple paragraphs.
+Use text for any single piece of content: headings, paragraphs, labels, captions, etc. Authors get a clean inline editing experience.
 
 ```html
 <h1 data-scms-text="hero-title">Welcome to Our Site</h1>
 <p data-scms-text="hero-subtitle">We build great products.</p>
 ```
 
+**Prefer text over HTML.** If you have three headings, use three `data-scms-text` elements—not one `data-scms-html` containing all three. This gives authors a better editing experience and keeps content structured.
+
 ### HTML (`data-scms-html`)
 
-For rich content that needs formatting (bold, italic, lists, etc.). Authors edit via a code editor in the toolbar.
+Use HTML only when the author needs to control the actual HTML code, or when a combination of other element types (text, link, image) won't work. Authors edit via a code editor in the toolbar.
 
 ```html
 <div data-scms-html="about-content">
@@ -52,6 +58,16 @@ For rich content that needs formatting (bold, italic, lists, etc.). Authors edit
     </ul>
 </div>
 ```
+
+**When to use HTML:**
+- Content with tables or complex formatting
+- Blocks where the structure itself needs to be editable
+- Cases where you can't break the content into separate text/link/image elements
+
+**When NOT to use HTML:**
+- Individual headings, paragraphs, or labels (use `data-scms-text`)
+- A paragraph that just needs one link (use `data-scms-text` + `data-scms-link`)
+- Multiple separate elements that could each be their own editable (use multiple `data-scms-text`)
 
 ### Images (`data-scms-image`)
 
@@ -127,10 +143,14 @@ Both pages can use the same element IDs (`title`, `content`) because they're in 
 
 Use templates for repeating content blocks where authors need to add, remove, or reorder items.
 
-Add `data-scms-template` to a container element. The first child becomes the template that can be repeated. Authors can add new instances, delete existing ones, and reorder them.
+Add `data-scms-template` to the **wrapper element** that will contain all instances. The first child element inside becomes the template that gets cloned for each instance. Authors can add new instances, delete existing ones, and reorder them.
+
+**Important:** The attribute goes on the wrapper, not on individual items. Do NOT put `data-scms-template` on the repeating item itself.
 
 ```html
+<!-- The attribute goes on the wrapper (team-grid), NOT on team-card -->
 <div class="team-grid" data-scms-template="team-member">
+    <!-- This first child is the item template - it gets cloned for each instance -->
     <div class="team-card">
         <img data-scms-image="photo" src="placeholder.jpg" alt="Team member" />
         <h3 data-scms-text="name">Team Member Name</h3>
@@ -138,6 +158,10 @@ Add `data-scms-template` to a container element. The first child becomes the tem
     </div>
 </div>
 ```
+
+Your HTML can include one or many instances—the SDK uses the first child as the template structure and manages all instances from there. You don't need to reduce existing instances down to one; leave your HTML as-is.
+
+**Note:** If you have multiple instances in your HTML, ensure they all have the same structure (elements, IDs, and classes). The SDK expects all instances to match the first child's structure.
 
 **When to use templates:**
 - Lists (feature lists, benefit lists, navigation items)
@@ -175,7 +199,7 @@ In this example, the promo banner text is shared across all product cards, while
 
 ## Sign-In Link
 
-Authors need a way to sign in to enable editing. Add the `data-scms-signin` attribute to any element, typically in your footer:
+Authors need a way to sign in to enable editing. You should add a sign-in link to your footer, typically in the copyright line. Add the `data-scms-signin` attribute to a link element:
 
 ```html
 <footer>
@@ -188,9 +212,7 @@ The SDK automatically:
 - Changes the text to "Sign Out" when authenticated
 - Restores the original text when signed out
 
-**Recommended placement:** Footer or copyright section, where it's accessible but unobtrusive.
-
-If you don't add a `data-scms-signin` element, the SDK will automatically append a default sign-in link to the page.
+**Note:** If you forget to add a `data-scms-signin` element, the SDK will append a default sign-in link to the page. This fallback is unstyled and may not match your design, so always add your own.
 
 ## Complete Example
 
