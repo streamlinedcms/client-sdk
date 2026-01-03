@@ -48,6 +48,9 @@ export class Toolbar extends LitElement {
     @property({ type: String })
     warning: string | null = null;
 
+    @property({ type: Boolean, attribute: "read-only" })
+    readOnly = false;
+
     // Template context - set when editing an element inside a template
     @property({ type: String, attribute: "template-id" })
     templateId: string | null = null;
@@ -338,7 +341,8 @@ export class Toolbar extends LitElement {
 
     private renderModeToggle() {
         // Hide toggle when there's a warning (domain not whitelisted, payment required)
-        if (this.warning) {
+        // or when user is in read-only mode (no contentWrite permission)
+        if (this.warning || this.readOnly) {
             return null;
         }
         return html`
@@ -1060,6 +1064,7 @@ export class Toolbar extends LitElement {
     render() {
         return html`
             ${this.warning ? this.renderWarning() : nothing}
+            ${!this.warning && this.readOnly ? this.renderReadOnlyBanner() : nothing}
             ${this.isMobile ? this.renderMobile() : this.renderDesktop()}
         `;
     }
@@ -1074,6 +1079,18 @@ export class Toolbar extends LitElement {
                 >
                     Reload
                 </button>
+            </div>
+        `;
+    }
+
+    private renderReadOnlyBanner() {
+        return html`
+            <div class="bg-blue-100 text-blue-800 px-4 py-2 text-center text-sm flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>View-only mode. You don't have permission to edit content.</span>
             </div>
         `;
     }

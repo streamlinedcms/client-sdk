@@ -10,6 +10,24 @@ export type LogLevel = "fatal" | "error" | "warn" | "normal" | "info" | "debug" 
 export type LogLevelInput = LogLevel | false | null;
 
 /**
+ * Granular permissions for an app member
+ * @see RFC-0013
+ */
+export interface AppPermissions {
+    contentRead: boolean; // Always true (locked)
+    contentWrite: boolean;
+    mediaRead: boolean;
+    mediaUpload: boolean;
+    mediaEditOwn: boolean;
+    mediaEditOthers: boolean;
+    mediaDeleteOwn: boolean;
+    mediaDeleteOthers: boolean;
+    manageMembers: boolean;
+    manageBilling: boolean;
+    manageSettings: boolean;
+}
+
+/**
  * Configuration options for StreamlinedCMS
  */
 export interface StreamlinedCMSConfig {

@@ -9,7 +9,7 @@
 import { reactive } from "@vue/reactivity";
 import type Sortable from "sortablejs";
 import type { EditorMode } from "../key-storage.js";
-import type { EditableType, ElementAttributes } from "../types.js";
+import type { AppPermissions, EditableType, ElementAttributes } from "../types.js";
 import type { Toolbar } from "../components/toolbar.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
 import type { LinkEditorModal } from "../components/link-editor-modal.js";
@@ -48,6 +48,7 @@ export interface TemplateInfo {
 export interface EditorState {
     // Auth & mode
     apiKey: string | null;
+    permissions: AppPermissions | null;
     currentMode: EditorMode;
     editingEnabled: boolean;
     domainWarningShown: boolean;
@@ -97,6 +98,7 @@ export function createEditorState(): EditorState {
     return reactive({
         // Auth & mode
         apiKey: null,
+        permissions: null,
         currentMode: "viewer",
         editingEnabled: false,
         domainWarningShown: false,

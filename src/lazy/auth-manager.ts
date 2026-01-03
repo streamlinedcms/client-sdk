@@ -13,6 +13,7 @@ import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
 import type { KeyStorage } from "../key-storage.js";
 import type { PopupManager } from "../popup-manager.js";
+import type { AppPermissions } from "../types.js";
 
 /**
  * Configuration for AuthManager
@@ -76,6 +77,9 @@ export class AuthManager {
             this.state.apiKey = storedKey;
             this.helpers.updateMediaManagerApiKey();
 
+            // Fetch user permissions
+            await this.fetchPermissions(storedKey);
+
             // Set up all custom triggers as sign-out
             const customTriggers = document.querySelectorAll("[data-scms-signin]");
             customTriggers.forEach((trigger) => {
@@ -129,6 +133,42 @@ export class AuthManager {
     }
 
     /**
+     * Fetch user permissions from the members/@me endpoint.
+     * Updates state.permissions on success.
+     * Returns the permissions object, or null on failure.
+     */
+    async fetchPermissions(apiKey: string): Promise<AppPermissions | null> {
+        try {
+            const response = await fetch(
+                `${this.config.apiUrl}/apps/${this.config.appId}/members/@me`,
+                {
+                    headers: { Authorization: `Bearer ${apiKey}` },
+                },
+            );
+
+            if (!response.ok) {
+                this.log.warn("Failed to fetch permissions", { status: response.status });
+                return null;
+            }
+
+            const data = await response.json();
+            const permissions = data.role?.permissions as AppPermissions | undefined;
+
+            if (permissions) {
+                this.state.permissions = permissions;
+                this.log.debug("Fetched permissions", { permissions });
+                return permissions;
+            }
+
+            this.log.warn("No permissions in member response", { data });
+            return null;
+        } catch (error) {
+            this.log.warn("Failed to fetch permissions", error);
+            return null;
+        }
+    }
+
+    /**
      * Show sign-in link UI (either custom triggers or default Lit component)
      */
     showSignInLink(): void {
@@ -173,6 +213,9 @@ export class AuthManager {
             this.helpers.updateMediaManagerApiKey();
             this.keyStorage.storeKey(key);
 
+            // Fetch user permissions
+            await this.fetchPermissions(key);
+
             // Remove default sign-in link if present
             const signInLink = document.getElementById("scms-signin-link");
             if (signInLink) signInLink.remove();
@@ -209,6 +252,7 @@ export class AuthManager {
 
         this.keyStorage.clearStoredKey();
         this.state.apiKey = null;
+        this.state.permissions = null;
         this.helpers.updateMediaManagerApiKey();
         this.state.currentMode = "viewer";
 

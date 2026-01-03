@@ -205,6 +205,17 @@ class EditorController {
                 apiFetch: this.apiFetch.bind(this),
                 signOut: (skip) => this.authManager.signOut(skip),
                 fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
+                refetchPermissions: async () => {
+                    if (this.state.apiKey) {
+                        await this.authManager.fetchPermissions(this.state.apiKey);
+                    }
+                },
+                disableEditing: this.disableEditing.bind(this),
+                updateToolbarReadOnly: () => {
+                    if (this.state.toolbar) {
+                        this.state.toolbar.readOnly = this.state.permissions?.contentWrite === false;
+                    }
+                },
             },
         );
 
@@ -574,7 +585,12 @@ class EditorController {
 
         if (mode === "author") {
             this.log.debug("Entering author mode");
-            this.enableEditing();
+            // Only enable editing if user has contentWrite permission
+            if (this.state.permissions?.contentWrite !== false) {
+                this.enableEditing();
+            } else {
+                this.log.info("User lacks contentWrite permission, editing disabled");
+            }
         } else {
             this.log.debug("Entering viewer mode");
             this.disableEditing();
@@ -708,10 +724,13 @@ class EditorController {
     }
 
     private showToolbar(): void {
+        const isReadOnly = this.state.permissions?.contentWrite === false;
+
         // Update existing toolbar if present
         if (this.state.toolbar) {
             this.state.toolbar.mode = this.state.currentMode;
             this.state.toolbar.activeElement = this.state.editingKey;
+            this.state.toolbar.readOnly = isReadOnly;
             return;
         }
 
@@ -723,6 +742,7 @@ class EditorController {
         toolbar.appUrl = this.config.appUrl;
         toolbar.appId = this.config.appId;
         toolbar.mockAuth = this.config.mockAuth?.enabled ?? false;
+        toolbar.readOnly = isReadOnly;
 
         toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
             this.setMode(e.detail.mode);

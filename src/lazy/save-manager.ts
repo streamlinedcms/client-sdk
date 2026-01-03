@@ -19,12 +19,22 @@ import type { BatchUpdateRequest, BatchUpdateResponse } from "../types.js";
 import { parseTemplateKey, buildTemplateKey, parseStorageKey } from "../types.js";
 
 /**
- * Error thrown when an API request fails due to authentication issues (401/403)
+ * Error thrown when an API request fails due to authentication issues (401)
  */
 class AuthError extends Error {
     constructor(message: string) {
         super(message);
         this.name = "AuthError";
+    }
+}
+
+/**
+ * Error thrown when an API request fails due to permission issues (403)
+ */
+class PermissionError extends Error {
+    constructor(message: string) {
+        super(message);
+        this.name = "PermissionError";
     }
 }
 
@@ -66,6 +76,9 @@ export interface SaveManagerHelpers {
     apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
     signOut: (skipConfirmation: boolean) => void;
     fetchSavedContentKeys: () => Promise<boolean>;
+    refetchPermissions: () => Promise<void>;
+    disableEditing: () => void;
+    updateToolbarReadOnly: () => void;
 }
 
 /**
@@ -334,8 +347,11 @@ export class SaveManager {
                 });
 
                 if (!response.ok) {
-                    if (response.status === 401 || response.status === 403) {
+                    if (response.status === 401) {
                         throw new AuthError(`Batch ${i + 1}: ${response.status} ${response.statusText}`);
+                    }
+                    if (response.status === 403) {
+                        throw new PermissionError(`Batch ${i + 1}: ${response.status} ${response.statusText}`);
                     }
                     throw new Error(`Batch ${i + 1}: ${response.status} ${response.statusText}`);
                 }
@@ -418,6 +434,21 @@ export class SaveManager {
                 this.log.error("Authentication failed during save", { error: error.message });
                 alert("Your session has expired. Please sign in again to save your changes.");
                 this.helpers.signOut(true); // Skip "unsaved changes" confirmation
+                return;
+            }
+            if (error instanceof PermissionError) {
+                this.log.warn("Permission denied during save, refetching permissions", { error: error.message });
+                // Refetch permissions - they may have changed
+                await this.helpers.refetchPermissions();
+                // Disable editing if user no longer has contentWrite permission
+                if (this.state.permissions?.contentWrite === false) {
+                    this.helpers.disableEditing();
+                    this.helpers.updateToolbarReadOnly();
+                    alert("Your permissions have changed. You no longer have permission to edit content.");
+                } else {
+                    // Permission denied for another reason (domain not whitelisted, etc.)
+                    alert("Permission denied. Check that this domain is whitelisted in Admin → Settings.");
+                }
                 return;
             }
             const errorMessage = error instanceof Error ? error.message : String(error);
