@@ -1,6 +1,6 @@
 {
   "name": "@streamlined-cms/client-sdk",
-  "version": "0.1.18",
+  "version": "0.1.19",
   "module": "dist/streamlined-cms.esm.js",
   "types": "dist/index.d.ts",
   "type": "module",
