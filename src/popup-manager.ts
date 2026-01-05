@@ -17,6 +17,17 @@ export interface PopupConfig {
     appUrl: string; // e.g., 'https://app.streamlinedcms.com'
 }
 
+export interface LoginCredentials {
+    email?: string;
+    password?: string;
+}
+
+/** Methods exposed by the login popup via penpal */
+interface LoginPopupRemote {
+    [index: string]: Function;
+    setCredentials(credentials: LoginCredentials): void;
+}
+
 export interface UserRef {
     id: string;
     name: string | null;
@@ -34,12 +45,12 @@ export interface MediaFile {
 }
 
 export class PopupManager {
-    private loginConnection: PopupConnection<string>;
+    private loginConnection: PopupConnection<string, LoginPopupRemote>;
 
     constructor(config: PopupConfig) {
         const origin = new URL(config.appUrl).origin;
 
-        this.loginConnection = new PopupConnection<string>({
+        this.loginConnection = new PopupConnection<string, LoginPopupRemote>({
             url: `${config.appUrl}/login?appId=${encodeURIComponent(config.appId)}`,
             name: "scms-login",
             width: 500,
@@ -52,8 +63,19 @@ export class PopupManager {
     /**
      * Open login popup and wait for authentication
      * Returns API key on success, null if user closes popup
+     *
+     * @param credentials - Optional credentials to prepopulate the login form
      */
-    async openLoginPopup(): Promise<string | null> {
+    async openLoginPopup(credentials?: LoginCredentials): Promise<string | null> {
+        // Set up credential prepopulation if provided
+        if (credentials && (credentials.email || credentials.password)) {
+            this.loginConnection.setOnConnected((remote) => {
+                remote.setCredentials(credentials);
+            });
+        } else {
+            this.loginConnection.setOnConnected(undefined);
+        }
+
         return this.loginConnection.open({
             receiveAuthResult: (result: { key: string }) => result.key,
         });

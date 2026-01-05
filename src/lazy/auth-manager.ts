@@ -12,7 +12,7 @@
 import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
 import type { KeyStorage } from "../key-storage.js";
-import type { PopupManager } from "../popup-manager.js";
+import type { PopupManager, LoginCredentials } from "../popup-manager.js";
 import type { AuthBridge } from "./auth-bridge.js";
 
 /**
@@ -34,8 +34,22 @@ export class AuthManager {
     // Bound event handlers for proper removal
     private handleSignInClick = (e: Event): void => {
         e.preventDefault();
-        this.handleSignIn();
+        const credentials = this.extractCredentials(e.currentTarget as Element | null);
+        this.handleSignIn(credentials);
     };
+
+    /**
+     * Extract login credentials from element's data attributes
+     */
+    private extractCredentials(element: Element | null): LoginCredentials | undefined {
+        if (!element) return undefined;
+
+        const email = element.getAttribute("data-scms-signin-email") || undefined;
+        const password = element.getAttribute("data-scms-signin-password") || undefined;
+
+        if (!email && !password) return undefined;
+        return { email, password };
+    }
 
     private handleSignOutClick = (e: Event): void => {
         e.preventDefault();
@@ -187,11 +201,12 @@ export class AuthManager {
 
     /**
      * Handle sign-in flow via popup
+     * @param credentials - Optional credentials to prepopulate the login form
      */
-    async handleSignIn(): Promise<void> {
-        this.log.debug("Opening login popup");
+    async handleSignIn(credentials?: LoginCredentials): Promise<void> {
+        this.log.debug("Opening login popup", credentials ? { hasCredentials: true } : undefined);
 
-        const key = await this.popupManager.openLoginPopup();
+        const key = await this.popupManager.openLoginPopup(credentials);
         if (key) {
             // Validate via auth bridge and get permissions
             const result = await this.authBridge.authenticate(key);

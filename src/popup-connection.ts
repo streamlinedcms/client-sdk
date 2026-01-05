@@ -19,11 +19,11 @@
  *   });
  */
 
-import { WindowMessenger, connect } from "penpal";
+import { WindowMessenger, connect, type Methods, type RemoteProxy } from "penpal";
 
 const POPUP_CHECK_INTERVAL = 500;
 
-export interface PopupConnectionConfig {
+export interface PopupConnectionConfig<TRemote extends Methods = Methods> {
     /** Full URL to open in the popup */
     url: string;
     /** Window name (used by browser to identify/reuse windows) */
@@ -36,6 +36,11 @@ export interface PopupConnectionConfig {
     allowedOrigins: string[];
     /** Penpal connection timeout in milliseconds */
     timeout: number;
+    /**
+     * Called after penpal connection is established, with the remote methods.
+     * Use this to call methods on the popup (e.g., setCredentials).
+     */
+    onConnected?: (remote: RemoteProxy<TRemote>) => void | Promise<void>;
 }
 
 /**
@@ -48,15 +53,25 @@ export type PopupMethodHandlers<TResult> = {
     [methodName: string]: (...args: any[]) => TResult | null;
 };
 
-export class PopupConnection<TResult> {
-    private config: PopupConnectionConfig;
+export class PopupConnection<TResult, TRemote extends Methods = Methods> {
+    private config: PopupConnectionConfig<TRemote>;
     private popup: Window | null = null;
     private cleanedUp = false;
     private checkInterval: number | null = null;
     private connection: { destroy: () => void } | null = null;
 
-    constructor(config: PopupConnectionConfig) {
+    constructor(config: PopupConnectionConfig<TRemote>) {
         this.config = config;
+    }
+
+    /**
+     * Update the onConnected callback for the next open() call.
+     * Useful for passing different credentials on each login attempt.
+     */
+    setOnConnected(
+        callback: ((remote: RemoteProxy<TRemote>) => void | Promise<void>) | undefined,
+    ): void {
+        this.config.onConnected = callback;
     }
 
     /**
@@ -131,11 +146,26 @@ export class PopupConnection<TResult> {
                 };
             }
 
-            this.connection = connect<Record<string, never>>({
+            const penpalConnection = connect<TRemote>({
                 messenger,
                 methods: wrappedMethods,
                 timeout,
             });
+
+            this.connection = penpalConnection;
+
+            // Call onConnected callback when connection is established
+            if (this.config.onConnected) {
+                penpalConnection.promise
+                    .then((remote) => {
+                        if (!this.cleanedUp && this.config.onConnected) {
+                            return this.config.onConnected(remote);
+                        }
+                    })
+                    .catch(() => {
+                        // Connection failed or was destroyed - ignore
+                    });
+            }
 
             // Poll for popup close (user closed window manually)
             this.checkInterval = window.setInterval(() => {
