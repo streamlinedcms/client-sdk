@@ -278,6 +278,73 @@ The SDK automatically:
 - IDs must be unique within their context (page, group, or template)
 - Template element IDs are scoped to each instance, so `name` in one team member doesn't conflict with `name` in another
 
+## Element Pairing
+
+Keep logically separate elements as separate editables. Don't combine unrelated content into a single editable element.
+
+### Logo + Company Name
+
+```html
+<!-- CORRECT: Separate editables for logo and name -->
+<div class="logo-container">
+    <img data-scms-image="logo" src="logo.png" alt="Logo" />
+    <span data-scms-text="company-name">Acme Services</span>
+</div>
+
+<!-- WRONG: Combined into one link loses individual editability -->
+<a href="/" data-scms-link="logo">
+    <img src="logo.png" />
+    <span>Acme</span>
+</a>
+```
+
+### Text + Link Combinations
+
+```html
+<!-- CORRECT: Separate text and link -->
+<p>
+    <span data-scms-text="powered-by-text">Powered by</span>
+    <a href="https://example.com" data-scms-link="powered-by-link">Example CMS</a>
+</p>
+
+<!-- WRONG: Can't edit text and link separately -->
+<a href="https://example.com" data-scms-link="powered-by">Powered by Example CMS</a>
+```
+
+## Link Clickability
+
+For the best editing experience, put padding inside links rather than using gap or margin on the parent container. This ensures the entire clickable area is part of the link element.
+
+```html
+<!-- CORRECT: Padding inside the link -->
+<nav class="flex items-center">
+    <a data-scms-link="nav-1" href="/" class="px-4 py-2">Home</a>
+    <a data-scms-link="nav-2" href="/about" class="px-4 py-2">About</a>
+</nav>
+
+<!-- WRONG: Gap creates unclickable dead zones between links -->
+<nav class="flex items-center gap-8">
+    <a data-scms-link="nav-1" href="/">Home</a>
+    <a data-scms-link="nav-2" href="/about">About</a>
+</nav>
+```
+
+For vertical link lists:
+
+```html
+<!-- CORRECT: Block links with padding -->
+<ul>
+    <li><a data-scms-link="menu-1" href="/services" class="block py-2">Services</a></li>
+    <li><a data-scms-link="menu-2" href="/contact" class="block py-2">Contact</a></li>
+</ul>
+
+<!-- WRONG: Spacing on list items creates unclickable gaps -->
+<ul class="space-y-4">
+    <li><a data-scms-link="menu-1" href="/services">Services</a></li>
+    <li><a data-scms-link="menu-2" href="/contact">Contact</a></li>
+</ul>
+```
+
 ## SEO & Accessibility
 
 SEO attributes (alt text, title) and accessibility attributes (ARIA labels, roles) can be configured in the CMS after content is set up. No additional HTML markup is required.

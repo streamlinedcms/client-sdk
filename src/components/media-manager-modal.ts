@@ -373,6 +373,7 @@ export class MediaManagerModal extends LitElement {
 
         // Re-check ready state (auth status may have changed since init)
         if (this.connectionReady && !this.isReady) {
+            this.error = null; // Clear stale error before re-checking
             await this.checkReady();
         }
 
@@ -502,6 +503,7 @@ export class MediaManagerModal extends LitElement {
 
         // Re-check ready state (auth status may have changed since init)
         if (this.connectionReady && !this.isReady) {
+            this.error = null; // Clear stale error before re-checking
             await this.checkReady();
         }
 
