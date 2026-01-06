@@ -98,6 +98,21 @@ interface ContentResponse {
     groups: Record<string, { elements: Record<string, { content: string }> }>;
 }
 
+/**
+ * Ready stages for the SDK lifecycle
+ */
+type ReadyStage = "loaded" | "auth" | "editing" | "bridges";
+
+/**
+ * Event types for SDK hooks
+ */
+type HookEvent = "signin" | "signout";
+
+/**
+ * Event handler function type
+ */
+type HookHandler = () => void;
+
 class EditorController {
     static readonly version: string = __SDK_VERSION__;
 
@@ -129,6 +144,19 @@ class EditorController {
     // localStorage key for draft persistence (namespaced by app ID by default)
     private _draftStorageKey: string;
 
+    // Stage promises for ready() API (initial load states only)
+    private _loadedPromise: Promise<void>;
+    private _loadedResolve!: () => void;
+    private _authPromise: Promise<void>;
+    private _authResolve!: () => void;
+    private _editingPromise: Promise<void>;
+    private _editingResolve!: () => void;
+    private _bridgesPromise: Promise<void>;
+    private _bridgesResolve!: () => void;
+
+    // Event hooks
+    private _eventHandlers: Map<HookEvent, Set<HookHandler>> = new Map();
+
     /** The app ID for this SDK instance */
     get appId(): string {
         return this.config.appId;
@@ -139,9 +167,38 @@ class EditorController {
         return this._draftStorageKey;
     }
 
+    /** Whether the user is currently authenticated */
+    get isAuthenticated(): boolean {
+        return this.state.apiKey !== null;
+    }
+
+    /** The current editor mode */
+    get mode(): EditorMode {
+        return this.state.currentMode;
+    }
+
+    /** Whether editing is currently enabled */
+    get editingEnabled(): boolean {
+        return this.state.editingEnabled;
+    }
+
     constructor(config: ViewerConfig) {
         this.config = config;
         this._draftStorageKey = config.draftStorageKey ?? `scms_draft_${config.appId}`;
+
+        // Initialize stage promises (for initial load states only)
+        this._loadedPromise = new Promise((resolve) => {
+            this._loadedResolve = resolve;
+        });
+        this._authPromise = new Promise((resolve) => {
+            this._authResolve = resolve;
+        });
+        this._editingPromise = new Promise((resolve) => {
+            this._editingResolve = resolve;
+        });
+        this._bridgesPromise = new Promise((resolve) => {
+            this._bridgesResolve = resolve;
+        });
 
         // Create logger with configured level
         const logLevel = config.logLevel || "error";
@@ -257,6 +314,8 @@ class EditorController {
                     }
                 },
                 removeLoadingIndicator: () => this.removeLoadingIndicator(),
+                emitSignIn: () => this.emit("signin"),
+                emitSignOut: () => this.emit("signout"),
             },
         );
     }
@@ -345,6 +404,9 @@ class EditorController {
             appId: this.config.appId,
         });
 
+        // Resolve 'loaded' stage - SDK module is loaded and controller created
+        this._loadedResolve();
+
         // Show loading indicator while we wait for auth bridge
         this.showLoadingIndicator();
 
@@ -361,12 +423,20 @@ class EditorController {
         if (this.config.mockAuth?.enabled) {
             this.state.apiKey = "mock-api-key";
             this.log.debug("Mock authentication enabled");
+
+            // Resolve auth stage (mock auth is always authenticated)
+            this._authResolve();
+
             this.modalManager.initMediaManagerModal();
             this.setMode("author");
             const success = await this.fetchSavedContentKeys();
             if (!success) {
                 this.disableEditing();
             }
+
+            // Resolve editing and bridges stages
+            this._editingResolve();
+            this._bridgesResolve();
             return;
         }
 
@@ -374,8 +444,18 @@ class EditorController {
         // This validates stored API key and sets this.state.apiKey if valid
         await this.authManager.setupAuthUI();
 
+        // Resolve 'auth' stage - authentication status is now determined
+        this._authResolve();
+
         // Initialize media manager modal (persistent, reused across selections)
         this.modalManager.initMediaManagerModal();
+
+        // Resolve auth-dependent stages if authenticated
+        // (If not authenticated, they stay pending - ready() will throw when called)
+        if (this.isAuthenticated) {
+            this._editingResolve();
+            this._bridgesResolve();
+        }
 
         this.log.info("Lazy module initialized", {
             editableCount: this.state.editableElements.size,
@@ -865,10 +945,15 @@ class EditorController {
     }
 
     /**
-     * Show a loading indicator at the bottom of the page while auth bridge connects
+     * Show a loading indicator at the bottom of the page
      */
-    private showLoadingIndicator(): void {
-        if (this.loadingIndicator) return;
+    private showLoadingIndicator(message = "Loading StreamlinedCMS editor..."): void {
+        if (this.loadingIndicator) {
+            // Update message if indicator already exists
+            const span = this.loadingIndicator.querySelector("span");
+            if (span) span.textContent = message;
+            return;
+        }
 
         const indicator = document.createElement("div");
         indicator.id = "scms-loading";
@@ -905,7 +990,7 @@ class EditorController {
                 }
             </style>
             <div class="spinner"></div>
-            <span>Loading StreamlinedCMS editor...</span>
+            <span>${message}</span>
         `;
         document.body.appendChild(indicator);
         this.loadingIndicator = indicator;
@@ -948,6 +1033,132 @@ class EditorController {
     }
 
     /**
+     * Wait for a specific SDK lifecycle stage to complete.
+     *
+     * Stages:
+     * - 'loaded': SDK module loaded, controller created (default)
+     * - 'auth': Authentication status determined (check isAuthenticated after)
+     * - 'editing': Editing setup complete (rejects if not authenticated at init)
+     * - 'bridges': Penpal bridges ready for API calls (rejects if not authenticated at init)
+     *
+     * @throws Error if stage requires authentication but user was not authenticated at init
+     */
+    public async ready(stage: ReadyStage = "loaded"): Promise<void> {
+        switch (stage) {
+            case "loaded":
+                return this._loadedPromise;
+            case "auth":
+                return this._authPromise;
+            case "editing":
+                await this._authPromise;
+                if (!this.isAuthenticated) {
+                    throw new Error("Not authenticated");
+                }
+                return this._editingPromise;
+            case "bridges":
+                await this._authPromise;
+                if (!this.isAuthenticated) {
+                    throw new Error("Not authenticated");
+                }
+                return this._bridgesPromise;
+            default:
+                throw new Error(`Unknown ready stage: ${stage}`);
+        }
+    }
+
+    /**
+     * Register an event handler for SDK lifecycle events.
+     *
+     * Events:
+     * - 'signin': Fired when user signs in (via popup or programmatic)
+     * - 'signout': Fired when user signs out
+     */
+    public on(event: HookEvent, handler: HookHandler): void {
+        if (!this._eventHandlers.has(event)) {
+            this._eventHandlers.set(event, new Set());
+        }
+        this._eventHandlers.get(event)!.add(handler);
+    }
+
+    /**
+     * Unregister an event handler.
+     */
+    public off(event: HookEvent, handler: HookHandler): void {
+        const handlers = this._eventHandlers.get(event);
+        if (handlers) {
+            handlers.delete(handler);
+        }
+    }
+
+    /**
+     * Emit an event to all registered handlers.
+     */
+    private emit(event: HookEvent): void {
+        const handlers = this._eventHandlers.get(event);
+        if (handlers) {
+            for (const handler of handlers) {
+                try {
+                    handler();
+                } catch (err) {
+                    this.log.error(`Error in ${event} handler`, err);
+                }
+            }
+        }
+    }
+
+    /**
+     * Sign in programmatically with email and password.
+     * This bypasses the login popup and authenticates directly via the auth bridge.
+     * On success, stores the API key and enters author mode.
+     *
+     * @returns { success: true } on success, { success: false, error: string } on failure
+     */
+    public async signIn(
+        email: string,
+        password: string,
+    ): Promise<{ success: true } | { success: false; error: string }> {
+        this.showLoadingIndicator("Signing in...");
+
+        const result = await this.authBridge.signIn(email, password);
+
+        if (!result.valid) {
+            this.removeLoadingIndicator();
+            return { success: false, error: result.error };
+        }
+
+        // Success - store key and set up state
+        this.state.apiKey = result.key;
+        this.state.permissions = result.permissions;
+        this.keyStorage.storeKey(result.key);
+
+        // Remove default sign-in link if present
+        const signInLink = document.getElementById("scms-signin-link");
+        if (signInLink) signInLink.remove();
+
+        // Convert all custom triggers to sign-out (mirrors auth-manager behavior)
+        const customTriggers = document.querySelectorAll("[data-scms-signin]");
+        customTriggers.forEach((trigger) => {
+            this.state.customSignInTriggers.set(trigger, trigger.textContent || "");
+            trigger.textContent = "Sign Out";
+            trigger.addEventListener("click", (e) => {
+                e.preventDefault();
+                this.authManager.signOut();
+            });
+        });
+
+        // Enter author mode
+        this.setMode("author");
+        const fetchSuccess = await this.fetchSavedContentKeys();
+        if (!fetchSuccess) {
+            this.disableEditing();
+        }
+
+        this.log.info("Programmatic sign-in successful");
+        this.emit("signin");
+        return { success: true };
+    }
+
+    /**
      * Open media manager for file selection
      * Returns selected file on success, null if user cancels or closes
      */
@@ -983,8 +1194,10 @@ export async function initLazy(config: ViewerConfig): Promise<EditorController> 
 // Auto-initialize when loaded directly
 const config = getConfigFromScriptTag();
 if (config) {
-    initLazy(config).then((controller) => {
-        // Expose SDK on window for console access and programmatic use
-        (window as unknown as { StreamlinedCMS: EditorController }).StreamlinedCMS = controller;
-    });
+    const controller = new EditorController(config);
+    // Expose SDK on window immediately so ready() can be called during init
+    (window as unknown as { StreamlinedCMS: EditorController }).StreamlinedCMS = controller;
+    // Dispatch event to signal SDK is available on window
+    document.dispatchEvent(new CustomEvent("streamlined-cms:ready"));
+    controller.init();
 }

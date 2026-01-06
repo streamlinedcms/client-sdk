@@ -15,9 +15,15 @@ export type AuthResult =
     | { valid: true; permissions: AppPermissions }
     | { valid: false; error: string };
 
+/** Result from signIn call */
+export type SignInResult =
+    | { valid: true; permissions: AppPermissions; key: string }
+    | { valid: false; error: string };
+
 /** Methods exposed by the auth bridge iframe */
 interface AuthBridgeMethods {
     authenticate(apiKey: string): Promise<AuthResult>;
+    signIn(email: string, password: string): Promise<SignInResult>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     [key: string]: (...args: any[]) => Promise<any>;
 }
@@ -128,6 +134,33 @@ export class AuthBridge {
             const error = err instanceof Error ? err.message : String(err);
             this.log.error("Authentication error", { error });
             return { valid: false, error: `Authentication request failed: ${error}` };
+        }
+    }
+
+    /**
+     * Sign in with email and password.
+     * Returns API key and permissions on success, or an error message on failure.
+     * This enables silent authentication without opening a popup.
+     */
+    async signIn(email: string, password: string): Promise<SignInResult> {
+        await this.waitForConnection();
+
+        if (!this.authBridge) {
+            return { valid: false, error: "Auth bridge not connected" };
+        }
+
+        try {
+            const result = await this.authBridge.signIn(email, password);
+            if (result.valid) {
+                this.log.debug("Sign in successful", { permissions: result.permissions });
+            } else {
+                this.log.warn("Sign in failed", { error: result.error });
+            }
+            return result;
+        } catch (err) {
+            const error = err instanceof Error ? err.message : String(err);
+            this.log.error("Sign in error", { error });
+            return { valid: false, error: `Sign in request failed: ${error}` };
         }
     }
 }

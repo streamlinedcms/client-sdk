@@ -513,7 +513,7 @@
                         labels.
                     </p>
                     <p>
-                        <a href="#" data-scms-signin data-scms-signin-email="demo@streamlinedcms.com" data-scms-signin-password="demo1234">Sign in</a> to enable editing mode, then click
+                        <a href="#" data-scms-signin>Sign in</a> to enable editing mode, then click
                         any outlined element below.
                     </p>
                 </div>
@@ -885,7 +885,7 @@
                     <p>
                         <span data-scms-html="copyright">&copy; 2025 StreamlinedCMS</span>
                         &nbsp;|&nbsp;
-                        <a href="#" data-scms-signin data-scms-signin-email="demo@streamlinedcms.com" data-scms-signin-password="demo1234">Sign In</a>
+                        <a href="#" data-scms-signin>Sign In</a>
                     </p>
                 </div>
             </div>
@@ -952,6 +952,45 @@
                 script.src = 'https://cdn.jsdelivr.net/npm/eruda';
                 script.onload = function() { eruda.init(); };
                 document.body.appendChild(script);
+            })();
+        </script>
+
+        <!-- Demo auto-signin logic -->
+        <script>
+            (function() {
+                var DEMO_EMAIL = 'demo@streamlinedcms.com';
+                var DEMO_PASSWORD = 'demo1234';
+                var FLAG_KEY = 'scms_demo_has_signed_in';
+
+                // Wait for SDK to be available on window
+                document.addEventListener('streamlined-cms:ready', async function() {
+                    // Set flag whenever user signs in (via popup or programmatic)
+                    StreamlinedCMS.on('signin', function() {
+                        localStorage.setItem(FLAG_KEY, 'true');
+                    });
+
+                    // Clear flag on signout
+                    StreamlinedCMS.on('signout', function() {
+                        localStorage.removeItem(FLAG_KEY);
+                    });
+
+                    // Wait for auth to be determined
+                    await StreamlinedCMS.ready('auth');
+
+                    // If not authenticated, check if we should auto sign-in
+                    if (!StreamlinedCMS.isAuthenticated) {
+                        var hasSignedInBefore = localStorage.getItem(FLAG_KEY) === 'true';
+                        if (hasSignedInBefore) {
+                            console.log('[Demo] Auto signing in...');
+                            var result = await StreamlinedCMS.signIn(DEMO_EMAIL, DEMO_PASSWORD);
+                            if (result.success) {
+                                console.log('[Demo] Auto sign-in successful');
+                            } else {
+                                console.warn('[Demo] Auto sign-in failed:', result.error);
+                            }
+                        }
+                    }
+                });
             })();
         </script>
     </body>

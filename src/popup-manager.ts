@@ -17,15 +17,9 @@ export interface PopupConfig {
     appUrl: string; // e.g., 'https://app.streamlinedcms.com'
 }
 
-export interface LoginCredentials {
-    email?: string;
-    password?: string;
-}
-
 /** Methods exposed by the login popup via penpal */
 interface LoginPopupRemote {
     [index: string]: Function;
-    setCredentials(credentials: LoginCredentials): void;
 }
 
 export interface UserRef {
@@ -63,19 +57,8 @@ export class PopupManager {
     /**
      * Open login popup and wait for authentication
      * Returns API key on success, null if user closes popup
-     *
-     * @param credentials - Optional credentials to prepopulate the login form
      */
-    async openLoginPopup(credentials?: LoginCredentials): Promise<string | null> {
-        // Set up credential prepopulation if provided
-        if (credentials && (credentials.email || credentials.password)) {
-            this.loginConnection.setOnConnected((remote) => {
-                remote.setCredentials(credentials);
-            });
-        } else {
-            this.loginConnection.setOnConnected(undefined);
-        }
-
+    async openLoginPopup(): Promise<string | null> {
         return this.loginConnection.open({
             receiveAuthResult: (result: { key: string }) => result.key,
         });

@@ -93,6 +93,16 @@ export default defineConfig({
             {
                 extends: true,
                 test: {
+                    name: "api",
+                    include: ["tests/browser/api/**/*.test.ts"],
+                    browser: {
+                        viewport: { width: 1280, height: 720 },
+                    },
+                },
+            },
+            {
+                extends: true,
+                test: {
                     name: "desktop",
                     include: ["tests/browser/desktop/**/*.test.ts"],
                     browser: {

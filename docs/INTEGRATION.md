@@ -287,3 +287,85 @@ SEO attributes (alt text, title) and accessibility attributes (ARIA labels, role
 The SDK is designed to work on all modern browsers (desktop and mobile).
 
 <!-- TODO: Add specific browser version requirements -->
+
+## JavaScript API
+
+The SDK exposes a `window.StreamlinedCMS` object for programmatic control. Wait for the `streamlined-cms:ready` event before accessing it.
+
+### Waiting for the SDK
+
+```javascript
+document.addEventListener('streamlined-cms:ready', function() {
+    // StreamlinedCMS is now available
+    console.log('SDK version:', StreamlinedCMS.version);
+});
+```
+
+### Lifecycle Stages
+
+Use `ready(stage)` to wait for specific SDK lifecycle stages:
+
+```javascript
+// Wait for SDK to load (default)
+await StreamlinedCMS.ready();
+
+// Wait for authentication status to be determined
+await StreamlinedCMS.ready('auth');
+
+// Wait for editing setup (throws if not authenticated)
+await StreamlinedCMS.ready('editing');
+
+// Wait for cross-origin bridges (throws if not authenticated)
+await StreamlinedCMS.ready('bridges');
+```
+
+**Stages:**
+- `loaded` - SDK module loaded, controller created (default)
+- `auth` - Authentication status determined (check `isAuthenticated` after)
+- `editing` - Editing setup complete (requires authentication)
+- `bridges` - Penpal bridges ready for API calls (requires authentication)
+
+### State Getters
+
+```javascript
+StreamlinedCMS.isAuthenticated  // boolean - whether user is signed in
+StreamlinedCMS.mode             // 'author' | 'viewer' - current editing mode
+StreamlinedCMS.editingEnabled   // boolean - whether editing is active
+StreamlinedCMS.appId            // string - the configured app ID
+StreamlinedCMS.version          // string - SDK version
+```
+
+### Event Hooks
+
+Register handlers for SDK lifecycle events:
+
+```javascript
+function onSignIn() {
+    console.log('User signed in');
+}
+
+function onSignOut() {
+    console.log('User signed out');
+}
+
+// Register handlers
+StreamlinedCMS.on('signin', onSignIn);
+StreamlinedCMS.on('signout', onSignOut);
+
+// Remove a handler when no longer needed
+StreamlinedCMS.off('signin', onSignIn);
+```
+
+### Programmatic Sign-In
+
+For demo sites or custom login flows, you can sign in programmatically:
+
+```javascript
+const result = await StreamlinedCMS.signIn(email, password);
+if (result.success) {
+    console.log('Signed in successfully');
+} else {
+    console.error('Sign-in failed:', result.error);
+}
+```
+
