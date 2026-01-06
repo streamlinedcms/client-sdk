@@ -269,7 +269,7 @@ export class ModalManager {
         const modal = document.createElement("scms-link-editor-modal") as LinkEditorModal;
         modal.elementId = primaryInfo.elementId;
         modal.linkData = {
-            href: primaryAnchor.href,
+            href: primaryAnchor.getAttribute('href') || '',
             target: primaryAnchor.target,
             value: primaryAnchor.innerHTML,
         };
