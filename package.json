@@ -76,6 +76,7 @@
   },
   "dependencies": {
     "@vue/reactivity": "^3.5.26",
+    "driver.js": "^1.4.0",
     "lit": "^3.3.1",
     "loganite": "^0.1.4",
     "penpal": "^7.0.4",

@@ -91,7 +91,7 @@ export class Toolbar extends LitElement {
                 bottom: 0;
                 left: 0;
                 right: 0;
-                z-index: 2147483646;
+                z-index: 10000;
                 font-family:
                     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
                     sans-serif;
@@ -300,6 +300,15 @@ export class Toolbar extends LitElement {
     private handleEditAttributes() {
         this.dispatchEvent(
             new CustomEvent("edit-attributes", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
+    private handleHelp() {
+        this.dispatchEvent(
+            new CustomEvent("help", {
                 bubbles: true,
                 composed: true,
             }),
@@ -598,6 +607,26 @@ export class Toolbar extends LitElement {
         `;
     }
 
+    private renderHelpButton() {
+        return html`
+            <button
+                class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                @click=${this.handleHelp}
+                title="Help"
+                aria-label="Help"
+            >
+                <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
+                </svg>
+            </button>
+        `;
+    }
+
     private renderSaveButton() {
         if (!this.hasChanges) return nothing;
 
@@ -635,7 +664,7 @@ export class Toolbar extends LitElement {
                         ${this.renderAttributesButton()} ${this.renderTemplateControls()}
                     </div>
 
-                    <!-- Right: Save + Sign Out + Admin (separated) -->
+                    <!-- Right: Save + Sign Out + Admin + Help (separated) -->
                     <div class="flex items-center">
                         ${this.renderSaveButton()}
                         ${this.mockAuth
@@ -647,6 +676,7 @@ export class Toolbar extends LitElement {
                                       : html`<span class="mx-2 text-gray-300">|</span>
                                             ${this.renderAdminLink()}`}
                               </div>`}
+                        <div class="ml-3">${this.renderHelpButton()}</div>
                     </div>
                 </div>
             </div>
@@ -928,12 +958,14 @@ export class Toolbar extends LitElement {
     }
 
     private renderMobileSettingsSection() {
-        // When mockAuth is enabled, only show the mode toggle centered
+        // When mockAuth is enabled, only show the mode toggle and help centered
         if (this.mockAuth) {
             return html`
                 <div class="mobile-section">
-                    <div class="flex items-center justify-center">
+                    <div class="flex items-center justify-between">
+                        <div></div>
                         ${this.renderModeToggle()}
+                        ${this.renderHelpButton()}
                     </div>
                 </div>
             `;
@@ -949,30 +981,33 @@ export class Toolbar extends LitElement {
                         Sign Out
                     </button>
                     ${this.renderModeToggle()}
-                    ${this.appUrl && this.appId && !this.denyAppGui
-                        ? html`
-                              <a
-                                  href="${this.appUrl}/apps/${encodeURIComponent(this.appId)}"
-                                  target="_blank"
-                                  class="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors inline-flex items-center gap-1"
-                              >
-                                  Admin
-                                  <svg
-                                      class="w-3 h-3"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
+                    <div class="flex items-center gap-2">
+                        ${this.appUrl && this.appId && !this.denyAppGui
+                            ? html`
+                                  <a
+                                      href="${this.appUrl}/apps/${encodeURIComponent(this.appId)}"
+                                      target="_blank"
+                                      class="px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors inline-flex items-center gap-1"
                                   >
-                                      <path
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                          stroke-width="2"
-                                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                                      />
-                                  </svg>
-                              </a>
-                          `
-                        : html`<div></div>`}
+                                      Admin
+                                      <svg
+                                          class="w-3 h-3"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                      >
+                                          <path
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                              stroke-width="2"
+                                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                          />
+                                      </svg>
+                                  </a>
+                              `
+                            : nothing}
+                        ${this.renderHelpButton()}
+                    </div>
                 </div>
             </div>
         `;

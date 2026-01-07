@@ -85,6 +85,7 @@ import { AuthManager } from "./auth-manager.js";
 import { AuthBridge } from "./auth-bridge.js";
 import { injectEditStyles } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
+import { TourManager, getTourDefinitions } from "./tours/index.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -133,6 +134,7 @@ class EditorController {
     private modalManager: ModalManager;
     private saveManager: SaveManager;
     private authManager: AuthManager;
+    private tourManager: TourManager;
     // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Double-tap delay constant
@@ -318,6 +320,9 @@ class EditorController {
                 emitSignOut: () => this.emit("signout"),
             },
         );
+
+        // Initialize tour manager
+        this.tourManager = new TourManager();
     }
 
     /**
@@ -908,6 +913,10 @@ class EditorController {
             this.templateManager.handleMoveInstanceDown();
         });
 
+        toolbar.addEventListener("help", () => {
+            this.handleHelp();
+        });
+
         document.body.appendChild(toolbar);
         this.state.toolbar = toolbar;
 
@@ -973,7 +982,7 @@ class EditorController {
                     gap: 10px;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     font-size: 14px;
-                    z-index: 2147483646;
+                    z-index: 10000;
                     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
                     border-top: 1px solid #e5e7eb;
                 }
@@ -1179,6 +1188,157 @@ class EditorController {
             return { uploaded: [], errors: [{ src: "", error: "Media manager not initialized" }] };
         }
         return this.state.mediaManagerModal.uploadAllImages();
+    }
+
+    /**
+     * Start a guided tour.
+     *
+     * Available tours:
+     * - 'welcome': First-time onboarding tour
+     * - 'text-editing': How to edit text elements
+     * - 'image-editing': How to change images
+     * - 'templates': How to work with repeating templates
+     *
+     * @example
+     * StreamlinedCMS.startTour('welcome');
+     */
+    public startTour(tourId: string): void {
+        // Fire and forget - tour loading is async but we don't need to wait
+        this.tourManager.startTour(tourId);
+    }
+
+    /**
+     * Stop the currently active tour, if any.
+     */
+    public stopTour(): void {
+        this.tourManager.stopTour();
+    }
+
+    /**
+     * Handle help button click - show available tours
+     */
+    private handleHelp(): void {
+        this.showHelpPanel();
+    }
+
+    /**
+     * Show a panel with available tours
+     */
+    private async showHelpPanel(): Promise<void> {
+        // Remove existing panel if present
+        const existingPanel = document.getElementById("scms-help-panel");
+        if (existingPanel) {
+            existingPanel.remove();
+            return;
+        }
+
+        const panel = document.createElement("div");
+        panel.id = "scms-help-panel";
+        panel.style.cssText = `
+            position: fixed;
+            bottom: 60px;
+            right: 16px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            padding: 16px;
+            z-index: 10001;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            min-width: 220px;
+        `;
+
+        const title = document.createElement("div");
+        title.style.cssText = `
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 12px;
+            color: #374151;
+        `;
+        title.textContent = "Guided Tours";
+        panel.appendChild(title);
+
+        // Show loading state
+        const loading = document.createElement("div");
+        loading.style.cssText = `
+            font-size: 13px;
+            color: #6b7280;
+            padding: 8px 0;
+        `;
+        loading.textContent = "Loading tours...";
+        panel.appendChild(loading);
+
+        // Add close button and append panel immediately
+        const closeBtn = document.createElement("button");
+        closeBtn.style.cssText = `
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            color: #9ca3af;
+            font-size: 18px;
+            line-height: 1;
+        `;
+        closeBtn.innerHTML = "&times;";
+        closeBtn.addEventListener("click", () => panel.remove());
+        panel.appendChild(closeBtn);
+
+        document.body.appendChild(panel);
+
+        // Close on click outside
+        const closeOnOutsideClick = (e: MouseEvent) => {
+            if (!panel.contains(e.target as Node)) {
+                panel.remove();
+                document.removeEventListener("click", closeOnOutsideClick);
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener("click", closeOnOutsideClick);
+        }, 0);
+
+        // Load tours asynchronously
+        const tourDefs = await getTourDefinitions();
+
+        // Remove loading indicator
+        loading.remove();
+
+        tourDefs.forEach((tour) => {
+            const button = document.createElement("button");
+            button.style.cssText = `
+                display: block;
+                width: 100%;
+                text-align: left;
+                padding: 10px 12px;
+                margin-bottom: 8px;
+                border: 1px solid #e5e7eb;
+                border-radius: 6px;
+                background: #f9fafb;
+                cursor: pointer;
+                transition: all 0.15s;
+            `;
+            button.innerHTML = `
+                <div style="font-weight: 500; font-size: 13px; color: #374151;">${tour.label}</div>
+                <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">${tour.description}</div>
+            `;
+            button.addEventListener("mouseenter", () => {
+                button.style.background = "#f3f4f6";
+                button.style.borderColor = "#d1d5db";
+            });
+            button.addEventListener("mouseleave", () => {
+                button.style.background = "#f9fafb";
+                button.style.borderColor = "#e5e7eb";
+            });
+            button.addEventListener("click", () => {
+                panel.remove();
+                document.removeEventListener("click", closeOnOutsideClick);
+                this.startTour(tour.id);
+            });
+            // Insert before close button
+            panel.insertBefore(button, closeBtn);
+        });
     }
 }
 

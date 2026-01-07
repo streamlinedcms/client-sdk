@@ -100,13 +100,15 @@ export default [
             terserPlugin,
         ],
     },
-    // ESM bundle - unminified
+    // ESM bundle - unminified (with code splitting for lazy-loaded tours)
     {
         input: "src/lazy/index.ts",
         output: {
-            file: "dist/streamlined-cms.esm.js",
+            dir: "dist",
             format: "es",
             sourcemap: true,
+            entryFileNames: "streamlined-cms.esm.js",
+            chunkFileNames: "streamlined-cms.[name].js",
         },
         plugins: [
             replacePlugin,
@@ -119,13 +121,15 @@ export default [
             }),
         ],
     },
-    // ESM bundle - minified
+    // ESM bundle - minified (with code splitting for lazy-loaded tours)
     {
         input: "src/lazy/index.ts",
         output: {
-            file: "dist/streamlined-cms.esm.min.js",
+            dir: "dist",
             format: "es",
             sourcemap: true,
+            entryFileNames: "streamlined-cms.esm.min.js",
+            chunkFileNames: "streamlined-cms.[name].min.js",
         },
         plugins: [
             replacePlugin,
