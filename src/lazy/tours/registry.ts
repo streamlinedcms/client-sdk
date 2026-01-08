@@ -11,27 +11,38 @@ import { textEditingTour } from "./text-editing";
 import { imageEditingTour } from "./image-editing";
 import { linkEditingTour } from "./link-editing";
 import { templatesTour } from "./templates";
-import { seoTour } from "./seo";
 import { modeToggleTour } from "./mode-toggle";
+import { seoTour } from "./seo";
+import { accessibilityTour } from "./accessibility";
+import { attributesTour } from "./attributes";
 
 /**
- * All available tours
+ * All available tours in display order
  */
-export const tours = {
-    welcome: welcomeTour,
-    "text-editing": textEditingTour,
-    "image-editing": imageEditingTour,
-    "link-editing": linkEditingTour,
-    templates: templatesTour,
-    seo: seoTour,
-    "mode-toggle": modeToggleTour,
-} as const;
-
-export type TourId = keyof typeof tours;
+const tourList: TourDefinition[] = [
+    welcomeTour,
+    textEditingTour,
+    imageEditingTour,
+    linkEditingTour,
+    templatesTour,
+    modeToggleTour,
+    seoTour,
+    accessibilityTour,
+    attributesTour,
+];
 
 /**
- * Get all tour definitions (for help panel)
+ * Tours indexed by ID for lookup
+ */
+export const tours: Record<string, TourDefinition> = Object.fromEntries(
+    tourList.map((tour) => [tour.id, tour])
+);
+
+export type TourId = (typeof tourList)[number]["id"];
+
+/**
+ * Get all tour definitions in display order (for help panel)
  */
 export function getTourDefinitions(): TourDefinition[] {
-    return Object.values(tours);
+    return tourList;
 }

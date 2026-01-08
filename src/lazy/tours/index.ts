@@ -322,7 +322,7 @@ export class TourManager {
      */
     async startTour(tourId: string): Promise<void> {
         const registry = await loadRegistry();
-        const tourDef = registry.tours[tourId as keyof typeof registry.tours];
+        const tourDef = registry.tours[tourId];
 
         if (!tourDef) {
             console.warn(`[TourManager] Unknown tour: ${tourId}`);

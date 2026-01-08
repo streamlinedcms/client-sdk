@@ -1,25 +1,24 @@
 /**
- * SEO Tour - Learn how to optimize content for search engines
+ * Custom Attributes Tour - Learn how to add custom data attributes
  */
 
 import type { TourDefinition, TourStep, TourContext } from "../types";
 import { selectElementStep, repositionPopoverTop, getSaveButtonOrToolbar, observeElementRemoved } from "../common";
-import { clickMoreStep, clickSeoInMenuStep } from "./desktop";
-import { expandToolbarStepMobile, openMetadataSectionStepMobile, tapSeoStepMobile } from "./mobile";
+import { clickMoreStep, clickAttributesInMenuStep } from "./desktop";
+import { expandToolbarStepMobile, openMetadataSectionStepMobile, tapAttributesStepMobile } from "./mobile";
 
 /**
- * Step explaining the SEO modal fields
+ * Step explaining the attributes modal
  * Auto-advances when modal is closed (user clicks Apply or Cancel)
  */
-function explainFieldsStep(ctx: TourContext): TourStep {
+function explainModalStep(ctx: TourContext): TourStep {
     const action = ctx.isMobile ? "Tap" : "Click";
     return {
-        element: () => document.querySelector("scms-seo-modal") as HTMLElement,
+        element: () => document.querySelector("scms-attributes-modal") as HTMLElement,
         popover: {
-            title: "SEO Attributes",
+            title: "Custom Attributes",
             description:
-                "<strong>Alt Text</strong> - Describes images for screen readers and search engines.<br><br>" +
-                "<strong>Title</strong> - Shows as a tooltip on hover.<br><br>" +
+                "Add custom data attributes like <strong>data-tracking</strong> or <strong>data-category</strong>. " +
                 `${action} "Apply" when done.`,
             side: "top",
             align: "center",
@@ -28,7 +27,7 @@ function explainFieldsStep(ctx: TourContext): TourStep {
         onHighlighted: () => {
             repositionPopoverTop();
 
-            const observer = observeElementRemoved("scms-seo-modal", {
+            const observer = observeElementRemoved("scms-attributes-modal", {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
                     setTimeout(() => ctx.moveNext(), 200);
@@ -56,29 +55,28 @@ function saveStep(ctx: TourContext): TourStep {
     };
 }
 
-export const seoTour: TourDefinition = {
-    id: "seo",
-    label: "How do I improve SEO?",
-    description: "Optimize for search engines",
+export const attributesTour: TourDefinition = {
+    id: "attributes",
+    label: "How do I add custom attributes?",
+    description: "Add data attributes for tracking and integrations",
 
     getSteps: (ctx: TourContext) => {
         return [
-            // Select an element (prefer image for SEO context)
+            // Select an element
             selectElementStep(ctx, {
-                preferImage: true,
                 title: "Select an Element",
                 description: ctx.isMobile
-                    ? "Tap on this element to select it. Images are ideal for SEO attributes like alt text."
-                    : "Click on this element to select it. Images are ideal for SEO attributes like alt text.",
+                    ? "Tap on this element to select it."
+                    : "Click on this element to select it.",
             }),
 
-            // Open the SEO modal
+            // Open the attributes modal
             ...(ctx.isMobile
-                ? [expandToolbarStepMobile(ctx), openMetadataSectionStepMobile(ctx), tapSeoStepMobile(ctx)]
-                : [clickMoreStep(ctx), clickSeoInMenuStep(ctx)]),
+                ? [expandToolbarStepMobile(ctx), openMetadataSectionStepMobile(ctx), tapAttributesStepMobile(ctx)]
+                : [clickMoreStep(ctx), clickAttributesInMenuStep(ctx)]),
 
-            // Explain the modal fields (auto-advances when closed)
-            explainFieldsStep(ctx),
+            // Explain the modal (auto-advances when closed)
+            explainModalStep(ctx),
 
             // Save to toolbar
             saveStep(ctx),

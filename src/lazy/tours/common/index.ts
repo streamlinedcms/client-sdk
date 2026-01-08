@@ -358,16 +358,21 @@ export function selectElementStep(ctx: TourContext, options: SelectElementOption
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            // Watch for selection/editing class to be added to any element
+            // Watch for selection/editing class to be added
             // Desktop: goes straight to .streamlined-editing
             // Mobile: first tap adds .streamlined-selected, second adds .streamlined-editing
-            const observer = observeClassAdded(["streamlined-selected", "streamlined-editing"], {
-                onMatch: () => {
-                    ctx.untrackObserver(observer);
-                    // Delay to let toolbar re-render with element-specific buttons
-                    setTimeout(() => ctx.moveNext(), 300);
-                },
-            });
+            const classes = ["streamlined-selected", "streamlined-editing"];
+            const onMatch = () => {
+                ctx.untrackObserver(observer);
+                // Delay to let toolbar re-render with element-specific buttons
+                setTimeout(() => ctx.moveNext(), 300);
+            };
+
+            // If preferImage and images exist, only advance when an image is selected
+            const requireImage = preferImage && document.querySelector("[data-scms-image]");
+            const observer = requireImage
+                ? observeClassAddedOnSelector("[data-scms-image]", classes, { onMatch })
+                : observeClassAdded(classes, { onMatch });
             ctx.trackObserver(observer);
         },
     };

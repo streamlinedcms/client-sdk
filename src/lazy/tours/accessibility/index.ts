@@ -1,25 +1,25 @@
 /**
- * SEO Tour - Learn how to optimize content for search engines
+ * Accessibility Tour - Learn how to improve accessibility for screen readers
  */
 
 import type { TourDefinition, TourStep, TourContext } from "../types";
 import { selectElementStep, repositionPopoverTop, getSaveButtonOrToolbar, observeElementRemoved } from "../common";
-import { clickMoreStep, clickSeoInMenuStep } from "./desktop";
-import { expandToolbarStepMobile, openMetadataSectionStepMobile, tapSeoStepMobile } from "./mobile";
+import { clickMoreStep, clickAccessibilityInMenuStep } from "./desktop";
+import { expandToolbarStepMobile, openMetadataSectionStepMobile, tapAccessibilityStepMobile } from "./mobile";
 
 /**
- * Step explaining the SEO modal fields
+ * Step explaining the accessibility modal fields
  * Auto-advances when modal is closed (user clicks Apply or Cancel)
  */
 function explainFieldsStep(ctx: TourContext): TourStep {
     const action = ctx.isMobile ? "Tap" : "Click";
     return {
-        element: () => document.querySelector("scms-seo-modal") as HTMLElement,
+        element: () => document.querySelector("scms-accessibility-modal") as HTMLElement,
         popover: {
-            title: "SEO Attributes",
+            title: "Accessibility Attributes",
             description:
-                "<strong>Alt Text</strong> - Describes images for screen readers and search engines.<br><br>" +
-                "<strong>Title</strong> - Shows as a tooltip on hover.<br><br>" +
+                "<strong>ARIA Label</strong> - Provides an accessible name for screen readers.<br><br>" +
+                "<strong>Described By</strong> - References another element with a longer description.<br><br>" +
                 `${action} "Apply" when done.`,
             side: "top",
             align: "center",
@@ -28,7 +28,7 @@ function explainFieldsStep(ctx: TourContext): TourStep {
         onHighlighted: () => {
             repositionPopoverTop();
 
-            const observer = observeElementRemoved("scms-seo-modal", {
+            const observer = observeElementRemoved("scms-accessibility-modal", {
                 onMatch: () => {
                     ctx.untrackObserver(observer);
                     setTimeout(() => ctx.moveNext(), 200);
@@ -56,26 +56,25 @@ function saveStep(ctx: TourContext): TourStep {
     };
 }
 
-export const seoTour: TourDefinition = {
-    id: "seo",
-    label: "How do I improve SEO?",
-    description: "Optimize for search engines",
+export const accessibilityTour: TourDefinition = {
+    id: "accessibility",
+    label: "How do I improve accessibility?",
+    description: "Add ARIA labels and roles for screen readers",
 
     getSteps: (ctx: TourContext) => {
         return [
-            // Select an element (prefer image for SEO context)
+            // Select an element
             selectElementStep(ctx, {
-                preferImage: true,
                 title: "Select an Element",
                 description: ctx.isMobile
-                    ? "Tap on this element to select it. Images are ideal for SEO attributes like alt text."
-                    : "Click on this element to select it. Images are ideal for SEO attributes like alt text.",
+                    ? "Tap on this element to select it."
+                    : "Click on this element to select it.",
             }),
 
-            // Open the SEO modal
+            // Open the accessibility modal
             ...(ctx.isMobile
-                ? [expandToolbarStepMobile(ctx), openMetadataSectionStepMobile(ctx), tapSeoStepMobile(ctx)]
-                : [clickMoreStep(ctx), clickSeoInMenuStep(ctx)]),
+                ? [expandToolbarStepMobile(ctx), openMetadataSectionStepMobile(ctx), tapAccessibilityStepMobile(ctx)]
+                : [clickMoreStep(ctx), clickAccessibilityInMenuStep(ctx)]),
 
             // Explain the modal fields (auto-advances when closed)
             explainFieldsStep(ctx),
