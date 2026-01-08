@@ -37,8 +37,8 @@ function templateInstanceStep(ctx: TourContext): TourStep | null {
         popover: {
             title: "Template Items",
             description: ctx.isMobile
-                ? "Each item can be edited independently. Tap to select, then use the menu to manage."
-                : "Each item can be edited independently. Click to select, then use the toolbar to manage.",
+                ? "Each item can be edited independently. Tap to select, then use the toolbar to manage."
+                : "Each item can be edited independently. Click to select, then use the Template dropdown to manage.",
             side: "bottom",
             align: "center",
         },
@@ -48,13 +48,14 @@ function templateInstanceStep(ctx: TourContext): TourStep | null {
 /**
  * Step about template controls in toolbar
  */
-function templateControlsStep(_ctx: TourContext): TourStep {
+function templateControlsStep(ctx: TourContext): TourStep {
     return {
         element: "scms-toolbar",
         popover: {
             title: "Template Controls",
-            description:
-                "With a template item selected, use the toolbar to add new items, delete, or reorder.",
+            description: ctx.isMobile
+                ? "With a template item selected, expand the toolbar to access the Template Item section where you can add, delete, or reorder."
+                : "With a template item selected, use the Template dropdown to add new items, delete, or reorder.",
             side: "top",
             align: "center",
         },

@@ -5,19 +5,19 @@
  * Shows an empty state when no element is selected.
  */
 
-import { LitElement, html } from "lit";
+import { html } from "lit";
 import { customElement, property } from "lit/decorators.js";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 
 @customElement("scms-element-badge")
-export class ElementBadge extends LitElement {
+export class ElementBadge extends ScmsElement {
     @property({ type: String, attribute: "element-id" })
     elementId: string | null = null;
 
     @property({ type: String, attribute: "element-type" })
     elementType: string | null = null;
 
-    static styles = [tailwindSheet];
+    static styles = [...ScmsElement.styles];
 
     private renderTypeIcon() {
         const iconClass = "w-3.5 h-3.5 text-gray-500 shrink-0";

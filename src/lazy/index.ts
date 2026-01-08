@@ -667,8 +667,8 @@ class EditorController {
             }
         }
 
-        // Don't deselect if clicking inside the toolbar
-        if (this.state.toolbar?.contains(target)) {
+        // Don't deselect if clicking inside any SCMS component (toolbar, modals, panels, etc.)
+        if ((target as Element).closest?.(".scms-component")) {
             return;
         }
 

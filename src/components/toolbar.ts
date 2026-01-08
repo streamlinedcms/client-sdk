@@ -9,7 +9,7 @@
  * Secondary actions (collapsible on mobile): Mode toggle, Edit HTML, Sign Out
  */
 
-import { LitElement, html, css, nothing } from "lit";
+import { html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import {
@@ -21,7 +21,7 @@ import {
     Plus,
     Trash2,
 } from "lucide-static";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 import type { EditorMode } from "./mode-toggle.js";
 import "./mode-toggle.js";
 import "./element-badge.js";
@@ -32,7 +32,7 @@ import "./dropdown-menu.js";
 export type { EditorMode };
 
 @customElement("scms-toolbar")
-export class Toolbar extends LitElement {
+export class Toolbar extends ScmsElement {
     @property({ type: String })
     mode: EditorMode = "viewer";
 
@@ -82,8 +82,8 @@ export class Toolbar extends LitElement {
     @property({ type: Boolean, attribute: "structure-mismatch" })
     structureMismatch = false;
 
-    @state()
-    private expanded = false;
+    @property({ type: Boolean, reflect: true })
+    expanded = false;
 
     @state()
     private isMobile = false;
@@ -96,7 +96,7 @@ export class Toolbar extends LitElement {
     private static readonly STORAGE_KEY = "scms-toolbar-collapsed-sections";
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             :host {
                 position: fixed;

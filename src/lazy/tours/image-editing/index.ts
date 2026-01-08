@@ -38,7 +38,7 @@ function changeImageStep(ctx: TourContext): TourStep | null {
         popover: {
             title: "Changing Images",
             description: ctx.isMobile
-                ? 'Double-tap or use "Change Image" in the menu to open the media library.'
+                ? 'Double-tap or use "Change Image" in the toolbar to open the media library.'
                 : 'Double-click or use "Change Image" in the toolbar to open the media library.',
             side: "bottom",
             align: "center",
@@ -49,13 +49,14 @@ function changeImageStep(ctx: TourContext): TourStep | null {
 /**
  * Step about image options in toolbar
  */
-function imageOptionsStep(_ctx: TourContext): TourStep {
+function imageOptionsStep(ctx: TourContext): TourStep {
     return {
         element: "scms-toolbar",
         popover: {
             title: "Image Options",
-            description:
-                "The toolbar provides options for SEO (alt text), accessibility, and more.",
+            description: ctx.isMobile
+                ? "Expand the toolbar and use the Metadata section for SEO (alt text), accessibility, and more."
+                : "Use the 'More' dropdown in the toolbar for SEO (alt text), accessibility, and more.",
             side: "top",
             align: "center",
         },

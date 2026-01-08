@@ -5,14 +5,14 @@
  * Supports both dropdown (down) and dropup (up) directions.
  */
 
-import { LitElement, html, css } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, css } from "lit";
+import { customElement, property } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import { ChevronUp, ChevronDown } from "lucide-static";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 
 @customElement("scms-dropdown-menu")
-export class DropdownMenu extends LitElement {
+export class DropdownMenu extends ScmsElement {
     @property({ type: String })
     label = "";
 
@@ -25,14 +25,14 @@ export class DropdownMenu extends LitElement {
     @property({ type: Boolean })
     disabled = false;
 
-    @state()
-    private open = false;
+    @property({ type: Boolean, reflect: true })
+    open = false;
 
     private clickOutsideHandler: ((e: MouseEvent) => void) | null = null;
     private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             :host {
                 position: relative;

@@ -5,15 +5,15 @@
  * Positioned above the toolbar in the bottom-right corner.
  */
 
-import { LitElement, html, css } from "lit";
+import { html, css } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import { X } from "lucide-static";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 import type { TourDefinition } from "../lazy/tours/types.js";
 
 @customElement("scms-help-panel")
-export class HelpPanel extends LitElement {
+export class HelpPanel extends ScmsElement {
     @property({ type: Array })
     tours: TourDefinition[] = [];
 
@@ -21,7 +21,7 @@ export class HelpPanel extends LitElement {
     loading = true;
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             :host {
                 position: fixed;

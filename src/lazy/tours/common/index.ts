@@ -41,6 +41,46 @@ export function observeElementAppears(selector: string, options: ObserverOptions
 }
 
 /**
+ * Creates a MutationObserver that watches for an attribute to be added to a specific element
+ */
+export function observeAttributeAdded(
+    element: Element,
+    attributeName: string,
+    options: ObserverOptions
+): MutationObserver {
+    const { onMatch, timeout, onTimeout } = options;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+    const observer = new MutationObserver(() => {
+        if (element.hasAttribute(attributeName)) {
+            observer.disconnect();
+            if (timeoutId) clearTimeout(timeoutId);
+            onMatch();
+        }
+    });
+
+    // Check if already has attribute
+    if (element.hasAttribute(attributeName)) {
+        setTimeout(onMatch, 0);
+        return observer;
+    }
+
+    observer.observe(element, {
+        attributes: true,
+        attributeFilter: [attributeName],
+    });
+
+    if (timeout && onTimeout) {
+        timeoutId = setTimeout(() => {
+            observer.disconnect();
+            onTimeout();
+        }, timeout);
+    }
+
+    return observer;
+}
+
+/**
  * Creates a MutationObserver that watches for any element to gain one of the specified classes
  */
 export function observeClassAdded(classNames: string[], options: ObserverOptions): MutationObserver {

@@ -5,12 +5,12 @@
  * Shows a visual progress indicator while holding.
  */
 
-import { LitElement, html, css } from "lit";
+import { html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 
 @customElement("scms-hold-button")
-export class HoldButton extends LitElement {
+export class HoldButton extends ScmsElement {
     @property({ type: String })
     label = "Hold";
 
@@ -25,7 +25,7 @@ export class HoldButton extends LitElement {
     private startTime = 0;
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             button {
                 cursor: pointer;

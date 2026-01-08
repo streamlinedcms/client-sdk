@@ -17,3 +17,30 @@ export const desktopOverrides: Record<string, StepOverrides> = {
             "The toolbar shows actions for the selected element. Save your changes here when done.",
     },
 };
+
+/**
+ * Helper to get a dropdown menu element from toolbar's shadow DOM by label
+ */
+export function getToolbarDropdown(label: string): HTMLElement | null {
+    const toolbar = document.querySelector("scms-toolbar");
+    return toolbar?.shadowRoot?.querySelector(
+        `scms-dropdown-menu[label="${label}"]`
+    ) as HTMLElement | null;
+}
+
+/**
+ * Helper to get the open dropdown menu content (the popup menu, not the button)
+ * Returns the menu content div when open, or the dropdown element if closed
+ */
+export function getOpenDropdownMenu(label: string): HTMLElement | null {
+    const dropdown = getToolbarDropdown(label);
+    if (!dropdown) return null;
+
+    // When open, get the menu content div (absolutely positioned child)
+    // This is inside the dropdown's shadow DOM
+    const menuContent = dropdown.shadowRoot?.querySelector(
+        "div.absolute"
+    ) as HTMLElement | null;
+
+    return menuContent || dropdown;
+}

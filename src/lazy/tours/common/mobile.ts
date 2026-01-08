@@ -10,6 +10,6 @@ export const mobileOverrides: Record<string, StepOverrides> = {
     },
     toolbar: {
         description:
-            "Tap the gear icon to access more options. Save your changes when done.",
+            "Tap the toolbar to expand it and see more options. Save your changes when done.",
     },
 };

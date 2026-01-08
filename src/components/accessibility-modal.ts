@@ -6,9 +6,9 @@
  * Fields are shown based on relevance to the element type.
  */
 
-import { LitElement, html, css, nothing } from "lit";
+import { html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 import type { EditableType, ElementAttributes } from "../types.js";
 
 interface FieldConfig {
@@ -110,7 +110,7 @@ const ACCESSIBILITY_FIELDS: FieldConfig[] = [
 ];
 
 @customElement("scms-accessibility-modal")
-export class AccessibilityModal extends LitElement {
+export class AccessibilityModal extends ScmsElement {
     @property({ type: String, attribute: "element-id" })
     elementId: string | null = null;
 
@@ -127,7 +127,7 @@ export class AccessibilityModal extends LitElement {
     private showNotApplicable = false;
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             :host {
                 position: fixed;

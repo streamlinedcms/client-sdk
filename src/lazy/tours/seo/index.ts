@@ -3,9 +3,9 @@
  */
 
 import type { TourDefinition, TourStep, TourContext } from "../types";
-import { selectElementStep, waitForModalStep } from "../common";
-import { desktopSteps } from "./desktop";
-import { mobileSteps } from "./mobile";
+import { selectElementStep } from "../common";
+import { desktopSteps, clickMoreStep, clickSeoInMenuStep } from "./desktop";
+import { mobileSteps, expandToolbarStepMobile, tapSeoStepMobile } from "./mobile";
 
 /**
  * Step explaining the SEO modal fields
@@ -51,23 +51,22 @@ export const seoTour: TourDefinition = {
         const platformSteps = ctx.isMobile ? mobileSteps(ctx) : desktopSteps(ctx);
 
         return [
-            // Step 1: Select an element (prefer image for SEO context)
+            // Select an element (prefer image for SEO context)
             selectElementStep(ctx, {
                 preferImage: true,
-                title: "Step 1: Select an Element",
-                description:
-                    "Click on this element to select it. Images are ideal for SEO attributes like alt text.",
+                title: "Select an Element",
+                description: ctx.isMobile
+                    ? "Tap on this element to select it. Images are ideal for SEO attributes like alt text."
+                    : "Click on this element to select it. Images are ideal for SEO attributes like alt text.",
             }),
 
-            // Step 2: Open the SEO modal
-            waitForModalStep(ctx, {
-                selector: "scms-seo-modal",
-                title: "Step 2: Open SEO Settings",
-                description: 'Click the "SEO" button in the toolbar.',
-                mobileDescription: 'Tap the gear icon to open the menu, then tap "SEO".',
-            }),
+            // Open the SEO modal
+            // Both platforms have two steps to guide through the UI
+            ...(ctx.isMobile
+                ? [expandToolbarStepMobile(ctx), tapSeoStepMobile(ctx)]
+                : [clickMoreStep(ctx), clickSeoInMenuStep(ctx)]),
 
-            // Step 3: Explain the modal fields (shared)
+            // Explain the modal fields (shared)
             explainFieldsStep(ctx),
 
             // Platform-specific steps (desktop has extra detail)

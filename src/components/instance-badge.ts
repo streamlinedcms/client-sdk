@@ -5,21 +5,21 @@
  * Shows an empty state when no instance is selected.
  */
 
-import { LitElement, html, nothing } from "lit";
+import { html, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
 import { Layers } from "lucide-static";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 
 @customElement("scms-instance-badge")
-export class InstanceBadge extends LitElement {
+export class InstanceBadge extends ScmsElement {
     @property({ type: Number, attribute: "instance-index" })
     instanceIndex: number | null = null;
 
     @property({ type: Number, attribute: "instance-count" })
     instanceCount: number | null = null;
 
-    static styles = [tailwindSheet];
+    static styles = [...ScmsElement.styles];
 
     render() {
         if (this.instanceIndex === null || this.instanceCount === null) {

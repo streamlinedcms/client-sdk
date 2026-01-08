@@ -59,7 +59,7 @@ function linkElementStep(ctx: TourContext): TourStep | null {
         popover: {
             title: "Editable Links",
             description: ctx.isMobile
-                ? "Tap a link to select it, then use 'Edit Link' in the menu to change the URL or text."
+                ? "Tap a link to select it, then use 'Edit Link' in the toolbar to change the URL or text."
                 : "Click a link to select it, then use 'Edit Link' in the toolbar to change the URL or text.",
             side: "bottom",
             align: "start",

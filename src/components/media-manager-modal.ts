@@ -8,10 +8,10 @@
  * - Persistent connection
  */
 
-import { LitElement, html, css } from "lit";
+import { html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { WindowMessenger, connect } from "penpal";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 import type { MediaFile } from "../popup-manager.js";
 import { IMAGE_PLACEHOLDER_DATA_URI } from "../types.js";
 
@@ -67,7 +67,7 @@ interface MediaManagerMethods {
 }
 
 @customElement("scms-media-manager-modal")
-export class MediaManagerModal extends LitElement {
+export class MediaManagerModal extends ScmsElement {
     @property({ type: Boolean, reflect: true })
     open = false;
 
@@ -102,7 +102,7 @@ export class MediaManagerModal extends LitElement {
     private selectingMedia = false;
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             :host {
                 position: fixed;

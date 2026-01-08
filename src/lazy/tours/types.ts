@@ -1,5 +1,24 @@
 /**
  * Tour type definitions
+ *
+ * FILE ORGANIZATION FOR TOURS:
+ * Each tour has its own folder with three files:
+ *   - index.ts: Main tour definition with shared steps and getSteps() that assembles the tour
+ *   - desktop.ts: Desktop-specific steps (e.g., steps that reference dropdowns, hover interactions)
+ *   - mobile.ts: Mobile-specific steps (e.g., steps that reference expanded toolbar drawer)
+ *
+ * GUIDELINES:
+ * - Put shared steps (same on both platforms) in index.ts
+ * - Put platform-specific steps in desktop.ts or mobile.ts, then import/use in index.ts
+ * - Use ctx.isMobile to conditionally include different steps in getSteps()
+ * - For text differences only (e.g., "click" vs "tap"), use ternary in the step itself
+ * - For structural differences (different element targets, different observers), use separate step functions
+ *
+ * AUTO-ADVANCE PATTERN:
+ * Use onHighlighted + MutationObserver to auto-advance when user completes an action:
+ * - observeClassAdded(): Watch for element to gain a class (e.g., "streamlined-editing")
+ * - observeElementAppears(): Watch for element to appear in DOM (e.g., modal opens)
+ * Always call ctx.trackObserver() and ctx.untrackObserver() for cleanup.
  */
 
 /**

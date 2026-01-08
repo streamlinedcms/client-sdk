@@ -7,6 +7,7 @@
 
 import { driver, type Driver, type DriveStep } from "driver.js";
 import driverCss from "driver.js/dist/driver.css";
+import { GripHorizontal } from "lucide-static";
 import type { TourDefinition, TourStep, TourContext } from "./types";
 
 // Re-export types
@@ -140,6 +141,24 @@ export class TourManager {
             .driver-popover.scms-tour-popover .driver-popover-close-btn:hover {
                 color: #4b5563 !important;
             }
+            .driver-popover.scms-tour-popover .scms-drag-handle {
+                display: flex;
+                justify-content: center;
+                padding: 2px 0 6px 0;
+                cursor: grab;
+                user-select: none;
+                color: #d1d5db;
+            }
+            .driver-popover.scms-tour-popover .scms-drag-handle:hover {
+                color: #9ca3af;
+            }
+            .driver-popover.scms-tour-popover .scms-drag-handle:active {
+                cursor: grabbing;
+            }
+            .driver-popover.scms-tour-popover .scms-drag-handle svg {
+                width: 20px;
+                height: 20px;
+            }
         `;
 
         const style = document.createElement("style");
@@ -147,6 +166,59 @@ export class TourManager {
         style.textContent = driverCss + customCss;
         document.head.appendChild(style);
         this.cssInjected = true;
+    }
+
+    /**
+     * Inject pointer-events CSS into shadow roots to enable interaction
+     * with highlighted elements inside shadow DOM.
+     *
+     * PROBLEM:
+     * Driver.js adds the `.driver-active-element` class to highlighted elements
+     * and uses global CSS to restore interactivity:
+     *
+     *   .driver-active .driver-active-element,
+     *   .driver-active .driver-active-element * {
+     *       pointer-events: auto;
+     *   }
+     *
+     * However, global CSS cannot pierce shadow DOM boundaries, so elements
+     * highlighted inside shadow DOM remain unclickable.
+     *
+     * WHY ANCESTOR INJECTION:
+     * The `pointer-events` CSS property is inherited. Driver.js also sets
+     * `.driver-active * { pointer-events: none }` on the document, which
+     * applies to shadow host elements in the light DOM. Shadow DOM children
+     * inherit this value, so even if we inject CSS into one shadow root,
+     * an ancestor shadow host with `pointer-events: none` would still block
+     * clicks from reaching the highlighted element.
+     *
+     * SOLUTION:
+     * Walk up the entire ancestor chain and inject the CSS rule into every
+     * shadow root we encounter. This ensures the highlighted element and all
+     * its shadow DOM ancestors have `pointer-events: auto` applied.
+     */
+    private injectShadowDomStyles(element: Element): void {
+        const styleId = "driver-shadow-fix";
+        const css = `
+            .driver-active-element,
+            .driver-active-element * {
+                pointer-events: auto !important;
+            }
+        `;
+
+        // Walk up the tree and inject into all shadow roots
+        let node: Node | null = element;
+        while (node) {
+            const root = node.getRootNode();
+            if (root instanceof ShadowRoot && !root.getElementById(styleId)) {
+                const style = document.createElement("style");
+                style.id = styleId;
+                style.textContent = css;
+                root.appendChild(style);
+            }
+            // Move to the shadow host's parent to continue up the tree
+            node = root instanceof ShadowRoot ? root.host : null;
+        }
     }
 
     /**
@@ -218,17 +290,7 @@ export class TourManager {
      * Convert TourStep to Driver.js DriveStep
      */
     private toDriverStep(step: TourStep): DriveStep {
-        // Handle element type conversion - wrap functions that may return null
-        let element: DriveStep["element"];
-        if (typeof step.element === "function") {
-            const elementFn = step.element;
-            element = () => elementFn() as Element;
-        } else {
-            element = step.element;
-        }
-
-        return {
-            element,
+        const driveStep: DriveStep = {
             popover: {
                 title: step.popover.title,
                 description: step.popover.description,
@@ -238,6 +300,18 @@ export class TourManager {
             },
             onHighlighted: step.onHighlighted,
         };
+
+        // Only include element if defined - omitting it entirely shows a centered popover without overlay
+        if (step.element !== undefined) {
+            if (typeof step.element === "function") {
+                const elementFn = step.element;
+                driveStep.element = () => elementFn() as Element;
+            } else {
+                driveStep.element = step.element;
+            }
+        }
+
+        return driveStep;
     }
 
     /**
@@ -274,7 +348,6 @@ export class TourManager {
             animate: true,
             smoothScroll: true,
             allowClose: true,
-            overlayClickBehavior: "close",
             stagePadding: 8,
             stageRadius: 8,
             popoverOffset: 12,
@@ -284,12 +357,33 @@ export class TourManager {
             doneBtnText: "Done",
             progressText: "{{current}} of {{total}}",
             steps,
+            onHighlightStarted: (element) => {
+                if (element) {
+                    this.injectShadowDomStyles(element);
+                }
+            },
+            onPopoverRender: (popover) => {
+                // Prevent clicks inside popover from triggering document-level handlers (e.g., deselect)
+                popover.wrapper.addEventListener("click", (e) => e.stopPropagation());
+
+                // Inject drag handle at the top of the popover
+                const handle = document.createElement("div");
+                handle.className = "scms-drag-handle";
+                handle.innerHTML = GripHorizontal;
+                popover.wrapper.insertBefore(handle, popover.wrapper.firstChild);
+
+                this.makePopoverDraggable(popover.wrapper, handle);
+            },
             onDestroyed: () => {
                 this.driverInstance = null;
             },
         });
 
         this.driverInstance.drive();
+
+        // Prevent clicks on overlay from triggering document-level handlers (e.g., deselect)
+        const overlay = document.querySelector("svg.driver-overlay");
+        overlay?.addEventListener("click", (e) => e.stopPropagation());
     }
 
     /**
@@ -313,5 +407,70 @@ export class TourManager {
      */
     isActive(): boolean {
         return this.driverInstance?.isActive() ?? false;
+    }
+
+    /**
+     * Make a popover element draggable via a handle (works on both desktop and mobile)
+     */
+    private makePopoverDraggable(element: HTMLElement, handle: HTMLElement): void {
+        let isDragging = false;
+        let offsetX = 0;
+        let offsetY = 0;
+
+        const getEventCoords = (e: MouseEvent | TouchEvent) => {
+            if ("touches" in e) {
+                return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+            }
+            return { x: e.clientX, y: e.clientY };
+        };
+
+        const onStart = (e: MouseEvent | TouchEvent) => {
+            isDragging = true;
+            const coords = getEventCoords(e);
+            const rect = element.getBoundingClientRect();
+
+            // Calculate offset from cursor to element's top-left corner
+            offsetX = coords.x - rect.left;
+            offsetY = coords.y - rect.top;
+
+            // Prevent default and stop propagation to avoid deselecting elements
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
+        const onMove = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+
+            const coords = getEventCoords(e);
+            const newLeft = coords.x - offsetX;
+            const newTop = coords.y - offsetY;
+
+            // Override all positioning - Driver.js may use various combinations
+            element.style.setProperty("position", "fixed", "important");
+            element.style.setProperty("left", `${newLeft}px`, "important");
+            element.style.setProperty("top", `${newTop}px`, "important");
+            element.style.setProperty("right", "auto", "important");
+            element.style.setProperty("bottom", "auto", "important");
+            element.style.setProperty("transform", "none", "important");
+
+            e.preventDefault();
+            e.stopPropagation();
+        };
+
+        const onEnd = (e: MouseEvent | TouchEvent) => {
+            if (!isDragging) return;
+            isDragging = false;
+            e.stopPropagation();
+        };
+
+        // Mouse events - only handle initiates drag
+        handle.addEventListener("mousedown", onStart);
+        document.addEventListener("mousemove", onMove);
+        document.addEventListener("mouseup", onEnd);
+
+        // Touch events - only handle initiates drag
+        handle.addEventListener("touchstart", onStart, { passive: false });
+        document.addEventListener("touchmove", onMove, { passive: false });
+        document.addEventListener("touchend", onEnd);
     }
 }
