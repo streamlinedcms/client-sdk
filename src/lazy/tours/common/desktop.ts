@@ -2,6 +2,8 @@
  * Desktop-specific overrides for common steps
  */
 
+import { queryShadowSelector } from "./shadow-dom";
+
 export interface StepOverrides {
     title?: string;
     description?: string;
@@ -22,10 +24,7 @@ export const desktopOverrides: Record<string, StepOverrides> = {
  * Helper to get a dropdown menu element from toolbar's shadow DOM by label
  */
 export function getToolbarDropdown(label: string): HTMLElement | null {
-    const toolbar = document.querySelector("scms-toolbar");
-    return toolbar?.shadowRoot?.querySelector(
-        `scms-dropdown-menu[label="${label}"]`
-    ) as HTMLElement | null;
+    return queryShadowSelector(`scms-toolbar >>> scms-dropdown-menu[label="${label}"]`);
 }
 
 /**
@@ -33,14 +32,8 @@ export function getToolbarDropdown(label: string): HTMLElement | null {
  * Returns the menu content div when open, or the dropdown element if closed
  */
 export function getOpenDropdownMenu(label: string): HTMLElement | null {
-    const dropdown = getToolbarDropdown(label);
-    if (!dropdown) return null;
-
-    // When open, get the menu content div (absolutely positioned child)
-    // This is inside the dropdown's shadow DOM
-    const menuContent = dropdown.shadowRoot?.querySelector(
-        "div.absolute"
-    ) as HTMLElement | null;
-
-    return menuContent || dropdown;
+    return (
+        queryShadowSelector(`scms-toolbar >>> scms-dropdown-menu[label="${label}"] >>> div.absolute`) ??
+        getToolbarDropdown(label)
+    );
 }
