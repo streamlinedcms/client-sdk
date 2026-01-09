@@ -86,7 +86,7 @@ export class ContentManager {
         } else if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
             const data: LinkContentData = {
                 type: "link",
-                href: info.element.getAttribute('href') || '',
+                href: info.element.getAttribute("href") || "",
                 target: info.element.target,
                 value: info.element.innerHTML,
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),

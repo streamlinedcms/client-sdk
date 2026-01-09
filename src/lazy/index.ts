@@ -70,11 +70,7 @@ import "../components/accessibility-modal.js";
 import "../components/attributes-modal.js";
 import "../components/media-manager-modal.js";
 import type { Toolbar } from "../components/toolbar.js";
-import {
-    createEditorState,
-    type EditorState,
-    type EditableElementInfo,
-} from "./state.js";
+import { createEditorState, type EditorState, type EditableElementInfo } from "./state.js";
 import { DraftManager } from "./draft-manager.js";
 import { ContentManager } from "./content-manager.js";
 import { TemplateManager } from "./template-manager.js";
@@ -245,12 +241,18 @@ class EditorController {
 
         // Initialize draft manager
         this.draftManager = new DraftManager(this.state, this.log, this._draftStorageKey, {
-            syncAllElementsFromContent: (key) => this.contentManager.syncAllElementsFromContent(key),
+            syncAllElementsFromContent: (key) =>
+                this.contentManager.syncAllElementsFromContent(key),
             getEditableInfo: this.getEditableInfo.bind(this),
             getStorageContext: this.getStorageContext.bind(this),
             buildStorageKey: this.buildStorageKey.bind(this),
             registerInstanceElements: (element, templateId, instanceId, groupId) =>
-                this.templateManager.registerInstanceElements(element, templateId, instanceId, groupId),
+                this.templateManager.registerInstanceElements(
+                    element,
+                    templateId,
+                    instanceId,
+                    groupId,
+                ),
         });
 
         // Initialize save manager
@@ -270,7 +272,8 @@ class EditorController {
                 disableEditing: this.disableEditing.bind(this),
                 updateToolbarReadOnly: () => {
                     if (this.state.toolbar) {
-                        this.state.toolbar.readOnly = this.state.permissions?.contentWrite === false;
+                        this.state.toolbar.readOnly =
+                            this.state.permissions?.contentWrite === false;
                     }
                 },
             },
@@ -284,10 +287,7 @@ class EditorController {
         });
 
         // Initialize auth bridge (hidden iframe for cross-origin auth)
-        this.authBridge = new AuthBridge(
-            { appUrl: config.appUrl, appId: config.appId },
-            this.log,
-        );
+        this.authBridge = new AuthBridge({ appUrl: config.appUrl, appId: config.appId }, this.log);
         this.authBridge.init();
 
         // Initialize auth manager
@@ -391,7 +391,9 @@ class EditorController {
                 }
             }
 
-            this.log.debug("Fetched saved content keys", { count: this.state.savedContentKeys.size });
+            this.log.debug("Fetched saved content keys", {
+                count: this.state.savedContentKeys.size,
+            });
             return true;
         } catch (error) {
             this.log.warn("Could not fetch saved content keys", error);
@@ -529,11 +531,7 @@ class EditorController {
         elementId: string,
     ): string {
         if (context.templateId !== null && context.instanceId !== null) {
-            const templateKey = buildTemplateKey(
-                context.templateId,
-                context.instanceId,
-                elementId,
-            );
+            const templateKey = buildTemplateKey(context.templateId, context.instanceId, elementId);
             return context.groupId ? `${context.groupId}:${templateKey}` : templateKey;
         } else {
             return context.groupId ? `${context.groupId}:${elementId}` : elementId;
@@ -642,7 +640,9 @@ class EditorController {
         const target = e.target as Node;
 
         // Check if clicking inside a template instance
-        const clickedInstance = (target as Element).closest?.("[data-scms-instance]") as HTMLElement | null;
+        const clickedInstance = (target as Element).closest?.(
+            "[data-scms-instance]",
+        ) as HTMLElement | null;
 
         // Deselect instance if clicking outside all instances
         if (this.state.selectedInstance && !clickedInstance) {
@@ -715,7 +715,8 @@ class EditorController {
                     // Check for double-tap (mobile) on images and links
                     const now = Date.now();
                     const isDoubleTap =
-                        this.state.lastTapKey === key && now - this.state.lastTapTime < this.doubleTapDelay;
+                        this.state.lastTapKey === key &&
+                        now - this.state.lastTapTime < this.doubleTapDelay;
 
                     if (isDoubleTap && isMobile) {
                         // Mobile double-tap: open media manager for images, navigate for links

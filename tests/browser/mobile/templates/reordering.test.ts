@@ -20,16 +20,40 @@ beforeAll(async () => {
     const appId = generateTestAppId();
 
     // Set up team members for reorder testing
-    await setContent(appId, "team-reorder.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent(appId, "team-reorder.abc12.role", JSON.stringify({ type: "text", value: "CEO" }));
-    await setContent(appId, "team-reorder.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    await setContent(appId, "team-reorder.def34.role", JSON.stringify({ type: "text", value: "CTO" }));
-    await setContent(appId, "team-reorder.ghi56.name", JSON.stringify({ type: "text", value: "Charlie" }));
-    await setContent(appId, "team-reorder.ghi56.role", JSON.stringify({ type: "text", value: "CFO" }));
+    await setContent(
+        appId,
+        "team-reorder.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    await setContent(
+        appId,
+        "team-reorder.abc12.role",
+        JSON.stringify({ type: "text", value: "CEO" }),
+    );
+    await setContent(
+        appId,
+        "team-reorder.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    await setContent(
+        appId,
+        "team-reorder.def34.role",
+        JSON.stringify({ type: "text", value: "CTO" }),
+    );
+    await setContent(
+        appId,
+        "team-reorder.ghi56.name",
+        JSON.stringify({ type: "text", value: "Charlie" }),
+    );
+    await setContent(
+        appId,
+        "team-reorder.ghi56.role",
+        JSON.stringify({ type: "text", value: "CFO" }),
+    );
     await setContent(
         appId,
         "team-reorder._order",
-        JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] })
+        JSON.stringify({ type: "order", value: ["abc12", "def34", "ghi56"] }),
     );
 
     await initializeSDK({ appId });
@@ -137,7 +161,9 @@ async function selectTemplateElement(index: number): Promise<void> {
  */
 async function expandDrawer(): Promise<void> {
     const toolbar = getToolbar();
-    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    const menuBtn = toolbar.shadowRoot?.querySelector(
+        'button[aria-label*="menu"]',
+    ) as HTMLButtonElement;
     if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Open")) {
         menuBtn.click();
         await new Promise((r) => setTimeout(r, 100));
@@ -149,7 +175,9 @@ async function expandDrawer(): Promise<void> {
  */
 function collapseDrawer(): void {
     const toolbar = getToolbar();
-    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    const menuBtn = toolbar.shadowRoot?.querySelector(
+        'button[aria-label*="menu"]',
+    ) as HTMLButtonElement;
     if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Close")) {
         menuBtn.click();
     }

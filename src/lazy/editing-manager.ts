@@ -67,7 +67,9 @@ export class EditingManager {
         this.state.selectedKey = key;
 
         // Also select parent instance if element is inside one
-        const parentInstance = primaryInfo.element.closest("[data-scms-instance]") as HTMLElement | null;
+        const parentInstance = primaryInfo.element.closest(
+            "[data-scms-instance]",
+        ) as HTMLElement | null;
         if (parentInstance) {
             this.selectInstance(parentInstance);
         }

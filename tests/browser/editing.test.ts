@@ -785,7 +785,9 @@ test("inline group attribute on same element scopes content correctly", async ()
     await page.waitForSelector(".streamlined-editable");
 
     // Element has both data-scms-group="company-name" and data-scms-text="name" on same element
-    const inlineGroupElement = page.locator('[data-scms-group="company-name"][data-scms-text="name"]');
+    const inlineGroupElement = page.locator(
+        '[data-scms-group="company-name"][data-scms-text="name"]',
+    );
     expect(await inlineGroupElement.textContent()).toBe("Acme Corporation");
 });
 
@@ -1905,16 +1907,16 @@ test("adding new instance saves existing HTML-derived items", async () => {
     expect(await reloadedFeatures.count()).toBe(4);
 
     // All 4 items should have their content (the 3 original HTML-derived + 1 new)
-    expect(
-        await reloadedFeatures.nth(0).locator('[data-scms-text="feature"]').textContent(),
-    ).toBe("Feature One");
-    expect(
-        await reloadedFeatures.nth(1).locator('[data-scms-text="feature"]').textContent(),
-    ).toBe("Feature Two");
-    expect(
-        await reloadedFeatures.nth(2).locator('[data-scms-text="feature"]').textContent(),
-    ).toBe("Feature Three");
-    expect(
-        await reloadedFeatures.nth(3).locator('[data-scms-text="feature"]').textContent(),
-    ).toBe("Feature Four");
+    expect(await reloadedFeatures.nth(0).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature One",
+    );
+    expect(await reloadedFeatures.nth(1).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature Two",
+    );
+    expect(await reloadedFeatures.nth(2).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature Three",
+    );
+    expect(await reloadedFeatures.nth(3).locator('[data-scms-text="feature"]').textContent()).toBe(
+        "Feature Four",
+    );
 });

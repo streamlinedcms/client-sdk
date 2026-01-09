@@ -103,8 +103,13 @@ if (versionIndex === 0) {
 
     if (versionIndex === 1) {
         // Specific versions
-        const input = await prompt("\nEnter version(s), comma-separated (e.g., 0.1.0, 0.1, latest): ");
-        versions = input.split(",").map((v) => v.trim()).filter(Boolean);
+        const input = await prompt(
+            "\nEnter version(s), comma-separated (e.g., 0.1.0, 0.1, latest): ",
+        );
+        versions = input
+            .split(",")
+            .map((v) => v.trim())
+            .filter(Boolean);
         if (versions.length === 0) {
             console.error("No versions specified");
             process.exit(1);
@@ -128,7 +133,7 @@ if (versionIndex === 0) {
             if (relatedAliases.size > 0) {
                 const aliasesArray = Array.from(relatedAliases).sort();
                 const includeAliases = await prompt(
-                    `\nInclude related aliases? (${aliasesArray.join(", ")}) (Y/n): `
+                    `\nInclude related aliases? (${aliasesArray.join(", ")}) (Y/n): `,
                 );
                 if (includeAliases.toLowerCase() !== "n") {
                     versions.push(...aliasesArray);
@@ -176,7 +181,9 @@ if (versionIndex === 0) {
 
     if (fileIndex === 1) {
         // Specific files
-        const input = await prompt(`\nEnter file number(s), comma-separated (1-${allFiles.length}):\n${allFiles.map((f, i) => `  ${i + 1}. ${f}`).join("\n")}\n\nSelection: `);
+        const input = await prompt(
+            `\nEnter file number(s), comma-separated (1-${allFiles.length}):\n${allFiles.map((f, i) => `  ${i + 1}. ${f}`).join("\n")}\n\nSelection: `,
+        );
         const indices = input.split(",").map((s) => parseInt(s.trim(), 10) - 1);
         const invalid = indices.filter((i) => i < 0 || i >= allFiles.length);
         if (invalid.length > 0) {
@@ -229,7 +236,10 @@ for (let i = 0; i < urlsToPurge.length; i += BATCH_SIZE) {
 }
 
 // Get API token from environment (purge-specific token preferred)
-const apiToken = process.env.CLOUDFLARE_PURGE_TOKEN || process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN;
+const apiToken =
+    process.env.CLOUDFLARE_PURGE_TOKEN ||
+    process.env.CLOUDFLARE_API_TOKEN ||
+    process.env.CF_API_TOKEN;
 if (!apiToken) {
     console.error("Error: CLOUDFLARE_PURGE_TOKEN environment variable required");
     console.error("Add CLOUDFLARE_PURGE_TOKEN to packages/cdn/.env");
@@ -237,9 +247,11 @@ if (!apiToken) {
 }
 
 // Debug: show which token source is being used
-const tokenSource = process.env.CLOUDFLARE_PURGE_TOKEN ? "CLOUDFLARE_PURGE_TOKEN"
-    : process.env.CLOUDFLARE_API_TOKEN ? "CLOUDFLARE_API_TOKEN"
-    : "CF_API_TOKEN";
+const tokenSource = process.env.CLOUDFLARE_PURGE_TOKEN
+    ? "CLOUDFLARE_PURGE_TOKEN"
+    : process.env.CLOUDFLARE_API_TOKEN
+      ? "CLOUDFLARE_API_TOKEN"
+      : "CF_API_TOKEN";
 console.log(`Using token from: ${tokenSource} (${apiToken.slice(0, 8)}...${apiToken.slice(-4)})`);
 console.log(`Zone ID: ${ZONE_ID}\n`);
 

@@ -16,7 +16,6 @@ beforeAll(async () => {
     await initializeSDK();
 });
 
-
 test("user can click to edit content", async () => {
     const testTitle = document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
 

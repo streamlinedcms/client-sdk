@@ -43,7 +43,11 @@ async function runLoader(appId: string): Promise<void> {
     // Create promise that resolves when loader dispatches complete event
     const loaderComplete = new Promise<void>((resolve, reject) => {
         const timeoutId = setTimeout(() => {
-            reject(new Error(`runLoader: Timed out after ${TIMEOUT_MS}ms waiting for loader-complete event`));
+            reject(
+                new Error(
+                    `runLoader: Timed out after ${TIMEOUT_MS}ms waiting for loader-complete event`,
+                ),
+            );
         }, TIMEOUT_MS);
 
         document.addEventListener(
@@ -52,7 +56,7 @@ async function runLoader(appId: string): Promise<void> {
                 clearTimeout(timeoutId);
                 resolve();
             },
-            { once: true }
+            { once: true },
         );
     });
 

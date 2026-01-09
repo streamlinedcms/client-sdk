@@ -597,7 +597,9 @@ export class AttributesModal extends LitElement {
 
                     <!-- Reserved attributes (read-only) -->
                     <div class="attr-section">
-                        <div class="text-sm font-medium text-gray-500 mb-1">Reserved Attributes</div>
+                        <div class="text-sm font-medium text-gray-500 mb-1">
+                            Reserved Attributes
+                        </div>
                         <p class="attr-hint mb-2">Cannot be modified (class, id, style)</p>
                         <div class="space-y-2">
                             ${reservedEntries.length > 0

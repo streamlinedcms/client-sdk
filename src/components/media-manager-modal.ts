@@ -40,9 +40,7 @@ interface SelectFileResult {
 }
 
 /** Result from ready call */
-type ReadyResult =
-    | { ready: true }
-    | { ready: false; error: string };
+type ReadyResult = { ready: true } | { ready: false; error: string };
 
 /** Result from cancelCurrentRequest call */
 interface CancelRequestResult {
@@ -474,7 +472,10 @@ export class MediaManagerModal extends LitElement {
         try {
             const response = await fetch(src);
             if (!response.ok) {
-                console.debug("[MediaManagerModal] Failed to fetch image for candidate", { src, status: response.status });
+                console.debug("[MediaManagerModal] Failed to fetch image for candidate", {
+                    src,
+                    status: response.status,
+                });
                 return null;
             }
 
@@ -484,7 +485,10 @@ export class MediaManagerModal extends LitElement {
 
             return { data, filename, contentType };
         } catch (err) {
-            console.debug("[MediaManagerModal] Error fetching image for candidate", { src, error: err });
+            console.debug("[MediaManagerModal] Error fetching image for candidate", {
+                src,
+                error: err,
+            });
             return null;
         }
     }
@@ -514,7 +518,9 @@ export class MediaManagerModal extends LitElement {
         }
 
         // Find all data-scms-image elements
-        const images = Array.from(document.querySelectorAll<HTMLImageElement>("img[data-scms-image]"));
+        const images = Array.from(
+            document.querySelectorAll<HTMLImageElement>("img[data-scms-image]"),
+        );
 
         for (const img of images) {
             const candidate = await this.fetchImageAsCandidate(img);
@@ -604,11 +610,7 @@ export class MediaManagerModal extends LitElement {
             <div class="modal">
                 <div class="header">
                     <span class="title">Select Media</span>
-                    <button
-                        class="close-button"
-                        @click=${this.handleCloseClick}
-                        aria-label="Close"
-                    >
+                    <button class="close-button" @click=${this.handleCloseClick} aria-label="Close">
                         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path
                                 stroke-linecap="round"
@@ -619,12 +621,21 @@ export class MediaManagerModal extends LitElement {
                         </svg>
                     </button>
                 </div>
-                <div class="iframe-container${this.connectionReady && this.isReady && !this.error ? ' ready' : ''}">
+                <div
+                    class="iframe-container${this.connectionReady && this.isReady && !this.error
+                        ? " ready"
+                        : ""}"
+                >
                     ${statusMessage
-                        ? html`<div class="status"><div class="spinner"></div><span class="status-text">${statusMessage}</span></div>`
+                        ? html`<div class="status">
+                              <div class="spinner"></div>
+                              <span class="status-text">${statusMessage}</span>
+                          </div>`
                         : null}
                     ${this.error
-                        ? html`<div class="status"><span class="status-error">${this.error}</span></div>`
+                        ? html`<div class="status">
+                              <span class="status-error">${this.error}</span>
+                          </div>`
                         : null}
                 </div>
             </div>

@@ -30,7 +30,6 @@ beforeAll(async () => {
     await initializeSDK({ appId });
 });
 
-
 test("content is populated from API after load", async () => {
     const title = document.querySelector('[data-scms-html="test-title"]');
     expect(title?.innerHTML).toBe("Content from API");

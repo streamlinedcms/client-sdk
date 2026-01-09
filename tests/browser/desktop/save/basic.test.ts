@@ -125,7 +125,9 @@ test("hasChanges is false after successful save", async () => {
 
 test("multiple elements can be edited and saved together", async () => {
     const htmlElement = getHtmlElement();
-    const paragraphElement = document.querySelector('[data-scms-html="save-basic-paragraph"]') as HTMLElement;
+    const paragraphElement = document.querySelector(
+        '[data-scms-html="save-basic-paragraph"]',
+    ) as HTMLElement;
     const toolbar = getToolbar();
 
     // Edit first element
