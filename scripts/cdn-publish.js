@@ -23,10 +23,17 @@ dotenv.config({ path: join(__dirname, "..", ".env") });
 
 const packageJson = JSON.parse(readFileSync(join(__dirname, "..", "package.json"), "utf-8"));
 
-const environment = process.argv[2];
+const args = process.argv.slice(2);
+const environment = args.find((arg) => !arg.startsWith("--"));
+const flags = new Set(args.filter((arg) => arg.startsWith("--")));
+
+// --ci implies --yes (used in CI pipelines)
+const skipPrompts = flags.has("--yes") || flags.has("--ci");
 
 if (!["staging", "production"].includes(environment)) {
-    console.error("Usage: node scripts/cdn-publish.js <staging|production>");
+    console.error("Usage: node scripts/cdn-publish.js <staging|production> [--yes|--ci]");
+    console.error("  --yes  Skip confirmation prompts");
+    console.error("  --ci   Same as --yes (for CI pipelines)");
     process.exit(1);
 }
 
@@ -69,14 +76,16 @@ for (const [alias, targetVersion] of aliases) {
     console.log(`    "${key}"${" ".repeat(maxKeyLen - key.length)} -> "${targetVersion}"`);
 }
 
-const rl = createInterface({ input: process.stdin, output: process.stdout });
-const answer = await new Promise((resolve) => {
-    rl.question(`\nProceed? (yes/N): `, resolve);
-});
-rl.close();
-if (answer.toLowerCase() !== "yes") {
-    console.log("Aborted.");
-    process.exit(0);
+if (!skipPrompts) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    const answer = await new Promise((resolve) => {
+        rl.question(`\nProceed? (yes/N): `, resolve);
+    });
+    rl.close();
+    if (answer.toLowerCase() !== "yes") {
+        console.log("Aborted.");
+        process.exit(0);
+    }
 }
 
 console.log();
