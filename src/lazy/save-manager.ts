@@ -239,7 +239,8 @@ export class SaveManager {
 
         // Get unsaved template elements (HTML-derived items that need to be persisted
         // when the template order changes)
-        const unsavedTemplateElements = this.contentManager.getUnsavedTemplateElements(templatesWithOrderChanges);
+        const unsavedTemplateElements =
+            this.contentManager.getUnsavedTemplateElements(templatesWithOrderChanges);
 
         if (dirtyElements.size === 0 && pendingDeletes.length === 0 && !hasOrderChanges) {
             return;
@@ -348,10 +349,14 @@ export class SaveManager {
 
                 if (!response.ok) {
                     if (response.status === 401) {
-                        throw new AuthError(`Batch ${i + 1}: ${response.status} ${response.statusText}`);
+                        throw new AuthError(
+                            `Batch ${i + 1}: ${response.status} ${response.statusText}`,
+                        );
                     }
                     if (response.status === 403) {
-                        throw new PermissionError(`Batch ${i + 1}: ${response.status} ${response.statusText}`);
+                        throw new PermissionError(
+                            `Batch ${i + 1}: ${response.status} ${response.statusText}`,
+                        );
                     }
                     throw new Error(`Batch ${i + 1}: ${response.status} ${response.statusText}`);
                 }
@@ -437,17 +442,23 @@ export class SaveManager {
                 return;
             }
             if (error instanceof PermissionError) {
-                this.log.warn("Permission denied during save, refetching permissions", { error: error.message });
+                this.log.warn("Permission denied during save, refetching permissions", {
+                    error: error.message,
+                });
                 // Refetch permissions - they may have changed
                 await this.helpers.refetchPermissions();
                 // Disable editing if user no longer has contentWrite permission
                 if (this.state.permissions?.contentWrite === false) {
                     this.helpers.disableEditing();
                     this.helpers.updateToolbarReadOnly();
-                    alert("Your permissions have changed. You no longer have permission to edit content.");
+                    alert(
+                        "Your permissions have changed. You no longer have permission to edit content.",
+                    );
                 } else {
                     // Permission denied for another reason (domain not whitelisted, etc.)
-                    alert("Permission denied. Check that this domain is whitelisted in Admin → Settings.");
+                    alert(
+                        "Permission denied. Check that this domain is whitelisted in Admin → Settings.",
+                    );
                 }
                 return;
             }

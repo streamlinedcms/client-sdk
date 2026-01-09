@@ -1,35 +1,35 @@
 name: CI
 
 on:
-  pull_request:
-    branches: [master, develop]
+    pull_request:
+        branches: [master, develop]
 
 jobs:
-  validate:
-    runs-on: ubuntu-latest
+    validate:
+        runs-on: ubuntu-latest
 
-    steps:
-      - uses: actions/checkout@v4
+        steps:
+            - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
 
-      - name: Install dependencies
-        run: npm ci
+            - name: Install dependencies
+              run: npm ci
 
-      - name: Format check
-        run: npm run format:check
+            - name: Format check
+              run: npm run format:check
 
-      - name: Create .env for build
-        run: |
-          echo "SDK_API_URL=https://api.example.com/v1" >> .env
-          echo "SDK_APP_URL=https://app.example.com" >> .env
+            - name: Create .env for build
+              run: |
+                  echo "SDK_API_URL=https://api.example.com/v1" >> .env
+                  echo "SDK_APP_URL=https://app.example.com" >> .env
 
-      - name: Build
-        run: npm run build
+            - name: Build
+              run: npm run build
 
-      - name: Run tests
-        run: npm test
+            - name: Run tests
+              run: npm test

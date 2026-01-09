@@ -103,7 +103,9 @@ test("template context shows when editing template element", async () => {
     const toolbar = getToolbar();
 
     // Get a template element (name field in team template)
-    const templateElement = document.querySelector('[data-scms-template="team"] [data-scms-text="name"]') as HTMLElement;
+    const templateElement = document.querySelector(
+        '[data-scms-template="team"] [data-scms-text="name"]',
+    ) as HTMLElement;
 
     templateElement.click();
     await waitForCondition(() => templateElement.classList.contains("streamlined-editing"));
@@ -116,7 +118,9 @@ test("template context shows when editing template element", async () => {
 test("template context is cleared when clicking outside", async () => {
     const toolbar = getToolbar();
 
-    const templateElement = document.querySelector('[data-scms-template="team"] [data-scms-text="name"]') as HTMLElement;
+    const templateElement = document.querySelector(
+        '[data-scms-template="team"] [data-scms-text="name"]',
+    ) as HTMLElement;
 
     templateElement.click();
     await waitForCondition(() => templateElement.classList.contains("streamlined-editing"));

@@ -12,11 +12,7 @@ import type { Logger } from "loganite";
 import Sortable from "sortablejs";
 import type { EditorState, TemplateInfo, EditableElementInfo } from "./state.js";
 import type { ContentManager } from "./content-manager.js";
-import {
-    EDITABLE_SELECTOR,
-    IMAGE_PLACEHOLDER_DATA_URI,
-    type EditableType,
-} from "../types.js";
+import { EDITABLE_SELECTOR, IMAGE_PLACEHOLDER_DATA_URI, type EditableType } from "../types.js";
 
 /**
  * Helpers that TemplateManager needs from EditorController
@@ -87,7 +83,11 @@ export class TemplateManager {
             for (let i = 0; i < el.attributes.length; i++) {
                 const attr = el.attributes[i];
                 // Keep: id, class, and data-scms-* attributes (element ID defines structure)
-                if (attr.name === "id" || attr.name === "class" || attr.name.startsWith("data-scms-")) {
+                if (
+                    attr.name === "id" ||
+                    attr.name === "class" ||
+                    attr.name.startsWith("data-scms-")
+                ) {
                     continue;
                 }
                 attributesToRemove.push(attr.name);

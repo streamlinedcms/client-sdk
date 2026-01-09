@@ -27,7 +27,12 @@ export class ElementBadge extends LitElement {
             case "text":
                 // "T" text icon
                 return html`
-                    <svg class=${iconClassAdjusted} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                        class=${iconClassAdjusted}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
                         <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
@@ -39,7 +44,12 @@ export class ElementBadge extends LitElement {
             case "html":
                 // Code/HTML icon
                 return html`
-                    <svg class=${iconClassAdjusted} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                        class=${iconClassAdjusted}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
                         <path
                             stroke-linecap="round"
                             stroke-linejoin="round"
@@ -63,7 +73,12 @@ export class ElementBadge extends LitElement {
             case "link":
                 // Link icon
                 return html`
-                    <svg class=${iconClassAdjusted} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg
+                        class=${iconClassAdjusted}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
                         <path
                             stroke-linecap="round"
                             stroke-linejoin="round"

@@ -89,7 +89,10 @@ test("hasChanges remains true after 500 error", async () => {
     const toolbar = getToolbar();
 
     // Make a change with error trigger
-    await editContent(element, `${ERROR_TRIGGERS.SERVER_ERROR} Content that will fail - changes persist`);
+    await editContent(
+        element,
+        `${ERROR_TRIGGERS.SERVER_ERROR} Content that will fail - changes persist`,
+    );
     expect(toolbar?.hasChanges).toBe(true);
 
     // Try to save - server will return 500
@@ -104,7 +107,8 @@ test("hasChanges remains true after 500 error", async () => {
 
 test("content is preserved after 500 error", async () => {
     const element = getTestElement();
-    const editedContent = `${ERROR_TRIGGERS.SERVER_ERROR} Preserved content after error - ` + Date.now();
+    const editedContent =
+        `${ERROR_TRIGGERS.SERVER_ERROR} Preserved content after error - ` + Date.now();
 
     // Make a change with error trigger
     await editContent(element, editedContent);

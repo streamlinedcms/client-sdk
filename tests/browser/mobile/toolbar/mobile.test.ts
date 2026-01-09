@@ -6,7 +6,11 @@
  */
 
 import { test, expect, beforeAll } from "vitest";
-import { initializeSDK, setupTestHelpers, waitForCondition } from "~/@browser-support/sdk-helpers.js";
+import {
+    initializeSDK,
+    setupTestHelpers,
+    waitForCondition,
+} from "~/@browser-support/sdk-helpers.js";
 import type { Toolbar } from "~/src/components/toolbar.js";
 
 beforeAll(async () => {

@@ -140,7 +140,9 @@ export class ModalManager {
             const candidate = await this.state.mediaManagerModal.fetchImageAsCandidate(img);
             if (candidate) {
                 options.candidates = [candidate];
-                this.log.debug("Offering current image as candidate", { filename: candidate.filename });
+                this.log.debug("Offering current image as candidate", {
+                    filename: candidate.filename,
+                });
             }
         }
 
@@ -269,7 +271,7 @@ export class ModalManager {
         const modal = document.createElement("scms-link-editor-modal") as LinkEditorModal;
         modal.elementId = primaryInfo.elementId;
         modal.linkData = {
-            href: primaryAnchor.getAttribute('href') || '',
+            href: primaryAnchor.getAttribute("href") || "",
             target: primaryAnchor.target,
             value: primaryAnchor.innerHTML,
         };
@@ -537,9 +539,11 @@ export class ModalManager {
         const modal = document.createElement("scms-attributes-modal") as AttributesModal;
         modal.elementId = primaryInfo.elementId;
         modal.elementAttrs = this.getElementAttributes(key);
-        const { elementAttrs: elementDefinedAttrs, reservedAttrs, otherAttrs } = this.getDomAttributes(
-            primaryInfo.element,
-        );
+        const {
+            elementAttrs: elementDefinedAttrs,
+            reservedAttrs,
+            otherAttrs,
+        } = this.getDomAttributes(primaryInfo.element);
         modal.elementDefinedAttrs = elementDefinedAttrs;
         modal.reservedAttrs = reservedAttrs;
         modal.otherAttrs = otherAttrs;

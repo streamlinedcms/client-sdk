@@ -24,12 +24,12 @@ beforeAll(async () => {
     await setContent(
         appId,
         "sidebar:quote",
-        JSON.stringify({ type: "text", value: "Initial sidebar quote" })
+        JSON.stringify({ type: "text", value: "Initial sidebar quote" }),
     );
     await setContent(
         appId,
         "company-name:name",
-        JSON.stringify({ type: "text", value: "Acme Corp" })
+        JSON.stringify({ type: "text", value: "Acme Corp" }),
     );
 
     await initializeSDK({ appId });
@@ -52,14 +52,18 @@ function getToolbar(): Toolbar | null {
  * Helper to get the sidebar group quote element
  */
 function getSidebarQuote(): HTMLElement | null {
-    return document.querySelector('[data-scms-group="sidebar"] [data-scms-text="quote"]') as HTMLElement;
+    return document.querySelector(
+        '[data-scms-group="sidebar"] [data-scms-text="quote"]',
+    ) as HTMLElement;
 }
 
 /**
  * Helper to get the inline group element (company name)
  */
 function getCompanyName(): HTMLElement | null {
-    return document.querySelector('[data-scms-group="company-name"][data-scms-text="name"]') as HTMLElement;
+    return document.querySelector(
+        '[data-scms-group="company-name"][data-scms-text="name"]',
+    ) as HTMLElement;
 }
 
 /**
@@ -159,7 +163,7 @@ test("multiple grouped elements can be edited and saved together", async () => {
 test("grouped elements inside templates save correctly", async () => {
     // The products template has a company group inside it
     const companyNameInTemplate = document.querySelector(
-        '[data-scms-template="products"] [data-scms-group="company"] [data-scms-text="name"]'
+        '[data-scms-template="products"] [data-scms-group="company"] [data-scms-text="name"]',
     ) as HTMLElement;
 
     if (!companyNameInTemplate) {

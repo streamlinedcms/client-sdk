@@ -38,7 +38,9 @@ if (!["staging", "production"].includes(environment)) {
 }
 
 const namespaceId =
-    environment === "staging" ? process.env.KV_NAMESPACE_STAGING : process.env.KV_NAMESPACE_PRODUCTION;
+    environment === "staging"
+        ? process.env.KV_NAMESPACE_STAGING
+        : process.env.KV_NAMESPACE_PRODUCTION;
 
 if (!namespaceId) {
     const envVar = environment === "staging" ? "KV_NAMESPACE_STAGING" : "KV_NAMESPACE_PRODUCTION";
@@ -57,7 +59,7 @@ const collection = "client-sdk";
 // - Aliases pointing to the version
 const VERSION_MARKER = "_";
 const kvEntries = [
-    [version, VERSION_MARKER],  // Exact version marker
+    [version, VERSION_MARKER], // Exact version marker
     ["latest", version],
     [major, version],
     [`${major}.${minor}`, version],

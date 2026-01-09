@@ -91,8 +91,8 @@ test("draft contains the edited content", async () => {
     const draft = JSON.parse(stored!);
 
     // The draft should contain our edited content
-    const hasContent = Object.values(draft.content).some(
-        (value) => (value as string).includes("Unique draft content")
+    const hasContent = Object.values(draft.content).some((value) =>
+        (value as string).includes("Unique draft content"),
     );
     expect(hasContent).toBe(true);
 
@@ -181,8 +181,8 @@ test("multiple edits update the same draft", async () => {
     // Draft should be updated, not duplicated
     expect(secondDraft).not.toBeNull();
     const draft = JSON.parse(secondDraft!);
-    const hasSecondEdit = Object.values(draft.content).some(
-        (value) => (value as string).includes("Second edit")
+    const hasSecondEdit = Object.values(draft.content).some((value) =>
+        (value as string).includes("Second edit"),
     );
     expect(hasSecondEdit).toBe(true);
 

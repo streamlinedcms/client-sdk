@@ -59,7 +59,6 @@ beforeAll(async () => {
     await initializeSDK({ appId });
 });
 
-
 test("template instance that is also the editable element gets proper instance ID", async () => {
     // The checklist template has <li data-scms-text="item"> where the <li> is both instance and editable
     const checklistContainer = document.querySelector('[data-scms-template="checklist"]');
@@ -118,7 +117,9 @@ test("adding new instance works when instance=editable", async () => {
     const addButton = checklistContainer?.querySelector(".scms-template-add") as HTMLElement;
     addButton.click();
 
-    await waitForCondition(() => checklistContainer?.querySelectorAll("li").length === initialCount + 1);
+    await waitForCondition(
+        () => checklistContainer?.querySelectorAll("li").length === initialCount + 1,
+    );
 
     const items = checklistContainer?.querySelectorAll("li");
     expect(items?.length).toBe(initialCount + 1);
@@ -174,7 +175,9 @@ test("adding new instance saves existing HTML-derived items", async () => {
     expect(featureItems?.length).toBe(initialCount + 1);
 
     // Edit the new item
-    const newFeature = featureItems?.[featureItems.length - 1].querySelector('[data-scms-text="feature"]') as HTMLElement;
+    const newFeature = featureItems?.[featureItems.length - 1].querySelector(
+        '[data-scms-text="feature"]',
+    ) as HTMLElement;
     newFeature.click();
     await waitForCondition(() => newFeature.getAttribute("contenteditable") === "true");
 

@@ -147,7 +147,7 @@ export class Toolbar extends LitElement {
         try {
             sessionStorage.setItem(
                 Toolbar.STORAGE_KEY,
-                JSON.stringify([...this.collapsedSections])
+                JSON.stringify([...this.collapsedSections]),
             );
         } catch {
             // Ignore storage errors
@@ -465,8 +465,15 @@ export class Toolbar extends LitElement {
         if (!this.structureMismatch) return nothing;
 
         return html`
-            <div class="flex items-center gap-1.5 px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">
-                <svg class="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div
+                class="flex items-center gap-1.5 px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs"
+            >
+                <svg
+                    class="w-4 h-4 flex-shrink-0"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                >
                     <path
                         stroke-linecap="round"
                         stroke-linejoin="round"
@@ -640,7 +647,9 @@ export class Toolbar extends LitElement {
                         ${this.renderSaveButton()}
                         ${this.mockAuth
                             ? nothing
-                            : html`<div class="ml-6 pl-6 border-l border-gray-200 flex items-center">
+                            : html`<div
+                                  class="ml-6 pl-6 border-l border-gray-200 flex items-center"
+                              >
                                   ${this.renderSignOutButton()}
                                   ${this.denyAppGui
                                       ? nothing
@@ -663,7 +672,9 @@ export class Toolbar extends LitElement {
             >
                 <span>${title}</span>
                 <svg
-                    class="w-4 h-4 transition-transform duration-200 ${isCollapsed ? "" : "rotate-180"}"
+                    class="w-4 h-4 transition-transform duration-200 ${isCollapsed
+                        ? ""
+                        : "rotate-180"}"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -932,9 +943,7 @@ export class Toolbar extends LitElement {
         if (this.mockAuth) {
             return html`
                 <div class="mobile-section">
-                    <div class="flex items-center justify-center">
-                        ${this.renderModeToggle()}
-                    </div>
+                    <div class="flex items-center justify-center">${this.renderModeToggle()}</div>
                 </div>
             `;
         }
@@ -1043,8 +1052,12 @@ export class Toolbar extends LitElement {
 
                 <!-- Expandable drawer -->
                 <div
-                    class="${this.expanded ? "overflow-y-auto" : "overflow-hidden"} transition-all duration-200 ease-out"
-                    style="max-height: ${this.expanded ? "calc(100vh - 56px - env(safe-area-inset-bottom, 0px))" : "0"}"
+                    class="${this.expanded
+                        ? "overflow-y-auto"
+                        : "overflow-hidden"} transition-all duration-200 ease-out"
+                    style="max-height: ${this.expanded
+                        ? "calc(100vh - 56px - env(safe-area-inset-bottom, 0px))"
+                        : "0"}"
                 >
                     <div class="px-4 py-3 border-t border-gray-100">
                         <!-- Element section (only when element selected) -->
@@ -1077,7 +1090,9 @@ export class Toolbar extends LitElement {
 
     private renderWarning() {
         return html`
-            <div class="bg-amber-500 text-black px-4 py-2 text-center text-sm flex items-center justify-center gap-3">
+            <div
+                class="bg-amber-500 text-black px-4 py-2 text-center text-sm flex items-center justify-center gap-3"
+            >
                 <span>${this.warning}</span>
                 <button
                     class="px-2 py-1 bg-amber-600 hover:bg-amber-700 rounded text-white text-xs font-medium"
@@ -1091,10 +1106,16 @@ export class Toolbar extends LitElement {
 
     private renderReadOnlyBanner() {
         return html`
-            <div class="bg-blue-100 text-blue-800 px-4 py-2 text-center text-sm flex items-center justify-center gap-2">
+            <div
+                class="bg-blue-100 text-blue-800 px-4 py-2 text-center text-sm flex items-center justify-center gap-2"
+            >
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                 </svg>
                 <span>View-only mode. You don't have permission to edit content.</span>
             </div>

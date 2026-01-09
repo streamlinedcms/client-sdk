@@ -36,14 +36,18 @@ function getToolbar(): Toolbar | null {
  * Helper to get an element from the sidebar group
  */
 function getSidebarGroupElement(): HTMLElement | null {
-    return document.querySelector('[data-scms-group="sidebar"] [data-scms-text="quote"]') as HTMLElement;
+    return document.querySelector(
+        '[data-scms-group="sidebar"] [data-scms-text="quote"]',
+    ) as HTMLElement;
 }
 
 /**
  * Helper to get the inline group element (group attribute on same element as data-scms-*)
  */
 function getInlineGroupElement(): HTMLElement | null {
-    return document.querySelector('[data-scms-group="company-name"][data-scms-text="name"]') as HTMLElement;
+    return document.querySelector(
+        '[data-scms-group="company-name"][data-scms-text="name"]',
+    ) as HTMLElement;
 }
 
 test("grouped elements are editable", async () => {
@@ -149,7 +153,7 @@ test("editing inline group element triggers change detection", async () => {
 test("grouped elements inside templates are editable", async () => {
     // The products template has a company group inside it
     const companyElement = document.querySelector(
-        '[data-scms-template="products"] [data-scms-group="company"] [data-scms-text="name"]'
+        '[data-scms-template="products"] [data-scms-group="company"] [data-scms-text="name"]',
     ) as HTMLElement;
 
     if (companyElement) {

@@ -15,7 +15,11 @@ beforeAll(async () => {
     const appId = generateTestAppId();
 
     // Set up team with 2 members for drag handle tests
-    await setContent(appId, "team-drag.drag1.name", JSON.stringify({ type: "text", value: "Alice" }));
+    await setContent(
+        appId,
+        "team-drag.drag1.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
     await setContent(appId, "team-drag.drag2.name", JSON.stringify({ type: "text", value: "Bob" }));
     await setContent(
         appId,
@@ -25,7 +29,6 @@ beforeAll(async () => {
 
     await initializeSDK({ appId });
 });
-
 
 test("drag handle appears on instance hover when multiple instances exist", async () => {
     const teamMembers = document.querySelectorAll('[data-scms-template="team-drag"] .team-member');
