@@ -6,9 +6,9 @@
  * (users should edit those in their respective modals).
  */
 
-import { LitElement, html, css, nothing } from "lit";
+import { html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 import {
     SEO_ATTRIBUTES,
     ACCESSIBILITY_ATTRIBUTES,
@@ -28,7 +28,7 @@ interface AttributeEntry {
 }
 
 @customElement("scms-attributes-modal")
-export class AttributesModal extends LitElement {
+export class AttributesModal extends ScmsElement {
     @property({ type: String, attribute: "element-id" })
     elementId: string | null = null;
 
@@ -57,7 +57,7 @@ export class AttributesModal extends LitElement {
     private addError = "";
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             :host {
                 position: fixed;
@@ -65,7 +65,7 @@ export class AttributesModal extends LitElement {
                 left: 0;
                 right: 0;
                 bottom: 0;
-                z-index: 2147483647;
+                z-index: 10001;
                 display: flex;
                 align-items: center;
                 justify-content: center;

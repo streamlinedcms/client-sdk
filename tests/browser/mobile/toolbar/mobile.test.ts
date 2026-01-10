@@ -72,11 +72,25 @@ test("clicking menu button toggles expanded state", async () => {
     expect(menuBtn.getAttribute("aria-label")).toContain("Open");
 });
 
-test("mobile view shows element badge", async () => {
+test("mobile view shows element badge when element is selected", async () => {
+    // Click on an element to select it (mobile requires two taps for text/html)
+    const htmlElement = document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
+
+    // First click selects
+    htmlElement.click();
+    await waitForCondition(() => htmlElement.classList.contains("streamlined-selected"));
+
+    // Wait to avoid double-tap detection (400ms threshold)
+    await new Promise((r) => setTimeout(r, 450));
+
+    // Second click edits
+    htmlElement.click();
+    await waitForCondition(() => htmlElement.classList.contains("streamlined-editing"));
+
     const toolbar = getToolbar();
     const shadowRoot = toolbar.shadowRoot!;
 
-    // Element badge should be visible
+    // Element badge should be visible when element is selected
     const badge = shadowRoot.querySelector("scms-element-badge");
     expect(badge).not.toBeNull();
 });

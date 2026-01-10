@@ -36,6 +36,7 @@ export interface TemplateManagerHelpers {
     stopEditing: () => void;
     updateToolbarHasChanges: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
+    scrollToElement: (element: HTMLElement, delay?: number) => void;
 }
 
 export class TemplateManager {
@@ -254,7 +255,7 @@ export class TemplateManager {
             addBtn.addEventListener("click", (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.addInstance(templateId);
+                this.addInstance(templateId, false); // On-page button always appends at end
             });
 
             templateInfo.container.appendChild(addBtn);
@@ -345,7 +346,10 @@ export class TemplateManager {
             this.log.debug("No template context for add instance");
             return;
         }
-        this.addInstance(this.state.toolbar.templateId);
+        const newElement = this.addInstance(this.state.toolbar.templateId);
+        if (newElement) {
+            this.helpers.scrollToElement(newElement);
+        }
     }
 
     handleDeleteInstance(): void {
@@ -364,6 +368,7 @@ export class TemplateManager {
         const fromIndex = this.state.toolbar.instanceIndex;
         if (fromIndex > 0) {
             this.reorderInstance(this.state.toolbar.templateId, fromIndex, fromIndex - 1);
+            this.scrollToActiveInstance();
         }
     }
 
@@ -379,6 +384,23 @@ export class TemplateManager {
         const fromIndex = this.state.toolbar.instanceIndex;
         if (fromIndex < this.state.toolbar.instanceCount - 1) {
             this.reorderInstance(this.state.toolbar.templateId, fromIndex, fromIndex + 1);
+            this.scrollToActiveInstance();
+        }
+    }
+
+    private scrollToActiveInstance(): void {
+        const instanceId = this.state.toolbar?.instanceId;
+        const templateId = this.state.toolbar?.templateId;
+        if (!instanceId || !templateId) return;
+
+        const templateInfo = this.state.templates.get(templateId);
+        if (!templateInfo) return;
+
+        const instanceElement = templateInfo.container.querySelector<HTMLElement>(
+            `[data-scms-instance="${instanceId}"]`,
+        );
+        if (instanceElement) {
+            this.helpers.scrollToElement(instanceElement);
         }
     }
 
@@ -386,12 +408,15 @@ export class TemplateManager {
 
     /**
      * Add a new instance to a template
+     * @param insertAfterSelected - If true, insert after the currently selected instance (for toolbar).
+     *                              If false, always append at the end (for on-page add button).
+     * @returns The newly created instance element, or null if creation failed.
      */
-    addInstance(templateId: string): void {
+    addInstance(templateId: string, insertAfterSelected: boolean = true): HTMLElement | null {
         const templateInfo = this.state.templates.get(templateId);
         if (!templateInfo) {
             this.log.error("Template not found", { templateId });
-            return;
+            return null;
         }
 
         const { container, templateHtml, groupId } = templateInfo;
@@ -405,7 +430,7 @@ export class TemplateManager {
         const clone = tempDiv.firstElementChild as HTMLElement;
         if (!clone) {
             this.log.error("Failed to create clone from template HTML");
-            return;
+            return null;
         }
 
         clone.setAttribute("data-scms-instance", newInstanceId);
@@ -426,16 +451,55 @@ export class TemplateManager {
             clone.src = IMAGE_PLACEHOLDER_DATA_URI;
         }
 
-        // Insert before the add button (which is the last child)
-        const addButton = this.state.templateAddButtons.get(templateId);
-        if (addButton && addButton.parentElement === container) {
-            container.insertBefore(clone, addButton);
+        // Insert after the currently selected instance (if requested), or at the end
+        const currentInstanceId = insertAfterSelected ? this.state.toolbar?.instanceId : undefined;
+        const currentInstanceIndex = insertAfterSelected
+            ? this.state.toolbar?.instanceIndex
+            : undefined;
+        let insertIndex = templateInfo.instanceIds.length; // Default: append at end
+
+        if (
+            currentInstanceId &&
+            currentInstanceIndex !== null &&
+            currentInstanceIndex !== undefined
+        ) {
+            // Find the current instance element
+            const currentInstance = container.querySelector<HTMLElement>(
+                `[data-scms-instance="${currentInstanceId}"]`,
+            );
+            if (currentInstance && currentInstance.nextSibling) {
+                container.insertBefore(clone, currentInstance.nextSibling);
+                insertIndex = currentInstanceIndex + 1;
+            } else if (currentInstance) {
+                // Current instance is last, append after it
+                const addButton = this.state.templateAddButtons.get(templateId);
+                if (addButton && addButton.parentElement === container) {
+                    container.insertBefore(clone, addButton);
+                } else {
+                    container.appendChild(clone);
+                }
+                insertIndex = currentInstanceIndex + 1;
+            } else {
+                // Fallback: insert before add button or append
+                const addButton = this.state.templateAddButtons.get(templateId);
+                if (addButton && addButton.parentElement === container) {
+                    container.insertBefore(clone, addButton);
+                } else {
+                    container.appendChild(clone);
+                }
+            }
         } else {
-            container.appendChild(clone);
+            // No current instance, insert before the add button (at the end)
+            const addButton = this.state.templateAddButtons.get(templateId);
+            if (addButton && addButton.parentElement === container) {
+                container.insertBefore(clone, addButton);
+            } else {
+                container.appendChild(clone);
+            }
         }
 
-        // Update instance tracking
-        templateInfo.instanceIds.push(newInstanceId);
+        // Update instance tracking - insert at correct position
+        templateInfo.instanceIds.splice(insertIndex, 0, newInstanceId);
         templateInfo.instanceCount = templateInfo.instanceIds.length;
         this.updateOrderContent(templateId, templateInfo);
 
@@ -476,6 +540,8 @@ export class TemplateManager {
 
         // Notify toolbar that we're in a template context
         this.updateToolbarTemplateContext();
+
+        return clone;
     }
 
     /**
@@ -778,6 +844,14 @@ export class TemplateManager {
         // Add delete button for this instance (skip if instance is also the editable element)
         if (!this.helpers.isInstanceAlsoEditable(instanceElement)) {
             this.addInstanceDeleteButton(instanceElement);
+
+            // Add click handler for instance selection (mobile controls visibility)
+            if (!instanceElement.dataset.scmsInstanceClickHandler) {
+                instanceElement.addEventListener("click", () => {
+                    this.helpers.selectInstance(instanceElement);
+                });
+                instanceElement.dataset.scmsInstanceClickHandler = "true";
+            }
         }
     }
 
@@ -907,45 +981,33 @@ export class TemplateManager {
 
         // Get template context from currently editing or selected element
         const activeKey = this.state.editingKey || this.state.selectedKey;
+
+        // If no editable element is active, check if an instance is selected
         if (!activeKey) {
-            // Clear template context when nothing is active
-            this.state.toolbar.templateId = null;
-            this.state.toolbar.instanceId = null;
-            this.state.toolbar.instanceIndex = null;
-            this.state.toolbar.instanceCount = null;
-            this.state.toolbar.structureMismatch = false;
+            if (this.state.selectedInstance) {
+                this.setToolbarContextFromInstance(this.state.selectedInstance);
+            } else {
+                this.clearToolbarTemplateContext();
+            }
             return;
         }
 
         const infos = this.state.editableElements.get(activeKey);
         if (!infos || infos.length === 0) {
-            this.state.toolbar.templateId = null;
-            this.state.toolbar.instanceId = null;
-            this.state.toolbar.instanceIndex = null;
-            this.state.toolbar.instanceCount = null;
-            this.state.toolbar.structureMismatch = false;
+            this.clearToolbarTemplateContext();
             return;
         }
 
         // Use the first info to get template context
         const info = infos[0];
         if (!info.templateId || !info.instanceId) {
-            // Element is not in a template
-            this.state.toolbar.templateId = null;
-            this.state.toolbar.instanceId = null;
-            this.state.toolbar.instanceIndex = null;
-            this.state.toolbar.instanceCount = null;
-            this.state.toolbar.structureMismatch = false;
+            this.clearToolbarTemplateContext();
             return;
         }
 
         const templateInfo = this.state.templates.get(info.templateId);
         if (!templateInfo) {
-            this.state.toolbar.templateId = null;
-            this.state.toolbar.instanceId = null;
-            this.state.toolbar.instanceIndex = null;
-            this.state.toolbar.instanceCount = null;
-            this.state.toolbar.structureMismatch = false;
+            this.clearToolbarTemplateContext();
             return;
         }
 
@@ -961,6 +1023,53 @@ export class TemplateManager {
         );
         this.state.toolbar.structureMismatch =
             instanceElement?.hasAttribute("data-scms-structure-mismatch") ?? false;
+    }
+
+    /**
+     * Clear toolbar template context
+     */
+    private clearToolbarTemplateContext(): void {
+        if (!this.state.toolbar) return;
+        this.state.toolbar.templateId = null;
+        this.state.toolbar.instanceId = null;
+        this.state.toolbar.instanceIndex = null;
+        this.state.toolbar.instanceCount = null;
+        this.state.toolbar.structureMismatch = false;
+    }
+
+    /**
+     * Set toolbar template context from an instance element
+     */
+    private setToolbarContextFromInstance(instanceElement: HTMLElement): void {
+        if (!this.state.toolbar) return;
+
+        const instanceId = instanceElement.getAttribute("data-scms-instance");
+        if (!instanceId) {
+            this.clearToolbarTemplateContext();
+            return;
+        }
+
+        // Find which template this instance belongs to
+        const templateContainer = instanceElement.closest("[data-scms-template]");
+        const templateId = templateContainer?.getAttribute("data-scms-template");
+        if (!templateId) {
+            this.clearToolbarTemplateContext();
+            return;
+        }
+
+        const templateInfo = this.state.templates.get(templateId);
+        if (!templateInfo) {
+            this.clearToolbarTemplateContext();
+            return;
+        }
+
+        this.state.toolbar.templateId = templateId;
+        this.state.toolbar.instanceId = instanceId;
+        this.state.toolbar.instanceIndex = templateInfo.instanceIds.indexOf(instanceId);
+        this.state.toolbar.instanceCount = templateInfo.instanceIds.length;
+        this.state.toolbar.structureMismatch = instanceElement.hasAttribute(
+            "data-scms-structure-mismatch",
+        );
     }
 
     // ==================== Public Accessors ====================

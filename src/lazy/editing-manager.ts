@@ -20,6 +20,7 @@ export interface EditingManagerHelpers {
     updateToolbarHasChanges: () => void;
     updateToolbarTemplateContext: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
+    scrollToElement: (element: HTMLElement, delay?: number) => void;
 }
 
 export class EditingManager {
@@ -128,8 +129,23 @@ export class EditingManager {
             this.state.selectedInstance.classList.remove("scms-instance-selected");
         }
 
+        // Deselect any element that's in a different instance
+        const newInstanceId = instanceElement.getAttribute("data-scms-instance");
+        const activeKey = this.state.editingKey || this.state.selectedKey;
+        if (activeKey && newInstanceId) {
+            const infos = this.state.editableElements.get(activeKey);
+            const activeInstanceId = infos?.[0]?.instanceId;
+            if (activeInstanceId && activeInstanceId !== newInstanceId) {
+                this.stopEditing();
+                this.deselectElement();
+            }
+        }
+
         this.state.selectedInstance = instanceElement;
         instanceElement.classList.add("scms-instance-selected");
+
+        // Update toolbar to show template controls
+        this.helpers.updateToolbarTemplateContext();
     }
 
     /**
@@ -140,6 +156,9 @@ export class EditingManager {
 
         this.state.selectedInstance.classList.remove("scms-instance-selected");
         this.state.selectedInstance = null;
+
+        // Update toolbar to clear template controls
+        this.helpers.updateToolbarTemplateContext();
     }
 
     /**
@@ -236,9 +255,7 @@ export class EditingManager {
 
         // On mobile, scroll the element into view after keyboard opens
         if (window.innerWidth < 640) {
-            setTimeout(() => {
-                primaryInfo.element.scrollIntoView({ block: "center", behavior: "smooth" });
-            }, 300);
+            this.helpers.scrollToElement(primaryInfo.element, 300);
         }
     }
 

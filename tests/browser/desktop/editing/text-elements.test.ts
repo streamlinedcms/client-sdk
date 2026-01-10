@@ -103,7 +103,7 @@ test("clicking outside deselects text element", async () => {
     expect(element.classList.contains("streamlined-editing")).toBe(false);
 });
 
-test("toolbar shows Attrs button for text elements", async () => {
+test("toolbar shows Attributes button for text elements", async () => {
     const element = getTextElement();
     const toolbar = getToolbar();
 
@@ -113,15 +113,15 @@ test("toolbar shows Attrs button for text elements", async () => {
     const shadowRoot = toolbar!.shadowRoot!;
     const buttons = shadowRoot.querySelectorAll("button");
 
-    let hasAttrsButton = false;
+    let hasAttributesButton = false;
     for (const btn of buttons) {
-        if (btn.textContent?.includes("Attrs")) {
-            hasAttrsButton = true;
+        if (btn.textContent?.includes("Attributes")) {
+            hasAttributesButton = true;
             break;
         }
     }
 
-    expect(hasAttrsButton).toBe(true);
+    expect(hasAttributesButton).toBe(true);
 });
 
 test("toolbar shows Reset button for text elements", async () => {
