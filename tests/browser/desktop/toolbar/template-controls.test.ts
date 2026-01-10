@@ -56,10 +56,10 @@ test("toolbar shows template controls when editing element inside template", asy
     const toolbar = document.querySelector("scms-toolbar");
     const shadowRoot = toolbar?.shadowRoot;
 
-    const moveUpButton = shadowRoot?.querySelector("button[title='Move up']");
-    const moveDownButton = shadowRoot?.querySelector("button[title='Move down']");
-    const addButton = shadowRoot?.querySelector("button[title='Add item']");
-    const deleteButton = shadowRoot?.querySelector("button[title='Delete item']");
+    const moveUpButton = shadowRoot?.querySelector("button[data-action='move-up']");
+    const moveDownButton = shadowRoot?.querySelector("button[data-action='move-down']");
+    const addButton = shadowRoot?.querySelector("button[data-action='add-item']");
+    const deleteButton = shadowRoot?.querySelector("button[data-action='delete-item']");
 
     expect(moveUpButton).not.toBeNull();
     expect(moveDownButton).not.toBeNull();
@@ -78,7 +78,7 @@ test("toolbar template controls are hidden when editing non-template element", a
     const toolbar = document.querySelector("scms-toolbar");
     const shadowRoot = toolbar?.shadowRoot;
 
-    const moveUpButton = shadowRoot?.querySelector("button[title='Move up']");
+    const moveUpButton = shadowRoot?.querySelector("button[data-action='move-up']");
     expect(moveUpButton).toBeNull();
 });
 
@@ -95,7 +95,7 @@ test("toolbar move up button is disabled for first instance", async () => {
     // Move up button should be disabled
     const toolbar = document.querySelector("scms-toolbar");
     const moveUpButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Move up']",
+        "button[data-action='move-up']",
     ) as HTMLButtonElement;
     expect(moveUpButton.disabled).toBe(true);
 });
@@ -115,7 +115,7 @@ test("toolbar move down button is disabled for last instance", async () => {
     // Move down button should be disabled
     const toolbar = document.querySelector("scms-toolbar");
     const moveDownButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Move down']",
+        "button[data-action='move-down']",
     ) as HTMLButtonElement;
     expect(moveDownButton.disabled).toBe(true);
 });
@@ -134,7 +134,7 @@ test("toolbar move up button reorders instance", async () => {
     // Click move up button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
     const moveUpButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Move up']",
+        "button[data-action='move-up']",
     ) as HTMLElement;
     moveUpButton.click();
 
@@ -160,7 +160,7 @@ test("toolbar move down button reorders instance", async () => {
     // Click move down button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
     const moveDownButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Move down']",
+        "button[data-action='move-down']",
     ) as HTMLElement;
     moveDownButton.click();
 
@@ -184,7 +184,7 @@ test("toolbar add button creates new instance", async () => {
 
     // Click add button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
-    const addButton = toolbar?.shadowRoot?.querySelector("button[title='Add item']") as HTMLElement;
+    const addButton = toolbar?.shadowRoot?.querySelector("button[data-action='add-item']") as HTMLElement;
     addButton.click();
 
     await waitForCondition(
@@ -211,7 +211,7 @@ test("toolbar delete button removes current instance", async () => {
     // Click delete button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
     const deleteButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Delete item']",
+        "button[data-action='delete-item']",
     ) as HTMLElement;
     deleteButton.click();
 
@@ -236,7 +236,7 @@ test("reorder is saved and persists after save", async () => {
 
     const toolbar = document.querySelector("scms-toolbar");
     const moveUpButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Move up']",
+        "button[data-action='move-up']",
     ) as HTMLElement;
     moveUpButton.click();
 

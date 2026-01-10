@@ -42,7 +42,7 @@ async function openAttributesModal(): Promise<AttributesModal> {
     link.click();
     await waitForCondition(() => link.classList.contains("streamlined-editing"));
 
-    const clicked = await clickToolbarButton("Attrs");
+    const clicked = await clickToolbarButton("Attributes");
     expect(clicked).toBe(true);
 
     await waitForSelector("scms-attributes-modal");
@@ -77,7 +77,7 @@ beforeEach(async () => {
     await resetState();
 });
 
-test("clicking Attrs button opens the modal", async () => {
+test("clicking Attributes button opens the modal", async () => {
     const modal = await openAttributesModal();
 
     expect(modal).not.toBeNull();

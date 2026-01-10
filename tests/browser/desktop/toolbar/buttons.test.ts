@@ -99,7 +99,7 @@ test("Edit Link button does NOT appear for html-type elements", async () => {
 
 // --- Common buttons for all elements ---
 
-test("SEO, A11y, and Attrs buttons appear when editing", async () => {
+test("SEO, Accessibility, and Attributes buttons appear when editing", async () => {
     const htmlElement = document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
     htmlElement.click();
 
@@ -107,8 +107,8 @@ test("SEO, A11y, and Attrs buttons appear when editing", async () => {
 
     const buttonTexts = getToolbarButtonTexts();
     expect(buttonTexts.some((t) => t.includes("SEO"))).toBe(true);
-    expect(buttonTexts.some((t) => t.includes("A11y"))).toBe(true);
-    expect(buttonTexts.some((t) => t.includes("Attrs"))).toBe(true);
+    expect(buttonTexts.some((t) => t.includes("Accessibility"))).toBe(true);
+    expect(buttonTexts.some((t) => t.includes("Attributes"))).toBe(true);
 });
 
 // --- Save button tests ---
