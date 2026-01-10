@@ -6,11 +6,14 @@
  * Usage: node scripts/cdn-upload.js <staging|production> [options]
  */
 
-import { execSync } from "child_process";
-import { readFileSync } from "fs";
+import { exec as execCallback, execSync } from "child_process";
+import { readFileSync, readdirSync } from "fs";
 import { createInterface } from "readline";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
+import { promisify } from "util";
+
+const exec = promisify(execCallback);
 import dotenv from "dotenv";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -51,23 +54,24 @@ if (!bucketName) {
 const version = versionOverride || packageJson.version;
 const collection = "client-sdk";
 
-const files = [
-    "streamlined-cms.js",
-    "streamlined-cms.js.map",
-    "streamlined-cms.min.js",
-    "streamlined-cms.min.js.map",
-    "streamlined-cms.esm.js",
-    "streamlined-cms.esm.js.map",
-    "streamlined-cms.esm.min.js",
-    "streamlined-cms.esm.min.js.map",
-];
-
 // Build first (unless --skip-build)
 if (skipBuild) {
     console.log("Skipping build (--skip-build)\n");
 } else {
     console.log("Building SDK...\n");
     execSync("npm run build", { stdio: "inherit", cwd: join(__dirname, "..") });
+}
+
+// Discover JS files in dist/ (excluding TypeScript declarations)
+const distPath = join(__dirname, "..", "dist");
+const files = readdirSync(distPath)
+    .filter((f) => f.endsWith(".js") || f.endsWith(".js.map"))
+    .filter((f) => !f.endsWith(".d.ts") && !f.endsWith(".d.ts.map"))
+    .sort();
+
+if (files.length === 0) {
+    console.error("Error: No JS files found in dist/");
+    process.exit(1);
 }
 
 // Check if version already exists in R2
@@ -110,18 +114,30 @@ if (!skipPrompts) {
 
 console.log();
 
-for (const file of files) {
+// Upload all files in parallel
+const uploads = files.map(async (file) => {
     const localPath = join(__dirname, "..", "dist", file);
     const r2Path = `${bucketName}/${collection}/${version}/${file}`;
 
     try {
-        execSync(`npx wrangler r2 object put "${r2Path}" --remote --file "${localPath}"`, {
-            stdio: "inherit",
-        });
+        await exec(`npx wrangler r2 object put "${r2Path}" --remote --file "${localPath}"`);
+        console.log(`  ✓ ${file}`);
+        return { file, success: true };
     } catch (error) {
-        console.error(`\nFailed to upload ${file}`);
-        process.exit(1);
+        console.error(`  ✗ ${file}`);
+        return { file, success: false, error };
     }
+});
+
+const results = await Promise.all(uploads);
+const failures = results.filter((r) => !r.success);
+
+if (failures.length > 0) {
+    console.error(`\nFailed to upload ${failures.length} file(s):`);
+    for (const { file } of failures) {
+        console.error(`  - ${file}`);
+    }
+    process.exit(1);
 }
 
 console.log(`\nUpload complete. SDK v${version} is now in ${bucketName}.`);
