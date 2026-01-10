@@ -1,0 +1,55 @@
+name: Check Release Label
+
+on:
+    workflow_call:
+        inputs:
+            labels:
+                description: "JSON array of PR label names"
+                required: true
+                type: string
+            require:
+                description: "Whether to fail if no release label found"
+                required: false
+                type: boolean
+                default: true
+        outputs:
+            type:
+                description: "The release type (major, minor, patch) or empty if none"
+                value: ${{ jobs.check.outputs.type }}
+            found:
+                description: "Whether a release label was found"
+                value: ${{ jobs.check.outputs.found }}
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+        outputs:
+            type: ${{ steps.check.outputs.type }}
+            found: ${{ steps.check.outputs.found }}
+
+        steps:
+            - name: Check for release label
+              id: check
+              run: |
+                  LABELS='${{ inputs.labels }}'
+                  if echo "$LABELS" | grep -q 'release:major'; then
+                      echo "type=major" >> $GITHUB_OUTPUT
+                      echo "found=true" >> $GITHUB_OUTPUT
+                      echo "Found release:major label"
+                  elif echo "$LABELS" | grep -q 'release:minor'; then
+                      echo "type=minor" >> $GITHUB_OUTPUT
+                      echo "found=true" >> $GITHUB_OUTPUT
+                      echo "Found release:minor label"
+                  elif echo "$LABELS" | grep -q 'release:patch'; then
+                      echo "type=patch" >> $GITHUB_OUTPUT
+                      echo "found=true" >> $GITHUB_OUTPUT
+                      echo "Found release:patch label"
+                  else
+                      echo "type=" >> $GITHUB_OUTPUT
+                      echo "found=false" >> $GITHUB_OUTPUT
+                      if [ "${{ inputs.require }}" = "true" ]; then
+                          echo "::error::PRs to master require a release:patch, release:minor, or release:major label"
+                          exit 1
+                      fi
+                      echo "No release label found (not required)"
+                  fi

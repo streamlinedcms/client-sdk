@@ -8,7 +8,7 @@
  *   - "<major>" -> current version (e.g., "0")
  *   - "<major>.<minor>" -> current version (e.g., "0.1")
  *
- * Usage: node scripts/cdn-publish.js <staging|production>
+ * Usage: node scripts/cdn-publish.js <staging|production> [options]
  */
 
 import { execSync } from "child_process";
@@ -25,15 +25,20 @@ const packageJson = JSON.parse(readFileSync(join(__dirname, "..", "package.json"
 
 const args = process.argv.slice(2);
 const environment = args.find((arg) => !arg.startsWith("--"));
-const flags = new Set(args.filter((arg) => arg.startsWith("--")));
+const flags = new Set(args.filter((arg) => arg.startsWith("--") && !arg.includes("=")));
+
+// Parse --version=X.Y.Z option
+const versionArg = args.find((arg) => arg.startsWith("--version="));
+const versionOverride = versionArg ? versionArg.split("=")[1] : null;
 
 // --ci implies --yes (used in CI pipelines)
 const skipPrompts = flags.has("--yes") || flags.has("--ci");
 
 if (!["staging", "production"].includes(environment)) {
-    console.error("Usage: node scripts/cdn-publish.js <staging|production> [--yes|--ci]");
-    console.error("  --yes  Skip confirmation prompts");
-    console.error("  --ci   Same as --yes (for CI pipelines)");
+    console.error("Usage: node scripts/cdn-publish.js <staging|production> [options]");
+    console.error("  --yes            Skip confirmation prompts");
+    console.error("  --ci             Same as --yes (for CI pipelines)");
+    console.error("  --version=X.Y.Z  Override version (e.g., 0.1.22-dev.20260110143052)");
     process.exit(1);
 }
 
@@ -48,8 +53,10 @@ if (!namespaceId) {
     process.exit(1);
 }
 
-const version = packageJson.version;
-const [major, minor] = version.split(".");
+const version = versionOverride || packageJson.version;
+// Extract major.minor from base version (before any prerelease suffix)
+const baseVersion = version.split("-")[0];
+const [major, minor] = baseVersion.split(".");
 
 // Asset collection name for KV key prefixing
 const collection = "client-sdk";
@@ -96,7 +103,7 @@ for (const [key, value] of kvEntries) {
     const kvKey = `${collection}/${key}`;
     try {
         execSync(
-            `wrangler kv key put --namespace-id="${namespaceId}" --remote "${kvKey}" "${value}"`,
+            `npx wrangler kv key put --namespace-id="${namespaceId}" --remote "${kvKey}" "${value}"`,
             { stdio: "inherit" },
         );
     } catch (error) {
