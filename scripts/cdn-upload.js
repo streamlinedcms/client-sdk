@@ -134,8 +134,10 @@ const failures = results.filter((r) => !r.success);
 
 if (failures.length > 0) {
     console.error(`\nFailed to upload ${failures.length} file(s):`);
-    for (const { file } of failures) {
+    for (const { file, error } of failures) {
         console.error(`  - ${file}`);
+        if (error.stderr) console.error(`    ${error.stderr.trim()}`);
+        if (error.stdout) console.error(`    ${error.stdout.trim()}`);
     }
     process.exit(1);
 }
