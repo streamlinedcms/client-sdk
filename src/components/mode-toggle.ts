@@ -8,19 +8,19 @@
  * inside other components like the toolbar.
  */
 
-import { LitElement, html } from "lit";
+import { html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 import { styleMap } from "lit/directives/style-map.js";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 
 export type EditorMode = "author" | "viewer";
 
 @customElement("scms-mode-toggle")
-export class ModeToggle extends LitElement {
+export class ModeToggle extends ScmsElement {
     @property({ type: String })
     mode: EditorMode = "viewer";
 
-    static styles = [tailwindSheet];
+    static styles = [...ScmsElement.styles];
 
     private handleModeChange(newMode: EditorMode) {
         if (newMode !== this.mode) {

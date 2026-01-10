@@ -19,11 +19,11 @@ interface TriggerError {
  * When the server sees content containing these strings, it returns the corresponding error.
  */
 const ERROR_TRIGGERS: Record<string, TriggerError> = {
-    "__TRIGGER_500__": { status: 500, message: "Internal Server Error" },
-    "__TRIGGER_401__": { status: 401, message: "Unauthorized" },
-    "__TRIGGER_403__": { status: 403, message: "Forbidden" },
-    "__TRIGGER_404__": { status: 404, message: "Not Found" },
-    "__TRIGGER_429__": { status: 429, message: "Too Many Requests" },
+    __TRIGGER_500__: { status: 500, message: "Internal Server Error" },
+    __TRIGGER_401__: { status: 401, message: "Unauthorized" },
+    __TRIGGER_403__: { status: 403, message: "Forbidden" },
+    __TRIGGER_404__: { status: 404, message: "Not Found" },
+    __TRIGGER_429__: { status: 429, message: "Too Many Requests" },
 };
 
 /**
@@ -261,7 +261,10 @@ export class TestServer {
 
         // Match: /apps/{appId}/content (GET, HEAD, or PATCH)
         const contentListMatch = pathname.match(/^\/apps\/([^/]+)\/content$/);
-        if (contentListMatch && (req.method === "GET" || req.method === "HEAD" || req.method === "PATCH")) {
+        if (
+            contentListMatch &&
+            (req.method === "GET" || req.method === "HEAD" || req.method === "PATCH")
+        ) {
             // Check for invalid API key (used for auth validation)
             if (this.checkAuthAndReject(req, res)) {
                 return true;
@@ -283,7 +286,10 @@ export class TestServer {
                 const body = await this.readBody(req);
                 const data = JSON.parse(body) as {
                     elements?: Record<string, { content: string } | null>;
-                    groups?: Record<string, { elements: Record<string, { content: string } | null> }>;
+                    groups?: Record<
+                        string,
+                        { elements: Record<string, { content: string } | null> }
+                    >;
                 };
 
                 // Check for error triggers in the request content
@@ -298,7 +304,8 @@ export class TestServer {
                 }
 
                 const responseElements: Record<string, ContentElement> = {};
-                const responseGroups: Record<string, { elements: Record<string, ContentElement> }> = {};
+                const responseGroups: Record<string, { elements: Record<string, ContentElement> }> =
+                    {};
                 const deletedElements: string[] = [];
                 const deletedGroups: Record<string, string[]> = {};
 
@@ -354,14 +361,16 @@ export class TestServer {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*",
                 });
-                res.end(JSON.stringify({
-                    elements: responseElements,
-                    groups: responseGroups,
-                    deleted: {
-                        elements: deletedElements,
-                        groups: deletedGroups,
-                    },
-                }));
+                res.end(
+                    JSON.stringify({
+                        elements: responseElements,
+                        groups: responseGroups,
+                        deleted: {
+                            elements: deletedElements,
+                            groups: deletedGroups,
+                        },
+                    }),
+                );
                 return true;
             }
 
@@ -499,7 +508,7 @@ export class TestServer {
 
     async start(): Promise<void> {
         // Use preferred port if specified, otherwise find any available port
-        this.port = this.preferredPort ?? await getPort();
+        this.port = this.preferredPort ?? (await getPort());
 
         return new Promise((resolve, reject) => {
             this.server = createServer(async (req, res) => {

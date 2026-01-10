@@ -217,10 +217,7 @@ test("getStoredKey prefers scoped key over legacy key", () => {
 
 test("getStoredMode falls back to legacy key if scoped key is empty", () => {
     // Store in legacy key with matching appId
-    localStorage.setItem(
-        LEGACY_MODE_KEY,
-        JSON.stringify({ mode: "author", appId: TEST_APP_ID }),
-    );
+    localStorage.setItem(LEGACY_MODE_KEY, JSON.stringify({ mode: "author", appId: TEST_APP_ID }));
 
     const storage = new KeyStorage(TEST_APP_ID);
     expect(storage.getStoredMode()).toBe("author");
@@ -228,10 +225,7 @@ test("getStoredMode falls back to legacy key if scoped key is empty", () => {
 
 test("getStoredMode returns null if legacy key has different appId", () => {
     // Store in legacy key with different appId
-    localStorage.setItem(
-        LEGACY_MODE_KEY,
-        JSON.stringify({ mode: "author", appId: "other-app" }),
-    );
+    localStorage.setItem(LEGACY_MODE_KEY, JSON.stringify({ mode: "author", appId: "other-app" }));
 
     const storage = new KeyStorage(TEST_APP_ID);
     expect(storage.getStoredMode()).toBeNull();

@@ -28,8 +28,10 @@ function cssAsStringPlugin(): Plugin {
         name: "css-as-string",
         enforce: "post", // Run after Vite's CSS processing
         transform(code, id) {
-            // Only handle CSS files in src/ (not node_modules or processed CSS)
-            if (id.endsWith(".css") && id.includes("/src/")) {
+            // Handle CSS files in src/ and driver.js (for tours)
+            const shouldHandle =
+                id.endsWith(".css") && (id.includes("/src/") || id.includes("driver.js"));
+            if (shouldHandle) {
                 // Vite may have already wrapped this - check if it's a module
                 if (code.startsWith("export default")) {
                     return; // Already processed
@@ -70,6 +72,7 @@ export default defineConfig({
             "lit/decorators.js",
             "lit/directives/style-map.js",
             "penpal",
+            "driver.js",
         ],
     },
     css: {

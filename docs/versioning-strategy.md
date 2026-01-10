@@ -222,6 +222,56 @@ When to bump major version:
 
 ---
 
+## Prerelease Versions
+
+Prerelease versions allow testing before stable release. They have their own alias pipeline, isolated from stable aliases.
+
+### Prerelease Types
+
+| Type | Example | Purpose |
+|------|---------|---------|
+| Alpha | `1.0.0-alpha.0` | Early testing, incomplete features |
+| Beta | `1.0.0-beta.0` | Feature complete, external testing welcome |
+| RC | `1.0.0-rc.0` | Release candidate, believed ready |
+
+### Prerelease URL Structure
+
+```
+cdn.streamlinedcms.com/
+├── beta/streamlined-cms.js       → latest beta (any version)
+├── rc/streamlined-cms.js         → latest rc (any version)
+├── v1.0.0-beta/streamlined-cms.js → latest 1.0.0 beta build
+├── v1.0.0-rc/streamlined-cms.js   → latest 1.0.0 rc build
+├── v1.0.0-beta.3/streamlined-cms.js → exact prerelease
+```
+
+### Prerelease Aliases
+
+Prerelease aliases are separate from stable aliases:
+
+| Alias | Resolves To | Updated When |
+|-------|-------------|--------------|
+| `beta` | Latest beta of any version | New beta published |
+| `rc` | Latest rc of any version | New rc published |
+| `1.0.0-beta` | Latest beta for 1.0.0 | New 1.0.0 beta published |
+| `1.0.0-rc` | Latest rc for 1.0.0 | New 1.0.0 rc published |
+
+**Important:** Prerelease versions never update stable aliases (`latest`, `v1`, `v1.0`).
+
+### Cache Headers for Prereleases
+
+| URL Pattern | Cache Strategy |
+|-------------|---------------|
+| `/v1.0.0-beta.3/` | Immutable, long TTL (exact prerelease) |
+| `/v1.0.0-beta/` | Short TTL, revalidate (alias) |
+| `/beta/` | Short TTL, revalidate (alias) |
+
+### Future Expansion
+
+Major/minor prerelease aliases (e.g., `beta/1`, `beta/1.0`) may be added if a use case emerges for tracking prereleases across version lines. Currently deferred as typical workflow has only one version in beta at a time.
+
+---
+
 ## Version Discovery
 
 For tooling and automation, provide a version manifest:

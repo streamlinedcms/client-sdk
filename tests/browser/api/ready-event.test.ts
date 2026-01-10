@@ -64,8 +64,12 @@ test("streamlined-cms:ready event bubbles by default", () => {
 test("multiple handlers can listen for streamlined-cms:ready", () => {
     let count = 0;
 
-    const handler1 = () => { count++; };
-    const handler2 = () => { count++; };
+    const handler1 = () => {
+        count++;
+    };
+    const handler2 = () => {
+        count++;
+    };
 
     document.addEventListener("streamlined-cms:ready", handler1, { once: true });
     document.addEventListener("streamlined-cms:ready", handler2, { once: true });

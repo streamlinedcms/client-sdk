@@ -3,17 +3,12 @@
  */
 
 import { test, expect, beforeAll, afterAll } from "vitest";
-import {
-    initializeSDK,
-    setupTestHelpers,
-
-} from "~/@browser-support/sdk-helpers.js";
+import { initializeSDK, setupTestHelpers } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
     await initializeSDK();
 });
-
 
 test("toolbar renders desktop view", async () => {
     const toolbar = document.querySelector("scms-toolbar");

@@ -707,7 +707,11 @@
                     </p>
 
                     <!-- Standalone promo banner (outside template) for testing sync -->
-                    <div class="promo-banner" data-scms-group="promo-banner" style="margin-bottom: 1rem;">
+                    <div
+                        class="promo-banner"
+                        data-scms-group="promo-banner"
+                        style="margin-bottom: 1rem"
+                    >
                         <span data-scms-text="promo-text">Free Shipping on Orders $50+</span>
                     </div>
 
@@ -783,7 +787,9 @@
                             />
                             <h4 data-scms-text="name">Mike Rodriguez</h4>
                             <p class="role" data-scms-text="role">Senior Developer</p>
-                            <p class="bio" data-scms-text="bio">Full-stack engineer with 10 years experience.</p>
+                            <p class="bio" data-scms-text="bio">
+                                Full-stack engineer with 10 years experience.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -947,46 +953,48 @@
 
         <!-- Mobile debugging console (eruda) - loaded async so it doesn't block SDK -->
         <script>
-            (function() {
-                var script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/eruda';
-                script.onload = function() { eruda.init(); };
+            (function () {
+                var script = document.createElement("script");
+                script.src = "https://cdn.jsdelivr.net/npm/eruda";
+                script.onload = function () {
+                    eruda.init();
+                };
                 document.body.appendChild(script);
             })();
         </script>
 
         <!-- Demo auto-signin logic -->
         <script>
-            (function() {
-                var DEMO_EMAIL = 'demo@streamlinedcms.com';
-                var DEMO_PASSWORD = 'demo1234';
-                var FLAG_KEY = 'scms_demo_has_signed_in';
+            (function () {
+                var DEMO_EMAIL = "demo@streamlinedcms.com";
+                var DEMO_PASSWORD = "demo1234";
+                var FLAG_KEY = "scms_demo_has_signed_in";
 
                 // Wait for SDK to be available on window
-                document.addEventListener('streamlined-cms:ready', async function() {
+                document.addEventListener("streamlined-cms:ready", async function () {
                     // Set flag whenever user signs in (via popup or programmatic)
-                    StreamlinedCMS.on('signin', function() {
-                        localStorage.setItem(FLAG_KEY, 'true');
+                    StreamlinedCMS.on("signin", function () {
+                        localStorage.setItem(FLAG_KEY, "true");
                     });
 
                     // Clear flag on signout
-                    StreamlinedCMS.on('signout', function() {
+                    StreamlinedCMS.on("signout", function () {
                         localStorage.removeItem(FLAG_KEY);
                     });
 
                     // Wait for auth to be determined
-                    await StreamlinedCMS.ready('auth');
+                    await StreamlinedCMS.ready("auth");
 
                     // If not authenticated, check if we should auto sign-in
                     if (!StreamlinedCMS.isAuthenticated) {
-                        var hasSignedInBefore = localStorage.getItem(FLAG_KEY) === 'true';
+                        var hasSignedInBefore = localStorage.getItem(FLAG_KEY) === "true";
                         if (hasSignedInBefore) {
-                            console.log('[Demo] Auto signing in...');
+                            console.log("[Demo] Auto signing in...");
                             var result = await StreamlinedCMS.signIn(DEMO_EMAIL, DEMO_PASSWORD);
                             if (result.success) {
-                                console.log('[Demo] Auto sign-in successful');
+                                console.log("[Demo] Auto sign-in successful");
                             } else {
-                                console.warn('[Demo] Auto sign-in failed:', result.error);
+                                console.warn("[Demo] Auto sign-in failed:", result.error);
                             }
                         }
                     }

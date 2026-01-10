@@ -1,0 +1,143 @@
+name: Deploy Production
+
+on:
+    pull_request:
+        branches: [master]
+        types: [closed]
+
+jobs:
+    check-label:
+        if: github.event.pull_request.merged == true
+        uses: ./.github/workflows/check-release-label.yml
+        with:
+            labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+            require: true
+            head_ref: ${{ github.event.pull_request.head.ref }}
+
+    deploy:
+        needs: check-label
+        runs-on: ubuntu-latest
+        environment: production
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+                  cache: "npm"
+
+            - name: Install dependencies
+              run: npm ci
+
+            - name: Bump version
+              id: version
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  BUMP_TYPE="${{ needs.check-label.outputs.type }}"
+                  HEAD_REF="${{ github.event.pull_request.head.ref }}"
+                  CURRENT_VERSION=$(node -p "require('./package.json').version")
+
+                  echo "Source branch: $HEAD_REF"
+                  echo "Current version: $CURRENT_VERSION"
+                  echo "Bump type: $BUMP_TYPE"
+
+                  # Check if this is a release branch with prerelease suffix
+                  if [[ "$HEAD_REF" =~ ^release/([0-9]+\.[0-9]+\.[0-9]+)(-([a-z]+))?$ ]]; then
+                      TARGET_BASE="${BASH_REMATCH[1]}"
+                      PRERELEASE_SUFFIX="${BASH_REMATCH[3]}"
+
+                      if [ -n "$PRERELEASE_SUFFIX" ]; then
+                          echo "Prerelease branch detected: $PRERELEASE_SUFFIX"
+
+                          # Check if already in this prerelease series
+                          if [[ "$CURRENT_VERSION" == "$TARGET_BASE-$PRERELEASE_SUFFIX"* ]]; then
+                              echo "Incrementing existing $PRERELEASE_SUFFIX series"
+                              npm version prerelease -m "chore: release v%s"
+                          else
+                              echo "Starting new $PRERELEASE_SUFFIX series"
+                              npm version "pre$BUMP_TYPE" --preid="$PRERELEASE_SUFFIX" -m "chore: release v%s"
+                          fi
+                      else
+                          echo "Stable release branch"
+                          npm version "$BUMP_TYPE" -m "chore: release v%s"
+                      fi
+                  else
+                      echo "Regular branch (not release/*)"
+                      npm version "$BUMP_TYPE" -m "chore: release v%s"
+                  fi
+
+                  NEW_VERSION=$(node -p "require('./package.json').version")
+                  echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+                  echo "New version: $NEW_VERSION"
+
+            - name: Push version commit and tag
+              run: git push --follow-tags
+
+            - name: Create .env for build
+              run: |
+                  echo "SDK_API_URL=${{ vars.SDK_API_URL }}" >> .env
+                  echo "SDK_APP_URL=${{ vars.SDK_APP_URL }}" >> .env
+                  echo "R2_BUCKET_PRODUCTION=${{ vars.R2_BUCKET_PRODUCTION }}" >> .env
+                  echo "KV_NAMESPACE_PRODUCTION=${{ vars.KV_NAMESPACE_PRODUCTION }}" >> .env
+
+            - name: Build
+              run: npm run build
+
+            - name: Upload to CDN
+              run: node scripts/cdn-upload.js production --ci --skip-build
+              env:
+                  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+            - name: Publish version
+              run: node scripts/cdn-publish.js production --ci
+              env:
+                  CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+    sync-develop:
+        needs: deploy
+        if: startsWith(github.event.pull_request.head.ref, 'release/')
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+                  token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Sync master to develop
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "github-actions[bot]@users.noreply.github.com"
+
+                  git fetch origin master develop
+                  git checkout develop
+
+                  if git merge origin/master --no-edit; then
+                      echo "Merge successful, pushing to develop"
+                      git push
+                  else
+                      echo "Merge conflict detected, creating PR for manual resolution"
+                      git merge --abort
+                      gh pr create --base develop --head master \
+                          --title "Sync master to develop" \
+                          --body "Auto-generated PR to sync release changes back to develop. Manual conflict resolution required."
+                  fi
+
+            - name: Delete release branch
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+              run: |
+                  echo "Deleting branch: $HEAD_REF"
+                  git push origin --delete "$HEAD_REF"

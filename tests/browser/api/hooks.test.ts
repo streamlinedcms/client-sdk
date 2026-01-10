@@ -7,11 +7,7 @@
  */
 
 import { test, expect, beforeAll } from "vitest";
-import {
-    initializeSDK,
-    setupTestHelpers,
-    getController,
-} from "~/@browser-support/sdk-helpers.js";
+import { initializeSDK, setupTestHelpers, getController } from "~/@browser-support/sdk-helpers.js";
 
 beforeAll(async () => {
     setupTestHelpers();
@@ -90,8 +86,12 @@ test("off() only removes the specific handler", () => {
 
     let callCount1 = 0;
     let callCount2 = 0;
-    const handler1 = () => { callCount1++; };
-    const handler2 = () => { callCount2++; };
+    const handler1 = () => {
+        callCount1++;
+    };
+    const handler2 = () => {
+        callCount2++;
+    };
 
     controller!.on("signout", handler1);
     controller!.on("signout", handler2);

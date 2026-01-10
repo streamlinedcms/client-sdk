@@ -50,9 +50,10 @@ beforeAll(async () => {
     await initializeSDK({ appId });
 });
 
-
 test("typed link content is parsed correctly (not shown as raw JSON)", async () => {
-    const link = document.querySelector('[data-scms-link="test-link-parsing"]') as HTMLAnchorElement;
+    const link = document.querySelector(
+        '[data-scms-link="test-link-parsing"]',
+    ) as HTMLAnchorElement;
 
     // Verify the link text is the parsed text, NOT the raw JSON
     expect(link.textContent).toBe("Parsed Link Text");
@@ -78,7 +79,9 @@ test("typed text content is parsed correctly", async () => {
 
 test("link content has proper attributes parsed from type:link format", async () => {
     // Verify the typed link format is fully parsed
-    const link = document.querySelector('[data-scms-link="test-link-parsing"]') as HTMLAnchorElement;
+    const link = document.querySelector(
+        '[data-scms-link="test-link-parsing"]',
+    ) as HTMLAnchorElement;
 
     // href and target should be set from the JSON structure
     expect(link.href).toContain("parsed-link.com");

@@ -21,12 +21,36 @@ beforeAll(async () => {
 
     // Set up content for all templates that will be tested
     // Team template: 3 instances with known IDs
-    await setContent(appId, "team-rendering.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent(appId, "team-rendering.abc12.role", JSON.stringify({ type: "text", value: "CEO" }));
-    await setContent(appId, "team-rendering.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    await setContent(appId, "team-rendering.def34.role", JSON.stringify({ type: "text", value: "CTO" }));
-    await setContent(appId, "team-rendering.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
-    await setContent(appId, "team-rendering.ghi56.role", JSON.stringify({ type: "text", value: "Designer" }));
+    await setContent(
+        appId,
+        "team-rendering.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    await setContent(
+        appId,
+        "team-rendering.abc12.role",
+        JSON.stringify({ type: "text", value: "CEO" }),
+    );
+    await setContent(
+        appId,
+        "team-rendering.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    await setContent(
+        appId,
+        "team-rendering.def34.role",
+        JSON.stringify({ type: "text", value: "CTO" }),
+    );
+    await setContent(
+        appId,
+        "team-rendering.ghi56.name",
+        JSON.stringify({ type: "text", value: "Carol" }),
+    );
+    await setContent(
+        appId,
+        "team-rendering.ghi56.role",
+        JSON.stringify({ type: "text", value: "Designer" }),
+    );
     await setContent(
         appId,
         "team-rendering._order",
@@ -71,12 +95,15 @@ beforeAll(async () => {
         "features.feat2.feature",
         JSON.stringify({ type: "text", value: "API Feature B" }),
     );
-    await setContent(appId, "features._order", JSON.stringify({ type: "order", value: ["feat1", "feat2"] }));
+    await setContent(
+        appId,
+        "features._order",
+        JSON.stringify({ type: "order", value: ["feat1", "feat2"] }),
+    );
 
     // Initialize SDK once for all tests
     await initializeSDK({ appId });
 });
-
 
 test("template clones instances based on stored content", async () => {
     const teamContainer = document.querySelector('[data-scms-template="team-rendering"]');
@@ -115,9 +142,15 @@ test("template inside group uses grouped storage keys", async () => {
     expect(testimonials?.[0].querySelector('[data-scms-text="quote"]')?.textContent).toBe(
         "Great product!",
     );
-    expect(testimonials?.[0].querySelector('[data-scms-text="author"]')?.textContent).toBe("John Doe");
-    expect(testimonials?.[1].querySelector('[data-scms-text="quote"]')?.textContent).toBe("Love it!");
-    expect(testimonials?.[1].querySelector('[data-scms-text="author"]')?.textContent).toBe("Jane Smith");
+    expect(testimonials?.[0].querySelector('[data-scms-text="author"]')?.textContent).toBe(
+        "John Doe",
+    );
+    expect(testimonials?.[1].querySelector('[data-scms-text="quote"]')?.textContent).toBe(
+        "Love it!",
+    );
+    expect(testimonials?.[1].querySelector('[data-scms-text="author"]')?.textContent).toBe(
+        "Jane Smith",
+    );
 });
 
 test("template structure mismatch is detected and marked", async () => {

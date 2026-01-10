@@ -5,9 +5,9 @@
  * Fields are shown based on relevance to the element type.
  */
 
-import { LitElement, html, css, nothing } from "lit";
+import { html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 import type { EditableType, ElementAttributes } from "../types.js";
 
 interface FieldConfig {
@@ -85,7 +85,7 @@ const SEO_FIELDS: FieldConfig[] = [
 ];
 
 @customElement("scms-seo-modal")
-export class SeoModal extends LitElement {
+export class SeoModal extends ScmsElement {
     @property({ type: String, attribute: "element-id" })
     elementId: string | null = null;
 
@@ -102,7 +102,7 @@ export class SeoModal extends LitElement {
     private showNotApplicable = false;
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             :host {
                 position: fixed;
@@ -110,7 +110,7 @@ export class SeoModal extends LitElement {
                 left: 0;
                 right: 0;
                 bottom: 0;
-                z-index: 2147483647;
+                z-index: 10001;
                 display: flex;
                 align-items: center;
                 justify-content: center;

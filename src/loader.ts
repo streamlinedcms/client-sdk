@@ -159,7 +159,11 @@
             for (let i = 0; i < el.attributes.length; i++) {
                 const attr = el.attributes[i];
                 // Keep: id, class, and data-scms-* attributes (element ID defines structure)
-                if (attr.name === "id" || attr.name === "class" || attr.name.startsWith("data-scms-")) {
+                if (
+                    attr.name === "id" ||
+                    attr.name === "class" ||
+                    attr.name.startsWith("data-scms-")
+                ) {
                     continue;
                 }
                 attributesToRemove.push(attr.name);
@@ -702,13 +706,18 @@
                 if (response.status === 402) {
                     // Free plan - custom domains require upgrade
                     try {
-                        const data = (await response.json()) as { error?: string; upgradeUrl?: string };
+                        const data = (await response.json()) as {
+                            error?: string;
+                            upgradeUrl?: string;
+                        };
                         console.warn(
                             `[StreamlinedCMS] ${data.error || "Upgrade required"}`,
                             data.upgradeUrl ? `\nUpgrade at: ${data.upgradeUrl}` : "",
                         );
                     } catch {
-                        console.warn("[StreamlinedCMS] Upgrade required to access from this domain");
+                        console.warn(
+                            "[StreamlinedCMS] Upgrade required to access from this domain",
+                        );
                     }
                     return null;
                 }

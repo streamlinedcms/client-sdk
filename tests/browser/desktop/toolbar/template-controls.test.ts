@@ -18,9 +18,21 @@ beforeAll(async () => {
     const appId = generateTestAppId();
 
     // Set up team with 3 members for move/reorder tests
-    await setContent(appId, "team-controls.abc12.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent(appId, "team-controls.def34.name", JSON.stringify({ type: "text", value: "Bob" }));
-    await setContent(appId, "team-controls.ghi56.name", JSON.stringify({ type: "text", value: "Carol" }));
+    await setContent(
+        appId,
+        "team-controls.abc12.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    await setContent(
+        appId,
+        "team-controls.def34.name",
+        JSON.stringify({ type: "text", value: "Bob" }),
+    );
+    await setContent(
+        appId,
+        "team-controls.ghi56.name",
+        JSON.stringify({ type: "text", value: "Carol" }),
+    );
     await setContent(
         appId,
         "team-controls._order",
@@ -30,10 +42,11 @@ beforeAll(async () => {
     await initializeSDK({ appId });
 });
 
-
 test("toolbar shows template controls when editing element inside template", async () => {
     // Click on a template element
-    const teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
+    const teamMembers = document.querySelectorAll(
+        '[data-scms-template="team-controls"] .team-member',
+    );
     const firstName = teamMembers[0].querySelector('[data-scms-text="name"]') as HTMLElement;
     firstName.click();
 
@@ -43,10 +56,10 @@ test("toolbar shows template controls when editing element inside template", asy
     const toolbar = document.querySelector("scms-toolbar");
     const shadowRoot = toolbar?.shadowRoot;
 
-    const moveUpButton = shadowRoot?.querySelector("button[title='Move up']");
-    const moveDownButton = shadowRoot?.querySelector("button[title='Move down']");
-    const addButton = shadowRoot?.querySelector("button[title='Add item']");
-    const deleteButton = shadowRoot?.querySelector("button[title='Delete item']");
+    const moveUpButton = shadowRoot?.querySelector("button[data-action='move-up']");
+    const moveDownButton = shadowRoot?.querySelector("button[data-action='move-down']");
+    const addButton = shadowRoot?.querySelector("button[data-action='add-item']");
+    const deleteButton = shadowRoot?.querySelector("button[data-action='delete-item']");
 
     expect(moveUpButton).not.toBeNull();
     expect(moveDownButton).not.toBeNull();
@@ -65,13 +78,15 @@ test("toolbar template controls are hidden when editing non-template element", a
     const toolbar = document.querySelector("scms-toolbar");
     const shadowRoot = toolbar?.shadowRoot;
 
-    const moveUpButton = shadowRoot?.querySelector("button[title='Move up']");
+    const moveUpButton = shadowRoot?.querySelector("button[data-action='move-up']");
     expect(moveUpButton).toBeNull();
 });
 
 test("toolbar move up button is disabled for first instance", async () => {
     // Click on first instance
-    const teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
+    const teamMembers = document.querySelectorAll(
+        '[data-scms-template="team-controls"] .team-member',
+    );
     const firstName = teamMembers[0].querySelector('[data-scms-text="name"]') as HTMLElement;
     firstName.click();
 
@@ -80,15 +95,19 @@ test("toolbar move up button is disabled for first instance", async () => {
     // Move up button should be disabled
     const toolbar = document.querySelector("scms-toolbar");
     const moveUpButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Move up']",
+        "button[data-action='move-up']",
     ) as HTMLButtonElement;
     expect(moveUpButton.disabled).toBe(true);
 });
 
 test("toolbar move down button is disabled for last instance", async () => {
     // Click on last instance
-    const teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
-    const lastName = teamMembers[teamMembers.length - 1].querySelector('[data-scms-text="name"]') as HTMLElement;
+    const teamMembers = document.querySelectorAll(
+        '[data-scms-template="team-controls"] .team-member',
+    );
+    const lastName = teamMembers[teamMembers.length - 1].querySelector(
+        '[data-scms-text="name"]',
+    ) as HTMLElement;
     lastName.click();
 
     await waitForCondition(() => lastName.getAttribute("contenteditable") === "true");
@@ -96,13 +115,15 @@ test("toolbar move down button is disabled for last instance", async () => {
     // Move down button should be disabled
     const toolbar = document.querySelector("scms-toolbar");
     const moveDownButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Move down']",
+        "button[data-action='move-down']",
     ) as HTMLButtonElement;
     expect(moveDownButton.disabled).toBe(true);
 });
 
 test("toolbar move up button reorders instance", async () => {
-    let teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
+    let teamMembers = document.querySelectorAll(
+        '[data-scms-template="team-controls"] .team-member',
+    );
 
     // Click on second instance to select it
     const secondName = teamMembers[1].querySelector('[data-scms-text="name"]') as HTMLElement;
@@ -112,7 +133,9 @@ test("toolbar move up button reorders instance", async () => {
 
     // Click move up button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
-    const moveUpButton = toolbar?.shadowRoot?.querySelector("button[title='Move up']") as HTMLElement;
+    const moveUpButton = toolbar?.shadowRoot?.querySelector(
+        "button[data-action='move-up']",
+    ) as HTMLElement;
     moveUpButton.click();
 
     await new Promise((r) => setTimeout(r, 100));
@@ -124,7 +147,9 @@ test("toolbar move up button reorders instance", async () => {
 });
 
 test("toolbar move down button reorders instance", async () => {
-    let teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
+    let teamMembers = document.querySelectorAll(
+        '[data-scms-template="team-controls"] .team-member',
+    );
 
     // Click on first instance to select it (which is now Bob after previous test)
     const firstName = teamMembers[0].querySelector('[data-scms-text="name"]') as HTMLElement;
@@ -135,7 +160,7 @@ test("toolbar move down button reorders instance", async () => {
     // Click move down button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
     const moveDownButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Move down']",
+        "button[data-action='move-down']",
     ) as HTMLElement;
     moveDownButton.click();
 
@@ -159,7 +184,9 @@ test("toolbar add button creates new instance", async () => {
 
     // Click add button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
-    const addButton = toolbar?.shadowRoot?.querySelector("button[title='Add item']") as HTMLElement;
+    const addButton = toolbar?.shadowRoot?.querySelector(
+        "button[data-action='add-item']",
+    ) as HTMLElement;
     addButton.click();
 
     await waitForCondition(
@@ -176,7 +203,9 @@ test("toolbar delete button removes current instance", async () => {
 
     // Click on last instance to select it
     let teamMembers = teamContainer?.querySelectorAll(".team-member");
-    const lastName = teamMembers?.[teamMembers.length - 1].querySelector('[data-scms-text="name"]') as HTMLElement;
+    const lastName = teamMembers?.[teamMembers.length - 1].querySelector(
+        '[data-scms-text="name"]',
+    ) as HTMLElement;
     lastName.click();
 
     await waitForCondition(() => lastName.getAttribute("contenteditable") === "true");
@@ -184,7 +213,7 @@ test("toolbar delete button removes current instance", async () => {
     // Click delete button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
     const deleteButton = toolbar?.shadowRoot?.querySelector(
-        "button[title='Delete item']",
+        "button[data-action='delete-item']",
     ) as HTMLElement;
     deleteButton.click();
 
@@ -197,7 +226,9 @@ test("toolbar delete button removes current instance", async () => {
 });
 
 test("reorder is saved and persists after save", async () => {
-    let teamMembers = document.querySelectorAll('[data-scms-template="team-controls"] .team-member');
+    let teamMembers = document.querySelectorAll(
+        '[data-scms-template="team-controls"] .team-member',
+    );
     const firstMemberName = teamMembers[0].querySelector('[data-scms-text="name"]')?.textContent;
 
     // Click on second instance and move up
@@ -206,7 +237,9 @@ test("reorder is saved and persists after save", async () => {
     await waitForCondition(() => secondName.getAttribute("contenteditable") === "true");
 
     const toolbar = document.querySelector("scms-toolbar");
-    const moveUpButton = toolbar?.shadowRoot?.querySelector("button[title='Move up']") as HTMLElement;
+    const moveUpButton = toolbar?.shadowRoot?.querySelector(
+        "button[data-action='move-up']",
+    ) as HTMLElement;
     moveUpButton.click();
 
     await new Promise((r) => setTimeout(r, 100));

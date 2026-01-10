@@ -9,11 +9,7 @@
 
 import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
-import {
-    EDITABLE_SELECTOR,
-    IMAGE_PLACEHOLDER_DATA_URI,
-    type EditableType,
-} from "../types.js";
+import { EDITABLE_SELECTOR, IMAGE_PLACEHOLDER_DATA_URI, type EditableType } from "../types.js";
 
 /**
  * Storage context for an element (used for building keys)
@@ -223,7 +219,10 @@ export class DraftManager {
         // Step 2: Apply content changes
         for (const [key, value] of Object.entries(draft.content)) {
             // Skip _order keys - they were handled in reconciliation
-            if (key.endsWith("._order") || (key.includes(":") && key.split(":")[1].endsWith("._order"))) {
+            if (
+                key.endsWith("._order") ||
+                (key.includes(":") && key.split(":")[1].endsWith("._order"))
+            ) {
                 continue;
             }
 

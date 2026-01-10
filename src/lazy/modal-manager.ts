@@ -140,7 +140,9 @@ export class ModalManager {
             const candidate = await this.state.mediaManagerModal.fetchImageAsCandidate(img);
             if (candidate) {
                 options.candidates = [candidate];
-                this.log.debug("Offering current image as candidate", { filename: candidate.filename });
+                this.log.debug("Offering current image as candidate", {
+                    filename: candidate.filename,
+                });
             }
         }
 
@@ -205,7 +207,7 @@ export class ModalManager {
 
         // Create and show modal
         const modal = document.createElement("scms-html-editor-modal") as HtmlEditorModal;
-        modal.elementId = primaryInfo.elementId;
+        modal.elementId = key;
         modal.content = htmlValue;
 
         // Prevent clicks inside modal from deselecting the element
@@ -267,9 +269,9 @@ export class ModalManager {
 
         // Create and show modal
         const modal = document.createElement("scms-link-editor-modal") as LinkEditorModal;
-        modal.elementId = primaryInfo.elementId;
+        modal.elementId = key;
         modal.linkData = {
-            href: primaryAnchor.getAttribute('href') || '',
+            href: primaryAnchor.getAttribute("href") || "",
             target: primaryAnchor.target,
             value: primaryAnchor.innerHTML,
         };
@@ -426,7 +428,7 @@ export class ModalManager {
         this.log.debug("Opening SEO modal", { key, elementId: primaryInfo.elementId, elementType });
 
         const modal = document.createElement("scms-seo-modal") as SeoModal;
-        modal.elementId = primaryInfo.elementId;
+        modal.elementId = key;
         modal.elementType = elementType;
         // Merge DOM attributes (as defaults) with stored attributes (take precedence)
         modal.elementAttrs = this.getMergedAttributes(key, primaryInfo.element, SEO_ATTRIBUTES);
@@ -481,7 +483,7 @@ export class ModalManager {
         });
 
         const modal = document.createElement("scms-accessibility-modal") as AccessibilityModal;
-        modal.elementId = primaryInfo.elementId;
+        modal.elementId = key;
         modal.elementType = elementType;
         // Merge DOM attributes (as defaults) with stored attributes (take precedence)
         modal.elementAttrs = this.getMergedAttributes(
@@ -535,11 +537,13 @@ export class ModalManager {
         this.log.debug("Opening attributes modal", { key, elementId: primaryInfo.elementId });
 
         const modal = document.createElement("scms-attributes-modal") as AttributesModal;
-        modal.elementId = primaryInfo.elementId;
+        modal.elementId = key;
         modal.elementAttrs = this.getElementAttributes(key);
-        const { elementAttrs: elementDefinedAttrs, reservedAttrs, otherAttrs } = this.getDomAttributes(
-            primaryInfo.element,
-        );
+        const {
+            elementAttrs: elementDefinedAttrs,
+            reservedAttrs,
+            otherAttrs,
+        } = this.getDomAttributes(primaryInfo.element);
         modal.elementDefinedAttrs = elementDefinedAttrs;
         modal.reservedAttrs = reservedAttrs;
         modal.otherAttrs = otherAttrs;

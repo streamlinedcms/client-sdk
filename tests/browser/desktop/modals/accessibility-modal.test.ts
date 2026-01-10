@@ -49,7 +49,7 @@ async function openAccessibilityModalForLink(): Promise<AccessibilityModal> {
     link.click();
     await waitForCondition(() => link.classList.contains("streamlined-editing"));
 
-    const clicked = await clickToolbarButton("A11y");
+    const clicked = await clickToolbarButton("Accessibility");
     expect(clicked).toBe(true);
 
     await waitForSelector("scms-accessibility-modal");
@@ -68,7 +68,7 @@ async function openAccessibilityModalForHtml(): Promise<AccessibilityModal> {
     element.click();
     await waitForCondition(() => element.classList.contains("streamlined-editing"));
 
-    const clicked = await clickToolbarButton("A11y");
+    const clicked = await clickToolbarButton("Accessibility");
     expect(clicked).toBe(true);
 
     await waitForSelector("scms-accessibility-modal");

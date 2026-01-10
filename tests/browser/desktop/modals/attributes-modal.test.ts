@@ -42,7 +42,7 @@ async function openAttributesModal(): Promise<AttributesModal> {
     link.click();
     await waitForCondition(() => link.classList.contains("streamlined-editing"));
 
-    const clicked = await clickToolbarButton("Attrs");
+    const clicked = await clickToolbarButton("Attributes");
     expect(clicked).toBe(true);
 
     await waitForSelector("scms-attributes-modal");
@@ -77,7 +77,7 @@ beforeEach(async () => {
     await resetState();
 });
 
-test("clicking Attrs button opens the modal", async () => {
+test("clicking Attributes button opens the modal", async () => {
     const modal = await openAttributesModal();
 
     expect(modal).not.toBeNull();
@@ -125,10 +125,16 @@ test("can add a custom attribute", async () => {
 
     // The attribute should now appear in the custom attributes section
     const customSection = shadowRoot.querySelector(".space-y-2");
-    const customRow = customSection?.querySelector('.attribute-row:not(.disabled) input[type="text"]') as HTMLInputElement | null;
+    const customRow = customSection?.querySelector(
+        '.attribute-row:not(.disabled) input[type="text"]',
+    ) as HTMLInputElement | null;
 
     // Verify the attribute was added (check modal's internal state)
-    expect(Object.keys((modal as unknown as { editedAttributes: Record<string, string> }).editedAttributes)).toContain("data-custom");
+    expect(
+        Object.keys(
+            (modal as unknown as { editedAttributes: Record<string, string> }).editedAttributes,
+        ),
+    ).toContain("data-custom");
 });
 
 test("shows error for reserved attribute names", async () => {

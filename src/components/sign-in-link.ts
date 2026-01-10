@@ -5,13 +5,13 @@
  * in the footer area. Uses Shadow DOM with Tailwind for styling.
  */
 
-import { LitElement, html } from "lit";
+import { html } from "lit";
 import { customElement } from "lit/decorators.js";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 
 @customElement("scms-sign-in-link")
-export class SignInLink extends LitElement {
-    static styles = [tailwindSheet];
+export class SignInLink extends ScmsElement {
+    static styles = [...ScmsElement.styles];
 
     private handleClick(e: Event) {
         e.preventDefault();

@@ -54,7 +54,6 @@ beforeAll(async () => {
     await initializeSDK({ appId });
 });
 
-
 test("group inside template shares content across all instances", async () => {
     const products = document.querySelectorAll('[data-scms-template="products"] .product-card');
 
@@ -62,9 +61,15 @@ test("group inside template shares content across all instances", async () => {
     expect(products.length).toBe(3);
 
     // Each product has unique name
-    expect(products[0].querySelector('[data-scms-text="product-name"]')?.textContent).toBe("Widget A");
-    expect(products[1].querySelector('[data-scms-text="product-name"]')?.textContent).toBe("Widget B");
-    expect(products[2].querySelector('[data-scms-text="product-name"]')?.textContent).toBe("Widget C");
+    expect(products[0].querySelector('[data-scms-text="product-name"]')?.textContent).toBe(
+        "Widget A",
+    );
+    expect(products[1].querySelector('[data-scms-text="product-name"]')?.textContent).toBe(
+        "Widget B",
+    );
+    expect(products[2].querySelector('[data-scms-text="product-name"]')?.textContent).toBe(
+        "Widget C",
+    );
 
     // All products share the same company info
     for (let i = 0; i < 3; i++) {

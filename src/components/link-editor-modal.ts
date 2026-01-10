@@ -5,9 +5,9 @@
  * Provides form inputs and Apply/Cancel buttons.
  */
 
-import { LitElement, html, css } from "lit";
+import { html, css } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { tailwindSheet } from "./styles.js";
+import { ScmsElement } from "./base.js";
 
 export interface LinkData {
     href: string;
@@ -16,7 +16,7 @@ export interface LinkData {
 }
 
 @customElement("scms-link-editor-modal")
-export class LinkEditorModal extends LitElement {
+export class LinkEditorModal extends ScmsElement {
     @property({ type: String, attribute: "element-id" })
     elementId: string | null = null;
 
@@ -33,7 +33,7 @@ export class LinkEditorModal extends LitElement {
     private editedValue = "";
 
     static styles = [
-        tailwindSheet,
+        ...ScmsElement.styles,
         css`
             :host {
                 position: fixed;
@@ -41,7 +41,7 @@ export class LinkEditorModal extends LitElement {
                 left: 0;
                 right: 0;
                 bottom: 0;
-                z-index: 2147483647;
+                z-index: 10001;
                 display: flex;
                 align-items: center;
                 justify-content: center;

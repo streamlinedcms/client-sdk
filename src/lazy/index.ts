@@ -69,12 +69,10 @@ import "../components/seo-modal.js";
 import "../components/accessibility-modal.js";
 import "../components/attributes-modal.js";
 import "../components/media-manager-modal.js";
+import "../components/help-panel.js";
 import type { Toolbar } from "../components/toolbar.js";
-import {
-    createEditorState,
-    type EditorState,
-    type EditableElementInfo,
-} from "./state.js";
+import type { HelpPanel } from "../components/help-panel.js";
+import { createEditorState, type EditorState, type EditableElementInfo } from "./state.js";
 import { DraftManager } from "./draft-manager.js";
 import { ContentManager } from "./content-manager.js";
 import { TemplateManager } from "./template-manager.js";
@@ -85,6 +83,7 @@ import { AuthManager } from "./auth-manager.js";
 import { AuthBridge } from "./auth-bridge.js";
 import { injectEditStyles } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
+import { TourManager, getTourDefinitions } from "./tours/index.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -133,6 +132,7 @@ class EditorController {
     private modalManager: ModalManager;
     private saveManager: SaveManager;
     private authManager: AuthManager;
+    private tourManager: TourManager;
     // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Double-tap delay constant
@@ -215,6 +215,7 @@ class EditorController {
             updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
             updateToolbarTemplateContext: () => this.templateManager.updateToolbarTemplateContext(),
             getElementToKeyMap: () => this.elementToKey,
+            scrollToElement: this.scrollToElement.bind(this),
         });
 
         // Initialize modal manager
@@ -241,16 +242,23 @@ class EditorController {
             stopEditing: () => this.editingManager.stopEditing(),
             updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
             getElementToKeyMap: () => this.elementToKey,
+            scrollToElement: this.scrollToElement.bind(this),
         });
 
         // Initialize draft manager
         this.draftManager = new DraftManager(this.state, this.log, this._draftStorageKey, {
-            syncAllElementsFromContent: (key) => this.contentManager.syncAllElementsFromContent(key),
+            syncAllElementsFromContent: (key) =>
+                this.contentManager.syncAllElementsFromContent(key),
             getEditableInfo: this.getEditableInfo.bind(this),
             getStorageContext: this.getStorageContext.bind(this),
             buildStorageKey: this.buildStorageKey.bind(this),
             registerInstanceElements: (element, templateId, instanceId, groupId) =>
-                this.templateManager.registerInstanceElements(element, templateId, instanceId, groupId),
+                this.templateManager.registerInstanceElements(
+                    element,
+                    templateId,
+                    instanceId,
+                    groupId,
+                ),
         });
 
         // Initialize save manager
@@ -270,7 +278,8 @@ class EditorController {
                 disableEditing: this.disableEditing.bind(this),
                 updateToolbarReadOnly: () => {
                     if (this.state.toolbar) {
-                        this.state.toolbar.readOnly = this.state.permissions?.contentWrite === false;
+                        this.state.toolbar.readOnly =
+                            this.state.permissions?.contentWrite === false;
                     }
                 },
             },
@@ -284,10 +293,7 @@ class EditorController {
         });
 
         // Initialize auth bridge (hidden iframe for cross-origin auth)
-        this.authBridge = new AuthBridge(
-            { appUrl: config.appUrl, appId: config.appId },
-            this.log,
-        );
+        this.authBridge = new AuthBridge({ appUrl: config.appUrl, appId: config.appId }, this.log);
         this.authBridge.init();
 
         // Initialize auth manager
@@ -318,6 +324,9 @@ class EditorController {
                 emitSignOut: () => this.emit("signout"),
             },
         );
+
+        // Initialize tour manager
+        this.tourManager = new TourManager();
     }
 
     /**
@@ -391,7 +400,9 @@ class EditorController {
                 }
             }
 
-            this.log.debug("Fetched saved content keys", { count: this.state.savedContentKeys.size });
+            this.log.debug("Fetched saved content keys", {
+                count: this.state.savedContentKeys.size,
+            });
             return true;
         } catch (error) {
             this.log.warn("Could not fetch saved content keys", error);
@@ -529,11 +540,7 @@ class EditorController {
         elementId: string,
     ): string {
         if (context.templateId !== null && context.instanceId !== null) {
-            const templateKey = buildTemplateKey(
-                context.templateId,
-                context.instanceId,
-                elementId,
-            );
+            const templateKey = buildTemplateKey(context.templateId, context.instanceId, elementId);
             return context.groupId ? `${context.groupId}:${templateKey}` : templateKey;
         } else {
             return context.groupId ? `${context.groupId}:${elementId}` : elementId;
@@ -621,6 +628,32 @@ class EditorController {
         );
     }
 
+    /**
+     * Scroll an element into view, centered in the visible area below the toolbar.
+     * Uses visualViewport when available to account for mobile keyboard.
+     */
+    private scrollToElement(element: HTMLElement, delay = 50): void {
+        // Use setTimeout to allow DOM to settle after reorder/creation or keyboard to open
+        setTimeout(() => {
+            const toolbarHeight = this.state.toolbar?.offsetHeight ?? 60;
+
+            // Two possible constraints on visible height:
+            // 1. Window minus toolbar (when keyboard is closed)
+            // 2. Visual viewport (when keyboard is open, it covers the toolbar)
+            const windowMinusToolbar = window.innerHeight - toolbarHeight;
+            const visualViewportHeight = window.visualViewport?.height ?? window.innerHeight;
+            const visibleHeight = Math.min(windowMinusToolbar, visualViewportHeight);
+
+            const viewportTop = window.visualViewport?.offsetTop ?? 0;
+            const rect = element.getBoundingClientRect();
+            const elementCenter = rect.top + rect.height / 2 - viewportTop;
+            const targetCenter = visibleHeight / 2;
+            const scrollOffset = elementCenter - targetCenter;
+
+            window.scrollBy({ top: scrollOffset, behavior: "smooth" });
+        }, delay);
+    }
+
     private getEditableType(key: string): EditableType {
         return this.state.editableTypes.get(key) || "html";
     }
@@ -642,10 +675,16 @@ class EditorController {
         const target = e.target as Node;
 
         // Check if clicking inside a template instance
-        const clickedInstance = (target as Element).closest?.("[data-scms-instance]") as HTMLElement | null;
+        const clickedInstance = (target as Element).closest?.(
+            "[data-scms-instance]",
+        ) as HTMLElement | null;
 
-        // Deselect instance if clicking outside all instances
-        if (this.state.selectedInstance && !clickedInstance) {
+        // Deselect instance if clicking outside all instances (but not if clicking toolbar)
+        if (
+            this.state.selectedInstance &&
+            !clickedInstance &&
+            !this.state.toolbar?.contains(target)
+        ) {
             this.editingManager.deselectInstance();
         }
 
@@ -660,8 +699,8 @@ class EditorController {
             }
         }
 
-        // Don't deselect if clicking inside the toolbar
-        if (this.state.toolbar?.contains(target)) {
+        // Don't deselect if clicking inside any SCMS component (toolbar, modals, panels, etc.)
+        if ((target as Element).closest?.(".scms-component")) {
             return;
         }
 
@@ -715,7 +754,8 @@ class EditorController {
                     // Check for double-tap (mobile) on images and links
                     const now = Date.now();
                     const isDoubleTap =
-                        this.state.lastTapKey === key && now - this.state.lastTapTime < this.doubleTapDelay;
+                        this.state.lastTapKey === key &&
+                        now - this.state.lastTapTime < this.doubleTapDelay;
 
                     if (isDoubleTap && isMobile) {
                         // Mobile double-tap: open media manager for images, navigate for links
@@ -728,10 +768,17 @@ class EditorController {
                         this.state.lastTapKey = null;
                         this.state.lastTapTime = 0;
                     } else if (isMobile) {
-                        // Mobile two-step: first tap selects, second tap edits
-                        if (this.state.selectedKey === key && this.state.editingKey !== key) {
+                        // Mobile: images and links go straight to editing, others use two-step
+                        if (elementType === "image" || elementType === "link") {
+                            this.editingManager.startEditing(key, element);
+                        } else if (
+                            this.state.selectedKey === key &&
+                            this.state.editingKey !== key
+                        ) {
+                            // Two-step: second tap edits
                             this.editingManager.startEditing(key, element);
                         } else {
+                            // Two-step: first tap selects
                             this.editingManager.selectElement(key, element);
                         }
                         this.state.lastTapKey = key;
@@ -908,6 +955,10 @@ class EditorController {
             this.templateManager.handleMoveInstanceDown();
         });
 
+        toolbar.addEventListener("help", () => {
+            this.handleHelp();
+        });
+
         document.body.appendChild(toolbar);
         this.state.toolbar = toolbar;
 
@@ -973,7 +1024,7 @@ class EditorController {
                     gap: 10px;
                     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                     font-size: 14px;
-                    z-index: 2147483646;
+                    z-index: 10000;
                     box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
                     border-top: 1px solid #e5e7eb;
                 }
@@ -1179,6 +1230,93 @@ class EditorController {
             return { uploaded: [], errors: [{ src: "", error: "Media manager not initialized" }] };
         }
         return this.state.mediaManagerModal.uploadAllImages();
+    }
+
+    /**
+     * Start a guided tour.
+     *
+     * Available tours:
+     * - 'welcome': First-time onboarding tour
+     * - 'text-editing': How to edit text elements
+     * - 'image-editing': How to change images
+     * - 'templates': How to work with repeating templates
+     *
+     * @example
+     * StreamlinedCMS.startTour('welcome');
+     */
+    public startTour(tourId: string): void {
+        // Fire and forget - tour loading is async but we don't need to wait
+        this.tourManager.startTour(tourId);
+    }
+
+    /**
+     * Stop the currently active tour, if any.
+     */
+    public stopTour(): void {
+        this.tourManager.stopTour();
+    }
+
+    /**
+     * Handle help button click - toggle help panel
+     */
+    private handleHelp(): void {
+        this.toggleHelpPanel();
+    }
+
+    private helpPanel: HelpPanel | null = null;
+    private helpPanelCloseHandler: ((e: MouseEvent) => void) | null = null;
+
+    /**
+     * Toggle the help panel visibility
+     */
+    private async toggleHelpPanel(): Promise<void> {
+        // Remove existing panel if present
+        if (this.helpPanel) {
+            this.closeHelpPanel();
+            return;
+        }
+
+        const panel = document.createElement("scms-help-panel") as HelpPanel;
+        panel.loading = true;
+
+        panel.addEventListener("close", () => this.closeHelpPanel());
+        panel.addEventListener("tour-select", (e: Event) => {
+            const tourId = (e as CustomEvent<{ tourId: string }>).detail.tourId;
+            this.closeHelpPanel();
+            this.startTour(tourId);
+        });
+
+        document.body.appendChild(panel);
+        this.helpPanel = panel;
+
+        // Close on click outside
+        this.helpPanelCloseHandler = (e: MouseEvent) => {
+            if (this.helpPanel && !this.helpPanel.contains(e.target as Node)) {
+                this.closeHelpPanel();
+            }
+        };
+        setTimeout(() => {
+            document.addEventListener("click", this.helpPanelCloseHandler!);
+        }, 0);
+
+        // Load tours asynchronously
+        const tourDefs = await getTourDefinitions();
+        panel.tours = tourDefs;
+        panel.loading = false;
+    }
+
+    /**
+     * Close the help panel
+     */
+    private closeHelpPanel(): void {
+        if (this.helpPanel) {
+            this.helpPanel.remove();
+            this.helpPanel = null;
+        }
+        if (this.helpPanelCloseHandler) {
+            document.removeEventListener("click", this.helpPanelCloseHandler);
+            this.helpPanelCloseHandler = null;
+        }
     }
 }
 

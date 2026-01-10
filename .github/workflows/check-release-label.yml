@@ -1,0 +1,111 @@
+name: Check Release Label
+
+on:
+    workflow_call:
+        inputs:
+            labels:
+                description: "JSON array of PR label names"
+                required: true
+                type: string
+            require:
+                description: "Whether to fail if no release label found"
+                required: false
+                type: boolean
+                default: true
+            head_ref:
+                description: "Source branch name (for release branch validation)"
+                required: false
+                type: string
+                default: ""
+        outputs:
+            type:
+                description: "The release type (major, minor, patch) or empty if none"
+                value: ${{ jobs.check.outputs.type }}
+            found:
+                description: "Whether a release label was found"
+                value: ${{ jobs.check.outputs.found }}
+
+jobs:
+    check:
+        runs-on: ubuntu-latest
+        outputs:
+            type: ${{ steps.check.outputs.type }}
+            found: ${{ steps.check.outputs.found }}
+
+        steps:
+            - name: Check for release label
+              id: check
+              run: |
+                  LABELS='${{ inputs.labels }}'
+                  if echo "$LABELS" | grep -q 'release:major'; then
+                      echo "type=major" >> $GITHUB_OUTPUT
+                      echo "found=true" >> $GITHUB_OUTPUT
+                      echo "Found release:major label"
+                  elif echo "$LABELS" | grep -q 'release:minor'; then
+                      echo "type=minor" >> $GITHUB_OUTPUT
+                      echo "found=true" >> $GITHUB_OUTPUT
+                      echo "Found release:minor label"
+                  elif echo "$LABELS" | grep -q 'release:patch'; then
+                      echo "type=patch" >> $GITHUB_OUTPUT
+                      echo "found=true" >> $GITHUB_OUTPUT
+                      echo "Found release:patch label"
+                  else
+                      echo "type=" >> $GITHUB_OUTPUT
+                      echo "found=false" >> $GITHUB_OUTPUT
+                      if [ "${{ inputs.require }}" = "true" ]; then
+                          echo "::error::PRs to master require a release:patch, release:minor, or release:major label"
+                          exit 1
+                      fi
+                      echo "No release label found (not required)"
+                  fi
+
+            - name: Checkout for version validation
+              if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true'
+              uses: actions/checkout@v4
+
+            - name: Validate release branch version
+              if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true'
+              run: |
+                  HEAD_REF="${{ inputs.head_ref }}"
+                  BUMP_TYPE="${{ steps.check.outputs.type }}"
+
+                  # Extract expected version from branch name (release/1.0.0-beta → 1.0.0)
+                  BRANCH_VERSION="${HEAD_REF#release/}"
+                  # Strip any prerelease suffix for base version comparison
+                  EXPECTED_BASE="${BRANCH_VERSION%%-*}"
+
+                  echo "Branch: $HEAD_REF"
+                  echo "Expected base version: $EXPECTED_BASE"
+                  echo "Bump type: $BUMP_TYPE"
+
+                  # Get current version from package.json
+                  CURRENT_VERSION=$(node -p "require('./package.json').version")
+                  CURRENT_BASE="${CURRENT_VERSION%%-*}"
+                  echo "Current version: $CURRENT_VERSION (base: $CURRENT_BASE)"
+
+                  # Calculate what npm version would produce
+                  # Use node to simulate the bump without actually changing anything
+                  RESULT_VERSION=$(node -e "
+                    const semver = require('semver');
+                    const current = '$CURRENT_BASE';
+                    const type = '$BUMP_TYPE';
+                    console.log(semver.inc(current, type));
+                  " 2>/dev/null || node -e "
+                    // Fallback if semver not available - parse manually
+                    const [major, minor, patch] = '$CURRENT_BASE'.split('.').map(Number);
+                    const type = '$BUMP_TYPE';
+                    if (type === 'major') console.log(\`\${major + 1}.0.0\`);
+                    else if (type === 'minor') console.log(\`\${major}.\${minor + 1}.0\`);
+                    else console.log(\`\${major}.\${minor}.\${patch + 1}\`);
+                  ")
+
+                  echo "Calculated result: $RESULT_VERSION"
+
+                  if [ "$RESULT_VERSION" != "$EXPECTED_BASE" ]; then
+                      echo "::error::Version mismatch: release:$BUMP_TYPE bump from $CURRENT_BASE produces $RESULT_VERSION, but branch expects $EXPECTED_BASE"
+                      echo ""
+                      echo "Suggested fix: Use release:major, release:minor, or release:patch label that produces $EXPECTED_BASE"
+                      exit 1
+                  fi
+
+                  echo "Version validated: $BUMP_TYPE bump will produce $EXPECTED_BASE"

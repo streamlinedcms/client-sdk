@@ -26,12 +26,16 @@ beforeAll(async () => {
     await setContent(appId, "team.member1.role", JSON.stringify({ type: "text", value: "CEO" }));
     await setContent(appId, "team.member2.name", JSON.stringify({ type: "text", value: "Bob" }));
     await setContent(appId, "team.member2.role", JSON.stringify({ type: "text", value: "CTO" }));
-    await setContent(appId, "team.member3.name", JSON.stringify({ type: "text", value: "Charlie" }));
+    await setContent(
+        appId,
+        "team.member3.name",
+        JSON.stringify({ type: "text", value: "Charlie" }),
+    );
     await setContent(appId, "team.member3.role", JSON.stringify({ type: "text", value: "CFO" }));
     await setContent(
         appId,
         "team._order",
-        JSON.stringify({ type: "order", value: ["member1", "member2", "member3"] })
+        JSON.stringify({ type: "order", value: ["member1", "member2", "member3"] }),
     );
 
     await initializeSDK({ appId });
@@ -97,9 +101,10 @@ async function selectTemplateElement(index: number): Promise<void> {
     nameElement.click();
     // Mobile uses two-step interaction: first tap selects, second tap edits
     // For template controls, we only need selection (not editing)
-    await waitForCondition(() =>
-        nameElement.classList.contains("streamlined-selected") ||
-        nameElement.classList.contains("streamlined-editing")
+    await waitForCondition(
+        () =>
+            nameElement.classList.contains("streamlined-selected") ||
+            nameElement.classList.contains("streamlined-editing"),
     );
 }
 
@@ -108,7 +113,9 @@ async function selectTemplateElement(index: number): Promise<void> {
  */
 async function expandDrawer(): Promise<void> {
     const toolbar = getToolbar();
-    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    const menuBtn = toolbar.shadowRoot?.querySelector(
+        'button[aria-label*="menu"]',
+    ) as HTMLButtonElement;
     if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Open")) {
         menuBtn.click();
         await new Promise((r) => setTimeout(r, 100));
@@ -120,7 +127,9 @@ async function expandDrawer(): Promise<void> {
  */
 function collapseDrawer(): void {
     const toolbar = getToolbar();
-    const menuBtn = toolbar.shadowRoot?.querySelector('button[aria-label*="menu"]') as HTMLButtonElement;
+    const menuBtn = toolbar.shadowRoot?.querySelector(
+        'button[aria-label*="menu"]',
+    ) as HTMLButtonElement;
     if (menuBtn && menuBtn.getAttribute("aria-label")?.includes("Close")) {
         menuBtn.click();
     }

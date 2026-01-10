@@ -194,7 +194,38 @@ npm run dev
 
 ## Versioning
 
-See [docs/versioning-strategy.md](docs/versioning-strategy.md) for the SDK versioning strategy, including URL structure, cache headers, release process, and breaking change policy.
+See [docs/versioning-strategy.md](docs/versioning-strategy.md) for the SDK versioning strategy, including URL structure, cache headers, prerelease versions, and breaking change policy.
+
+## Release Process
+
+### PR Labels
+
+PRs to `master` require a release label to determine version bump:
+
+| Label | Bump Type | Example |
+|-------|-----------|---------|
+| `release:patch` | Patch | `0.1.22` → `0.1.23` |
+| `release:minor` | Minor | `0.1.22` → `0.2.0` |
+| `release:major` | Major | `0.1.22` → `1.0.0` |
+
+### Release Branches
+
+For major releases or prereleases, use a release branch:
+
+| Branch | Purpose |
+|--------|---------|
+| `release/1.0.0-beta` | Beta testing before stable release |
+| `release/1.0.0-rc` | Release candidate, final validation |
+| `release/1.0.0` | Stable release preparation |
+
+Commits to release branches auto-deploy to the production CDN for testing (without updating aliases). When merged to `master`, the version is bumped and aliases are updated.
+
+### Deployment Flow
+
+1. **Feature work** → PR to `develop` → auto-deploys to staging CDN
+2. **Release prep** → create `release/X.Y.Z[-suffix]` from `develop`
+3. **Testing** → commits to release branch deploy to production CDN (no aliases)
+4. **Release** → PR to `master` with release label → version bump + alias updates
 
 ## Pull Requests
 

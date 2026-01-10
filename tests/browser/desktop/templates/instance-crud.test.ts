@@ -22,8 +22,16 @@ beforeAll(async () => {
     const appId = generateTestAppId();
 
     // Start with 1 team member
-    await setContent(appId, "team-crud.alice1.name", JSON.stringify({ type: "text", value: "Alice" }));
-    await setContent(appId, "team-crud.alice1.role", JSON.stringify({ type: "text", value: "CEO" }));
+    await setContent(
+        appId,
+        "team-crud.alice1.name",
+        JSON.stringify({ type: "text", value: "Alice" }),
+    );
+    await setContent(
+        appId,
+        "team-crud.alice1.role",
+        JSON.stringify({ type: "text", value: "CEO" }),
+    );
     await setContent(
         appId,
         "team-crud._order",
@@ -32,7 +40,6 @@ beforeAll(async () => {
 
     await initializeSDK({ appId });
 });
-
 
 test("add button appears in author mode for templates", async () => {
     // Add button should be visible in author mode
@@ -52,7 +59,9 @@ test("cannot delete last instance", async () => {
         if (deleteButton) {
             deleteButton.click();
             await waitForCondition(
-                () => (teamContainer?.querySelectorAll(".team-member").length ?? 0) < teamMembers!.length,
+                () =>
+                    (teamContainer?.querySelectorAll(".team-member").length ?? 0) <
+                    teamMembers!.length,
             );
         }
         teamMembers = teamContainer?.querySelectorAll(".team-member");
