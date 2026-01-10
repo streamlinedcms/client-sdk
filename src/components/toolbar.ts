@@ -12,15 +12,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
-import {
-    CircleHelp,
-    ChevronUp,
-    ChevronDown,
-    Ellipsis,
-    Layers,
-    Plus,
-    Trash2,
-} from "lucide-static";
+import { CircleHelp, ChevronUp, ChevronDown, Ellipsis, Layers, Plus, Trash2 } from "lucide-static";
 import { ScmsElement } from "./base.js";
 import type { EditorMode } from "./mode-toggle.js";
 import "./mode-toggle.js";
@@ -506,8 +498,12 @@ export class Toolbar extends ScmsElement {
         return html`
             <scms-dropdown-menu label="More" .icon=${Ellipsis} direction="up">
                 <button @click=${this.handleEditSeo} data-action="seo">SEO</button>
-                <button @click=${this.handleEditAccessibility} data-action="accessibility">Accessibility</button>
-                <button @click=${this.handleEditAttributes} data-action="attributes">Attributes</button>
+                <button @click=${this.handleEditAccessibility} data-action="accessibility">
+                    Accessibility
+                </button>
+                <button @click=${this.handleEditAttributes} data-action="attributes">
+                    Attributes
+                </button>
             </scms-dropdown-menu>
         `;
     }
@@ -524,16 +520,28 @@ export class Toolbar extends ScmsElement {
 
         return html`
             <scms-dropdown-menu label="Template" .icon=${Layers} direction="up">
-                <button ?disabled=${!canMoveUp} @click=${this.handleMoveInstanceUp} data-action="move-up">
+                <button
+                    ?disabled=${!canMoveUp}
+                    @click=${this.handleMoveInstanceUp}
+                    data-action="move-up"
+                >
                     <span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(ChevronUp)}</span>
                     Move Up
                 </button>
-                <button ?disabled=${!canMoveDown} @click=${this.handleMoveInstanceDown} data-action="move-down">
+                <button
+                    ?disabled=${!canMoveDown}
+                    @click=${this.handleMoveInstanceDown}
+                    data-action="move-down"
+                >
                     <span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(ChevronDown)}</span>
                     Move Down
                 </button>
                 <hr />
-                <button @click=${this.handleAddInstance} style="color: #16a34a;" data-action="add-item">
+                <button
+                    @click=${this.handleAddInstance}
+                    style="color: #16a34a;"
+                    data-action="add-item"
+                >
                     <span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(Plus)}</span>
                     Add Item
                 </button>
@@ -608,7 +616,12 @@ export class Toolbar extends ScmsElement {
             : "px-4 py-1.5 text-xs font-medium rounded-md transition-colors bg-red-600 text-white hover:bg-red-700";
 
         return html`
-            <button class=${saveClasses} ?disabled=${this.saving} data-action="save" @click=${this.handleSave}>
+            <button
+                class=${saveClasses}
+                ?disabled=${this.saving}
+                data-action="save"
+                @click=${this.handleSave}
+            >
                 ${this.saving ? "Saving..." : "Save"}
             </button>
         `;
@@ -647,8 +660,8 @@ export class Toolbar extends ScmsElement {
                         ${this.renderResetButton()} ${this.renderActiveElement()}
                         ${this.renderEditHtmlButton()} ${this.renderChangeImageButton()}
                         ${this.renderEditLinkButton()} ${this.renderGoToLinkButton()}
-                        ${this.renderStructureMismatchWarning()}
-                        ${this.renderMoreMenu()} ${this.renderTemplateMenu()}
+                        ${this.renderStructureMismatchWarning()} ${this.renderMoreMenu()}
+                        ${this.renderTemplateMenu()}
                     </div>
 
                     <!-- Right: Save + Sign Out + Admin + Help (separated) -->
@@ -979,9 +992,7 @@ export class Toolbar extends ScmsElement {
                     >
                         Sign Out
                     </button>
-                    <div class="justify-self-center">
-                        ${this.renderModeToggle()}
-                    </div>
+                    <div class="justify-self-center">${this.renderModeToggle()}</div>
                     ${this.appUrl && this.appId && !this.denyAppGui
                         ? html`
                               <a
@@ -1013,7 +1024,9 @@ export class Toolbar extends ScmsElement {
 
     private renderMobile() {
         return html`
-            <div class="bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] relative">
+            <div
+                class="bg-white border-t border-gray-200 shadow-[0_-4px_12px_rgba(0,0,0,0.08)] relative"
+            >
                 <!-- Drawer pull tab - raised step with angled sides -->
                 <div class="drawer-tab-wrapper">
                     <button
@@ -1036,9 +1049,7 @@ export class Toolbar extends ScmsElement {
                 >
                     <!-- Save (left) -->
                     <div class="flex items-center w-16" @click=${(e: Event) => e.stopPropagation()}>
-                        ${this.hasChanges
-                            ? this.renderSaveButton()
-                            : nothing}
+                        ${this.hasChanges ? this.renderSaveButton() : nothing}
                     </div>
 
                     <!-- Center: Element badge -->
@@ -1047,7 +1058,10 @@ export class Toolbar extends ScmsElement {
                     </div>
 
                     <!-- Help (right) -->
-                    <div class="flex items-center w-16 justify-end" @click=${(e: Event) => e.stopPropagation()}>
+                    <div
+                        class="flex items-center w-16 justify-end"
+                        @click=${(e: Event) => e.stopPropagation()}
+                    >
                         ${this.renderHelpButton()}
                     </div>
                 </button>

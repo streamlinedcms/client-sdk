@@ -30,7 +30,7 @@ export function selectInstanceStepDesktop(ctx: TourContext): TourStep {
                         ctx.untrackObserver(observer);
                         setTimeout(() => ctx.moveNext(), 300);
                     },
-                }
+                },
             );
             ctx.trackObserver(observer);
         },
@@ -87,7 +87,9 @@ export function templateActionsStepDesktop(ctx: TourContext): TourStep {
             showButtons: ["next", "close"],
         },
         onHighlighted: () => {
-            const addButton = queryShadowSelector("scms-toolbar >>> button[data-action='add-item']");
+            const addButton = queryShadowSelector(
+                "scms-toolbar >>> button[data-action='add-item']",
+            );
             if (!addButton) return;
 
             const handleClick = () => {

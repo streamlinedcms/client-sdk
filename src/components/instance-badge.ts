@@ -37,7 +37,9 @@ export class InstanceBadge extends ScmsElement {
                 <span
                     class="text-xs text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded inline-flex items-center gap-1.5"
                 >
-                    <span class="[&>svg]:w-3.5 [&>svg]:h-3.5 text-gray-500">${unsafeSVG(Layers)}</span>
+                    <span class="[&>svg]:w-3.5 [&>svg]:h-3.5 text-gray-500"
+                        >${unsafeSVG(Layers)}</span
+                    >
                     Item ${this.instanceIndex + 1} of ${this.instanceCount}
                 </span>
             </div>

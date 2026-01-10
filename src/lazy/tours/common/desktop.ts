@@ -33,7 +33,8 @@ export function getToolbarDropdown(label: string): HTMLElement | null {
  */
 export function getOpenDropdownMenu(label: string): HTMLElement | null {
     return (
-        queryShadowSelector(`scms-toolbar >>> scms-dropdown-menu[label="${label}"] >>> div.absolute`) ??
-        getToolbarDropdown(label)
+        queryShadowSelector(
+            `scms-toolbar >>> scms-dropdown-menu[label="${label}"] >>> div.absolute`,
+        ) ?? getToolbarDropdown(label)
     );
 }

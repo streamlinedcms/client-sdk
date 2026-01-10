@@ -24,12 +24,16 @@ export function selectTextStepDesktop(ctx: TourContext): TourStep | null {
         },
         onHighlighted: () => {
             // Auto-advance when text element enters editing mode
-            const observer = observeClassAddedOnSelector("[data-scms-text]", ["streamlined-editing"], {
-                onMatch: () => {
-                    ctx.untrackObserver(observer);
-                    ctx.moveNext();
+            const observer = observeClassAddedOnSelector(
+                "[data-scms-text]",
+                ["streamlined-editing"],
+                {
+                    onMatch: () => {
+                        ctx.untrackObserver(observer);
+                        ctx.moveNext();
+                    },
                 },
-            });
+            );
             ctx.trackObserver(observer);
         },
     };

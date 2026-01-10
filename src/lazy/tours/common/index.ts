@@ -10,7 +10,10 @@ import { queryShadowSelector } from "./shadow-dom";
 /**
  * Creates a MutationObserver that watches for an element matching a selector to appear
  */
-export function observeElementAppears(selector: string, options: ObserverOptions): MutationObserver {
+export function observeElementAppears(
+    selector: string,
+    options: ObserverOptions,
+): MutationObserver {
     const { onMatch, timeout, onTimeout } = options;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -44,7 +47,10 @@ export function observeElementAppears(selector: string, options: ObserverOptions
 /**
  * Creates a MutationObserver that watches for an element matching a selector to be removed
  */
-export function observeElementRemoved(selector: string, options: ObserverOptions): MutationObserver {
+export function observeElementRemoved(
+    selector: string,
+    options: ObserverOptions,
+): MutationObserver {
     const { onMatch, timeout, onTimeout } = options;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -85,7 +91,7 @@ export function observeElementRemoved(selector: string, options: ObserverOptions
 export function observeAttributeAdded(
     element: Element,
     attributeName: string,
-    options: ObserverOptions
+    options: ObserverOptions,
 ): MutationObserver {
     const { onMatch, timeout, onTimeout } = options;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -125,7 +131,7 @@ export function observeAttributeAdded(
 export function observeAttributeRemoved(
     element: Element,
     attributeName: string,
-    options: ObserverOptions
+    options: ObserverOptions,
 ): MutationObserver {
     const { onMatch, timeout, onTimeout } = options;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -166,7 +172,7 @@ export function observeAttributeValue(
     element: Element,
     attributeName: string,
     targetValue: string,
-    options: ObserverOptions
+    options: ObserverOptions,
 ): MutationObserver {
     const { onMatch, timeout, onTimeout } = options;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -224,7 +230,10 @@ export function repositionPopoverTop(topOffset = 20): void {
 /**
  * Creates a MutationObserver that watches for any element to gain one of the specified classes
  */
-export function observeClassAdded(classNames: string[], options: ObserverOptions): MutationObserver {
+export function observeClassAdded(
+    classNames: string[],
+    options: ObserverOptions,
+): MutationObserver {
     const { onMatch, timeout, onTimeout } = options;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
@@ -276,7 +285,7 @@ export function observeClassAdded(classNames: string[], options: ObserverOptions
 export function observeClassAddedOnSelector(
     baseSelector: string,
     classNames: string[],
-    options: ObserverOptions
+    options: ObserverOptions,
 ): MutationObserver {
     const { onMatch, timeout, onTimeout } = options;
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
@@ -337,7 +346,10 @@ export interface SelectElementOptions {
 /**
  * Creates a step that prompts the user to select an element and waits for selection
  */
-export function selectElementStep(ctx: TourContext, options: SelectElementOptions = {}): TourStep | null {
+export function selectElementStep(
+    ctx: TourContext,
+    options: SelectElementOptions = {},
+): TourStep | null {
     const { preferImage = false, title, description } = options;
 
     const element = preferImage
@@ -352,7 +364,8 @@ export function selectElementStep(ctx: TourContext, options: SelectElementOption
         element,
         popover: {
             title: title ?? overrides?.title ?? "Select an Element",
-            description: description ?? overrides?.description ?? "Click on this element to select it.",
+            description:
+                description ?? overrides?.description ?? "Click on this element to select it.",
             side: overrides?.side ?? "bottom",
             align: "center",
             showButtons: ["close"],
@@ -445,6 +458,8 @@ export function waitForModalStep(ctx: TourContext, options: WaitForModalOptions)
  * Use this as the element selector for save steps.
  */
 export function getSaveButtonOrToolbar(): HTMLElement | null {
-    return queryShadowSelector("scms-toolbar >>> button[data-action='save']")
-        || document.querySelector("scms-toolbar");
+    return (
+        queryShadowSelector("scms-toolbar >>> button[data-action='save']") ||
+        document.querySelector("scms-toolbar")
+    );
 }

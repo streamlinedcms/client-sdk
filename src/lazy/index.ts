@@ -680,7 +680,11 @@ class EditorController {
         ) as HTMLElement | null;
 
         // Deselect instance if clicking outside all instances (but not if clicking toolbar)
-        if (this.state.selectedInstance && !clickedInstance && !this.state.toolbar?.contains(target)) {
+        if (
+            this.state.selectedInstance &&
+            !clickedInstance &&
+            !this.state.toolbar?.contains(target)
+        ) {
             this.editingManager.deselectInstance();
         }
 
@@ -767,7 +771,10 @@ class EditorController {
                         // Mobile: images and links go straight to editing, others use two-step
                         if (elementType === "image" || elementType === "link") {
                             this.editingManager.startEditing(key, element);
-                        } else if (this.state.selectedKey === key && this.state.editingKey !== key) {
+                        } else if (
+                            this.state.selectedKey === key &&
+                            this.state.editingKey !== key
+                        ) {
                             // Two-step: second tap edits
                             this.editingManager.startEditing(key, element);
                         } else {

@@ -42,7 +42,7 @@ export class HelpPanel extends ScmsElement {
             new CustomEvent("close", {
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
@@ -52,13 +52,15 @@ export class HelpPanel extends ScmsElement {
                 detail: { tourId },
                 bubbles: true,
                 composed: true,
-            })
+            }),
         );
     }
 
     render() {
         return html`
-            <div class="bg-white rounded-lg shadow-xl min-w-[220px] max-h-[calc(100vh-76px)] flex flex-col">
+            <div
+                class="bg-white rounded-lg shadow-xl min-w-[220px] max-h-[calc(100vh-76px)] flex flex-col"
+            >
                 <div class="flex items-center justify-between p-4 pb-3 shrink-0">
                     <div class="font-semibold text-sm text-gray-700">Guided Tours</div>
                     <button
@@ -79,10 +81,14 @@ export class HelpPanel extends ScmsElement {
                                       class="block w-full text-left p-3 mb-2 last:mb-0 border border-gray-200 rounded-md bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all"
                                       @click=${() => this.handleTourSelect(tour.id)}
                                   >
-                                      <div class="font-medium text-sm text-gray-700">${tour.label}</div>
-                                      <div class="text-xs text-gray-500 mt-0.5">${tour.description}</div>
+                                      <div class="font-medium text-sm text-gray-700">
+                                          ${tour.label}
+                                      </div>
+                                      <div class="text-xs text-gray-500 mt-0.5">
+                                          ${tour.description}
+                                      </div>
                                   </button>
-                              `
+                              `,
                           )}
                 </div>
             </div>

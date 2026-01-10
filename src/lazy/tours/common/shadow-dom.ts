@@ -11,7 +11,7 @@ const SHADOW_PIERCE = ">>>";
  */
 export function queryShadowSelector(
     selector: string,
-    root: Element | Document | ShadowRoot = document
+    root: Element | Document | ShadowRoot = document,
 ): HTMLElement | null {
     const parts = selector.split(SHADOW_PIERCE).map((p) => p.trim());
 

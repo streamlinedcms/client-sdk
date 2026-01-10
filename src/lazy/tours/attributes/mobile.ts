@@ -47,7 +47,8 @@ export function expandToolbarStepMobile(ctx: TourContext): TourStep {
  */
 export function openMetadataSectionStepMobile(ctx: TourContext): TourStep {
     return {
-        element: () => queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='metadata']"),
+        element: () =>
+            queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='metadata']"),
         popover: {
             title: "Metadata Options",
             description: "The Metadata section contains SEO, accessibility, and custom attributes.",
@@ -56,7 +57,9 @@ export function openMetadataSectionStepMobile(ctx: TourContext): TourStep {
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const section = queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='metadata']");
+            const section = queryShadowSelector(
+                "scms-toolbar >>> .mobile-section[data-section='metadata']",
+            );
             const headerButton = section?.querySelector("button[aria-expanded]");
             if (!headerButton) return;
 

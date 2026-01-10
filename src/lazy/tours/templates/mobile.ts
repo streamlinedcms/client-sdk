@@ -3,7 +3,11 @@
  */
 
 import type { TourStep, TourContext } from "../types";
-import { observeClassAddedOnSelector, observeAttributeAdded, observeAttributeValue } from "../common";
+import {
+    observeClassAddedOnSelector,
+    observeAttributeAdded,
+    observeAttributeValue,
+} from "../common";
 import { queryShadowSelector } from "../common/shadow-dom";
 
 /**
@@ -29,7 +33,7 @@ export function selectInstanceStepMobile(ctx: TourContext): TourStep {
                         ctx.untrackObserver(observer);
                         setTimeout(() => ctx.moveNext(), 200);
                     },
-                }
+                },
             );
             ctx.trackObserver(observer);
         },
@@ -77,7 +81,8 @@ export function expandToolbarStepMobile(ctx: TourContext): TourStep {
  */
 export function openTemplateSectionStepMobile(ctx: TourContext): TourStep {
     return {
-        element: () => queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='template']"),
+        element: () =>
+            queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='template']"),
         popover: {
             title: "Template Options",
             description: "The Template section shows actions for managing items.",
@@ -86,7 +91,9 @@ export function openTemplateSectionStepMobile(ctx: TourContext): TourStep {
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const section = queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='template']");
+            const section = queryShadowSelector(
+                "scms-toolbar >>> .mobile-section[data-section='template']",
+            );
             const headerButton = section?.querySelector("button[aria-expanded]");
             if (!headerButton) return;
 
@@ -116,7 +123,9 @@ export function templateActionsStepMobile(ctx: TourContext): TourStep {
             showButtons: ["next", "close"],
         },
         onHighlighted: () => {
-            const addButton = queryShadowSelector("scms-toolbar >>> button[data-action='add-item']");
+            const addButton = queryShadowSelector(
+                "scms-toolbar >>> button[data-action='add-item']",
+            );
             if (!addButton) return;
 
             const handleClick = () => {

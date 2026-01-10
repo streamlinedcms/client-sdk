@@ -3,9 +3,18 @@
  */
 
 import type { TourDefinition, TourStep, TourContext } from "../types";
-import { selectElementStep, repositionPopoverTop, getSaveButtonOrToolbar, observeElementRemoved } from "../common";
+import {
+    selectElementStep,
+    repositionPopoverTop,
+    getSaveButtonOrToolbar,
+    observeElementRemoved,
+} from "../common";
 import { clickMoreStep, clickAttributesInMenuStep } from "./desktop";
-import { expandToolbarStepMobile, openMetadataSectionStepMobile, tapAttributesStepMobile } from "./mobile";
+import {
+    expandToolbarStepMobile,
+    openMetadataSectionStepMobile,
+    tapAttributesStepMobile,
+} from "./mobile";
 
 /**
  * Step explaining the attributes modal
@@ -72,7 +81,11 @@ export const attributesTour: TourDefinition = {
 
             // Open the attributes modal
             ...(ctx.isMobile
-                ? [expandToolbarStepMobile(ctx), openMetadataSectionStepMobile(ctx), tapAttributesStepMobile(ctx)]
+                ? [
+                      expandToolbarStepMobile(ctx),
+                      openMetadataSectionStepMobile(ctx),
+                      tapAttributesStepMobile(ctx),
+                  ]
                 : [clickMoreStep(ctx), clickAttributesInMenuStep(ctx)]),
 
             // Explain the modal (auto-advances when closed)

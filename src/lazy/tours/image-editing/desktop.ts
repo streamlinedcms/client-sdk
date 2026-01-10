@@ -30,13 +30,17 @@ export function selectImageStepDesktop(ctx: TourContext): TourStep | null {
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const observer = observeClassAddedOnSelector("[data-scms-image]", ["streamlined-editing"], {
-                onMatch: () => {
-                    ctx.untrackObserver(observer);
-                    // Delay to let toolbar re-render with image-specific buttons
-                    setTimeout(() => ctx.moveNext(), 300);
+            const observer = observeClassAddedOnSelector(
+                "[data-scms-image]",
+                ["streamlined-editing"],
+                {
+                    onMatch: () => {
+                        ctx.untrackObserver(observer);
+                        // Delay to let toolbar re-render with image-specific buttons
+                        setTimeout(() => ctx.moveNext(), 300);
+                    },
                 },
-            });
+            );
             ctx.trackObserver(observer);
         },
     };

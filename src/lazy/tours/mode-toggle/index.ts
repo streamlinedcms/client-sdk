@@ -13,14 +13,9 @@ export const modeToggleTour: TourDefinition = {
 
     getSteps: (ctx: TourContext) => {
         if (ctx.isMobile) {
-            return [
-                expandToolbarStepMobile(ctx),
-                modeToggleStepMobile(),
-            ];
+            return [expandToolbarStepMobile(ctx), modeToggleStepMobile()];
         }
 
-        return [
-            modeToggleStepDesktop(),
-        ];
+        return [modeToggleStepDesktop()];
     },
 };

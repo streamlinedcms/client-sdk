@@ -3,9 +3,18 @@
  */
 
 import type { TourDefinition, TourStep, TourContext } from "../types";
-import { selectElementStep, repositionPopoverTop, getSaveButtonOrToolbar, observeElementRemoved } from "../common";
+import {
+    selectElementStep,
+    repositionPopoverTop,
+    getSaveButtonOrToolbar,
+    observeElementRemoved,
+} from "../common";
 import { clickMoreStep, clickAccessibilityInMenuStep } from "./desktop";
-import { expandToolbarStepMobile, openMetadataSectionStepMobile, tapAccessibilityStepMobile } from "./mobile";
+import {
+    expandToolbarStepMobile,
+    openMetadataSectionStepMobile,
+    tapAccessibilityStepMobile,
+} from "./mobile";
 
 /**
  * Step explaining the accessibility modal fields
@@ -73,7 +82,11 @@ export const accessibilityTour: TourDefinition = {
 
             // Open the accessibility modal
             ...(ctx.isMobile
-                ? [expandToolbarStepMobile(ctx), openMetadataSectionStepMobile(ctx), tapAccessibilityStepMobile(ctx)]
+                ? [
+                      expandToolbarStepMobile(ctx),
+                      openMetadataSectionStepMobile(ctx),
+                      tapAccessibilityStepMobile(ctx),
+                  ]
                 : [clickMoreStep(ctx), clickAccessibilityInMenuStep(ctx)]),
 
             // Explain the modal fields (auto-advances when closed)

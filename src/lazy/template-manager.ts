@@ -397,7 +397,7 @@ export class TemplateManager {
         if (!templateInfo) return;
 
         const instanceElement = templateInfo.container.querySelector<HTMLElement>(
-            `[data-scms-instance="${instanceId}"]`
+            `[data-scms-instance="${instanceId}"]`,
         );
         if (instanceElement) {
             this.helpers.scrollToElement(instanceElement);
@@ -453,13 +453,19 @@ export class TemplateManager {
 
         // Insert after the currently selected instance (if requested), or at the end
         const currentInstanceId = insertAfterSelected ? this.state.toolbar?.instanceId : undefined;
-        const currentInstanceIndex = insertAfterSelected ? this.state.toolbar?.instanceIndex : undefined;
+        const currentInstanceIndex = insertAfterSelected
+            ? this.state.toolbar?.instanceIndex
+            : undefined;
         let insertIndex = templateInfo.instanceIds.length; // Default: append at end
 
-        if (currentInstanceId && currentInstanceIndex !== null && currentInstanceIndex !== undefined) {
+        if (
+            currentInstanceId &&
+            currentInstanceIndex !== null &&
+            currentInstanceIndex !== undefined
+        ) {
             // Find the current instance element
             const currentInstance = container.querySelector<HTMLElement>(
-                `[data-scms-instance="${currentInstanceId}"]`
+                `[data-scms-instance="${currentInstanceId}"]`,
             );
             if (currentInstance && currentInstance.nextSibling) {
                 container.insertBefore(clone, currentInstance.nextSibling);
@@ -1061,8 +1067,9 @@ export class TemplateManager {
         this.state.toolbar.instanceId = instanceId;
         this.state.toolbar.instanceIndex = templateInfo.instanceIds.indexOf(instanceId);
         this.state.toolbar.instanceCount = templateInfo.instanceIds.length;
-        this.state.toolbar.structureMismatch =
-            instanceElement.hasAttribute("data-scms-structure-mismatch");
+        this.state.toolbar.structureMismatch = instanceElement.hasAttribute(
+            "data-scms-structure-mismatch",
+        );
     }
 
     // ==================== Public Accessors ====================

@@ -30,13 +30,17 @@ export function selectLinkStepDesktop(ctx: TourContext): TourStep | null {
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const observer = observeClassAddedOnSelector("[data-scms-link]", ["streamlined-editing"], {
-                onMatch: () => {
-                    ctx.untrackObserver(observer);
-                    // Delay to let toolbar re-render with link-specific buttons
-                    setTimeout(() => ctx.moveNext(), 300);
+            const observer = observeClassAddedOnSelector(
+                "[data-scms-link]",
+                ["streamlined-editing"],
+                {
+                    onMatch: () => {
+                        ctx.untrackObserver(observer);
+                        // Delay to let toolbar re-render with link-specific buttons
+                        setTimeout(() => ctx.moveNext(), 300);
+                    },
                 },
-            });
+            );
             ctx.trackObserver(observer);
         },
     };
@@ -78,7 +82,7 @@ export function linkEditorStepDesktop(ctx: TourContext): TourStep {
         popover: {
             title: "Link Editor",
             description:
-                "Edit the URL, choose whether to open in a new tab, and modify the link content. Click \"Apply\" when done.",
+                'Edit the URL, choose whether to open in a new tab, and modify the link content. Click "Apply" when done.',
             side: "top",
             align: "center",
             showButtons: ["close"],
@@ -127,4 +131,3 @@ export function saveStepDesktop(): TourStep {
         },
     };
 }
-

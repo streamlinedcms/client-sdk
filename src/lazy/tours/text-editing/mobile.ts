@@ -5,7 +5,6 @@
 import type { TourStep, TourContext } from "../types";
 import { observeClassAddedOnSelector, getSaveButtonOrToolbar } from "../common";
 
-
 /**
  * Step prompting user to tap a text element
  * Auto-advances when element becomes selected
@@ -25,12 +24,16 @@ export function selectTextStepMobile(ctx: TourContext): TourStep | null {
         },
         onHighlighted: () => {
             // Auto-advance when text element becomes selected
-            const observer = observeClassAddedOnSelector("[data-scms-text]", ["streamlined-selected"], {
-                onMatch: () => {
-                    ctx.untrackObserver(observer);
-                    setTimeout(() => ctx.moveNext(), 200);
+            const observer = observeClassAddedOnSelector(
+                "[data-scms-text]",
+                ["streamlined-selected"],
+                {
+                    onMatch: () => {
+                        ctx.untrackObserver(observer);
+                        setTimeout(() => ctx.moveNext(), 200);
+                    },
                 },
-            });
+            );
             ctx.trackObserver(observer);
         },
     };

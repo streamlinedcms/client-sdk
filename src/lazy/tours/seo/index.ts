@@ -3,7 +3,12 @@
  */
 
 import type { TourDefinition, TourStep, TourContext } from "../types";
-import { selectElementStep, repositionPopoverTop, getSaveButtonOrToolbar, observeElementRemoved } from "../common";
+import {
+    selectElementStep,
+    repositionPopoverTop,
+    getSaveButtonOrToolbar,
+    observeElementRemoved,
+} from "../common";
 import { clickMoreStep, clickSeoInMenuStep } from "./desktop";
 import { expandToolbarStepMobile, openMetadataSectionStepMobile, tapSeoStepMobile } from "./mobile";
 
@@ -74,7 +79,11 @@ export const seoTour: TourDefinition = {
 
             // Open the SEO modal
             ...(ctx.isMobile
-                ? [expandToolbarStepMobile(ctx), openMetadataSectionStepMobile(ctx), tapSeoStepMobile(ctx)]
+                ? [
+                      expandToolbarStepMobile(ctx),
+                      openMetadataSectionStepMobile(ctx),
+                      tapSeoStepMobile(ctx),
+                  ]
                 : [clickMoreStep(ctx), clickSeoInMenuStep(ctx)]),
 
             // Explain the modal fields (auto-advances when closed)

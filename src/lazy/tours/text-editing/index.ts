@@ -37,17 +37,9 @@ export const textEditingTour: TourDefinition = {
             // On mobile, skip the inline editing explanation step since
             // re-highlighting the element steals focus from contenteditable.
             // The keyboard appearing makes it obvious they can type.
-            return [
-                selectTextStepMobile(ctx),
-                tapToEditStepMobile(ctx),
-                saveStepMobile(),
-            ];
+            return [selectTextStepMobile(ctx), tapToEditStepMobile(ctx), saveStepMobile()];
         }
 
-        return [
-            selectTextStepDesktop(ctx),
-            inlineEditingStepDesktop(ctx),
-            saveStepDesktop(),
-        ];
+        return [selectTextStepDesktop(ctx), inlineEditingStepDesktop(ctx), saveStepDesktop()];
     },
 };

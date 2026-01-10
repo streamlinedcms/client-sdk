@@ -184,7 +184,9 @@ test("toolbar add button creates new instance", async () => {
 
     // Click add button in toolbar
     const toolbar = document.querySelector("scms-toolbar");
-    const addButton = toolbar?.shadowRoot?.querySelector("button[data-action='add-item']") as HTMLElement;
+    const addButton = toolbar?.shadowRoot?.querySelector(
+        "button[data-action='add-item']",
+    ) as HTMLElement;
     addButton.click();
 
     await waitForCondition(

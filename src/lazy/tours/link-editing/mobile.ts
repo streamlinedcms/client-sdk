@@ -32,12 +32,16 @@ export function selectLinkStepMobile(ctx: TourContext): TourStep | null {
             showButtons: ["close"],
         },
         onHighlighted: () => {
-            const observer = observeClassAddedOnSelector("[data-scms-link]", ["streamlined-editing"], {
-                onMatch: () => {
-                    ctx.untrackObserver(observer);
-                    setTimeout(() => ctx.moveNext(), 200);
+            const observer = observeClassAddedOnSelector(
+                "[data-scms-link]",
+                ["streamlined-editing"],
+                {
+                    onMatch: () => {
+                        ctx.untrackObserver(observer);
+                        setTimeout(() => ctx.moveNext(), 200);
+                    },
                 },
-            });
+            );
             ctx.trackObserver(observer);
         },
     };
@@ -84,7 +88,8 @@ export function expandToolbarStepMobile(ctx: TourContext): TourStep {
  */
 export function openElementSectionStepMobile(ctx: TourContext): TourStep {
     return {
-        element: () => queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='element']"),
+        element: () =>
+            queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='element']"),
         popover: {
             title: "Element Options",
             description: "The Element section shows actions for the selected link.",
@@ -94,7 +99,9 @@ export function openElementSectionStepMobile(ctx: TourContext): TourStep {
         },
         onHighlighted: () => {
             // Check if section is already expanded (header button has aria-expanded="true")
-            const section = queryShadowSelector("scms-toolbar >>> .mobile-section[data-section='element']");
+            const section = queryShadowSelector(
+                "scms-toolbar >>> .mobile-section[data-section='element']",
+            );
             const headerButton = section?.querySelector("button[aria-expanded]");
             if (!headerButton) return;
 
@@ -145,7 +152,7 @@ export function linkEditorStepMobile(ctx: TourContext): TourStep {
         popover: {
             title: "Link Editor",
             description:
-                "Edit the URL, choose whether to open in a new tab, and modify the link content. Tap \"Apply\" when done.",
+                'Edit the URL, choose whether to open in a new tab, and modify the link content. Tap "Apply" when done.',
             side: "top",
             align: "center",
             showButtons: ["close"],
@@ -198,4 +205,3 @@ export function saveStepMobile(): TourStep {
         },
     };
 }
-

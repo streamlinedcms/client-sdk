@@ -35,7 +35,7 @@ const tourList: TourDefinition[] = [
  * Tours indexed by ID for lookup
  */
 export const tours: Record<string, TourDefinition> = Object.fromEntries(
-    tourList.map((tour) => [tour.id, tour])
+    tourList.map((tour) => [tour.id, tour]),
 );
 
 export type TourId = (typeof tourList)[number]["id"];
