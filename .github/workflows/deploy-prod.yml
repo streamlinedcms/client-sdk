@@ -1,21 +1,69 @@
 name: Deploy Production
 
 on:
-    pull_request:
+    push:
         branches: [master]
-        types: [closed]
 
 jobs:
-    check-label:
-        if: github.event.pull_request.merged == true
-        uses: ./.github/workflows/check-release-label.yml
-        with:
-            labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
-            require: true
-            head_ref: ${{ github.event.pull_request.head.ref }}
+    get-pr-info:
+        runs-on: ubuntu-latest
+        outputs:
+            should_deploy: ${{ steps.lookup.outputs.should_deploy }}
+            bump_type: ${{ steps.lookup.outputs.bump_type }}
+            head_ref: ${{ steps.lookup.outputs.head_ref }}
+            pr_number: ${{ steps.lookup.outputs.pr_number }}
+
+        steps:
+            - name: Lookup merged PR
+              id: lookup
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  # Check if this is an automated commit (e.g., version bump)
+                  AUTHOR=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}" --jq '.author.login')
+                  if [ "$AUTHOR" = "github-actions[bot]" ]; then
+                      echo "Automated commit by $AUTHOR, skipping deploy"
+                      echo "should_deploy=false" >> $GITHUB_OUTPUT
+                      exit 0
+                  fi
+
+                  # Find PR associated with this commit
+                  PR_DATA=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0]' 2>/dev/null || echo "")
+
+                  if [ -z "$PR_DATA" ] || [ "$PR_DATA" = "null" ]; then
+                      echo "::error::No PR found for commit ${{ github.sha }}"
+                      exit 1
+                  fi
+
+                  PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
+                  HEAD_REF=$(echo "$PR_DATA" | jq -r '.head.ref')
+                  echo "Found PR #$PR_NUMBER from branch $HEAD_REF"
+
+                  # Get labels from PR
+                  LABELS=$(echo "$PR_DATA" | jq -r '.labels[].name')
+                  echo "Labels: $LABELS"
+
+                  # Determine bump type from labels
+                  if echo "$LABELS" | grep -q 'release:major'; then
+                      BUMP_TYPE="major"
+                  elif echo "$LABELS" | grep -q 'release:minor'; then
+                      BUMP_TYPE="minor"
+                  elif echo "$LABELS" | grep -q 'release:patch'; then
+                      BUMP_TYPE="patch"
+                  else
+                      echo "::error::No release label found on PR #$PR_NUMBER"
+                      exit 1
+                  fi
+
+                  echo "Bump type: $BUMP_TYPE"
+                  echo "should_deploy=true" >> $GITHUB_OUTPUT
+                  echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+                  echo "head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
+                  echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
 
     deploy:
-        needs: check-label
+        needs: get-pr-info
+        if: needs.get-pr-info.outputs.should_deploy == 'true'
         runs-on: ubuntu-latest
         environment: production
 
@@ -40,8 +88,8 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "github-actions[bot]@users.noreply.github.com"
 
-                  BUMP_TYPE="${{ needs.check-label.outputs.type }}"
-                  HEAD_REF="${{ github.event.pull_request.head.ref }}"
+                  BUMP_TYPE="${{ needs.get-pr-info.outputs.bump_type }}"
+                  HEAD_REF="${{ needs.get-pr-info.outputs.head_ref }}"
                   CURRENT_VERSION=$(node -p "require('./package.json').version")
 
                   echo "Source branch: $HEAD_REF"
@@ -103,9 +151,10 @@ jobs:
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
     sync-develop:
-        needs: deploy
-        if: startsWith(github.event.pull_request.head.ref, 'release/')
+        needs: [get-pr-info, deploy]
+        if: startsWith(needs.get-pr-info.outputs.head_ref, 'release/')
         runs-on: ubuntu-latest
+        environment: production
 
         steps:
             - uses: actions/checkout@v4
@@ -137,7 +186,7 @@ jobs:
             - name: Delete release branch
               env:
                   GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
               run: |
+                  HEAD_REF="${{ needs.get-pr-info.outputs.head_ref }}"
                   echo "Deleting branch: $HEAD_REF"
                   git push origin --delete "$HEAD_REF"

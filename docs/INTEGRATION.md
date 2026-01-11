@@ -13,7 +13,7 @@ Add this script tag to your HTML `<head>` (not at the end of `<body>`):
 ```html
 <head>
     <script
-        src="https://cdn.streamlinedcms.com/client-sdk/v0.1/streamlined-cms.min.js"
+        src="https://cdn.streamlinedcms.com/client-sdk/v1/streamlined-cms.min.js"
         data-app-id="YOUR_APP_ID"
     ></script>
 </head>
@@ -228,7 +228,7 @@ The SDK automatically:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My Website</title>
     <script
-        src="https://cdn.streamlinedcms.com/client-sdk/v0.1/streamlined-cms.min.js"
+        src="https://cdn.streamlinedcms.com/client-sdk/v1/streamlined-cms.min.js"
         data-app-id="YOUR_APP_ID"
     ></script>
 </head>

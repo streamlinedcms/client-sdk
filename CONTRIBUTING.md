@@ -226,6 +226,37 @@ Commits to release branches auto-deploy to the production CDN for testing (witho
 2. **Release prep** → create `release/X.Y.Z[-suffix]` from `develop`
 3. **Testing** → commits to release branch deploy to production CDN (no aliases)
 4. **Release** → PR to `master` with release label → version bump + alias updates
+5. **Post-release** → master auto-syncs to develop, release branch deleted
+
+### Repository Setup
+
+The release workflow requires specific GitHub configuration. Run `./scripts/setup-github.sh` to configure:
+
+**Rulesets:**
+```bash
+./scripts/setup-github.sh rulesets apply
+```
+- `master-protection` - require PR, approvals, status checks
+- `develop-protection` - require PR, status checks (no approval needed)
+- `release-protection` - only maintainers can create/delete `release/*` branches
+
+**Environments:**
+```bash
+./scripts/setup-github.sh environments apply
+```
+- `production` - restricted to `master` and `release/*` branches
+- `staging` - restricted to `develop` branch
+
+**Secrets:**
+
+The production environment requires a `RELEASE_PAT` secret for pushing version commits:
+
+1. Create a fine-grained PAT at https://github.com/settings/tokens?type=beta
+   - Repository access: this repo only
+   - Permissions: Contents (read/write), Pull requests (read/write)
+2. Add as environment secret in `production` (not repository secret)
+
+See the [deployment guide](https://github.com/streamlinedcms/planning/blob/master/guides/cloudflare-github-deployment.md#cicd-security) for security details.
 
 ## Pull Requests
 

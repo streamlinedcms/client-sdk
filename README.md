@@ -18,7 +18,7 @@ Add this script tag to your HTML `<head>`:
 
 ```html
 <script
-    src="https://cdn.streamlinedcms.com/client-sdk/v0.1/streamlined-cms.min.js"
+    src="https://cdn.streamlinedcms.com/client-sdk/v1/streamlined-cms.min.js"
     data-app-id="YOUR_APP_ID"
 ></script>
 ```
@@ -32,7 +32,7 @@ Get your App ID from [app.streamlinedcms.com](https://app.streamlinedcms.com).
 <html>
 <head>
     <script
-        src="https://cdn.streamlinedcms.com/client-sdk/v0.1/streamlined-cms.min.js"
+        src="https://cdn.streamlinedcms.com/client-sdk/v1/streamlined-cms.min.js"
         data-app-id="YOUR_APP_ID"
     ></script>
 </head>
