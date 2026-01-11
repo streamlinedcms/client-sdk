@@ -11,7 +11,7 @@ Usage: ./scripts/setup-github.sh <resource> <action> [scope] [options]
 Setup GitHub repository configuration: branch rulesets and environments.
 
 Resources:
-  rulesets      Branch protection rulesets (scope: master, develop)
+  rulesets      Branch protection rulesets (scope: master, develop, release)
   environments  GitHub environments for deployments (scope: staging, production)
 
 Actions:
@@ -49,6 +49,11 @@ Rulesets:
     - Allow force pushes, restrict deletions
     - Admins can bypass
 
+  release:
+    - Only maintainers can create release/* branches
+    - Restrict deletions
+    - Maintainers can bypass
+
 Environments:
   staging     - Auto-deploy target for develop branch
   production  - Auto-deploy target for master branch
@@ -81,7 +86,7 @@ for arg in "$@"; do
         rulesets|environments)
             RESOURCE="$arg"
             ;;
-        master|develop|staging|production)
+        master|develop|release|staging|production)
             SCOPE="$arg"
             ;;
         *)
@@ -108,8 +113,8 @@ fi
 
 # Validate scope matches resource
 if [ -n "$SCOPE" ]; then
-    if [ "$RESOURCE" = "rulesets" ] && [[ ! "$SCOPE" =~ ^(master|develop)$ ]]; then
-        echo "Error: scope for rulesets must be 'master' or 'develop'"
+    if [ "$RESOURCE" = "rulesets" ] && [[ ! "$SCOPE" =~ ^(master|develop|release)$ ]]; then
+        echo "Error: scope for rulesets must be 'master', 'develop', or 'release'"
         exit 1
     fi
     if [ "$RESOURCE" = "environments" ] && [[ ! "$SCOPE" =~ ^(staging|production)$ ]]; then
@@ -130,7 +135,7 @@ REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 # RULESETS
 # ============================================================================
 
-BRANCHES=(master develop)
+BRANCHES=(master develop release)
 
 get_ruleset_name() {
     echo "$1-protection"
@@ -297,6 +302,31 @@ develop_payload=$(cat <<'EOF'
 EOF
 )
 
+release_payload=$(cat <<'EOF'
+{
+    "target": "branch",
+    "enforcement": "active",
+    "bypass_actors": [
+        {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+        }
+    ],
+    "conditions": {
+        "ref_name": {
+            "include": ["refs/heads/release/*"],
+            "exclude": []
+        }
+    },
+    "rules": [
+        { "type": "creation" },
+        { "type": "deletion" }
+    ]
+}
+EOF
+)
+
 # ============================================================================
 # ENVIRONMENTS
 # ============================================================================
@@ -329,28 +359,59 @@ apply_environment() {
     echo
     echo "Environment '$env_name':"
 
+    # Define branch policies per environment
+    local -a branch_patterns
+    if [ "$env_name" = "production" ]; then
+        branch_patterns=("master" "release/*")
+    elif [ "$env_name" = "staging" ]; then
+        branch_patterns=("develop")
+    fi
+
     local exists
     if exists=$(gh api "/repos/$REPO/environments/$env_name" 2>/dev/null); then
         # Environment exists
         if [ "$DRY_RUN" = "true" ]; then
-            echo "  Action: SKIP (already exists)"
+            echo "  Action: UPDATE (configure branch policies)"
+            echo "  Allowed branches: ${branch_patterns[*]}"
             echo "  Current config:"
             echo "$exists" | jq '{
                 id: .id,
                 protection_rules: .protection_rules,
                 deployment_branch_policy: .deployment_branch_policy
             }' | sed 's/^/    /'
-        else
-            echo "  Already exists"
+            return
         fi
     else
         # Environment does not exist
         if [ "$DRY_RUN" = "true" ]; then
             echo "  Action: CREATE"
-        else
-            gh api --method PUT "/repos/$REPO/environments/$env_name" > /dev/null
-            echo "  Created"
+            echo "  Allowed branches: ${branch_patterns[*]}"
+            return
         fi
+    fi
+
+    # Create/update environment with custom branch policy enabled
+    gh api --method PUT "/repos/$REPO/environments/$env_name" \
+        -F "deployment_branch_policy[protected_branches]=false" \
+        -F "deployment_branch_policy[custom_branch_policies]=true" > /dev/null
+
+    # Remove existing branch policies
+    local existing_policies
+    existing_policies=$(gh api "/repos/$REPO/environments/$env_name/deployment-branch-policies" --jq '.branch_policies[].id' 2>/dev/null || true)
+    for policy_id in $existing_policies; do
+        gh api --method DELETE "/repos/$REPO/environments/$env_name/deployment-branch-policies/$policy_id" > /dev/null 2>&1 || true
+    done
+
+    # Add new branch policies
+    for pattern in "${branch_patterns[@]}"; do
+        gh api --method POST "/repos/$REPO/environments/$env_name/deployment-branch-policies" \
+            -f "name=$pattern" > /dev/null
+    done
+
+    if [ -z "$exists" ]; then
+        echo "  Created with branch restrictions: ${branch_patterns[*]}"
+    else
+        echo "  Updated branch restrictions: ${branch_patterns[*]}"
     fi
 }
 
