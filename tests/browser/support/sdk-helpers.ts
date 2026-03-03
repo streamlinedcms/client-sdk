@@ -27,7 +27,8 @@ export function getController(): EditorController | null {
  */
 export function generateTestAppId(): string {
     const counter = initCounter++;
-    return `test-app-${Date.now()}-${counter}`;
+    const random = Math.random().toString(36).slice(2, 8);
+    return `test-app-${Date.now()}-${counter}-${random}`;
 }
 
 /**
