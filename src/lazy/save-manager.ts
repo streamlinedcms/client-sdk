@@ -404,8 +404,8 @@ export class SaveManager {
                 }
 
                 // Process deleted grouped elements from response
-                for (const [groupId, elementIds] of Object.entries(result.deleted?.groups ?? {})) {
-                    for (const elementId of elementIds) {
+                for (const [groupId, group] of Object.entries(result.deleted?.groups ?? {})) {
+                    for (const elementId of group.elements) {
                         const key = `${groupId}:${elementId}`;
                         this.state.originalContent.delete(key);
                         this.state.savedContentKeys.delete(key);
