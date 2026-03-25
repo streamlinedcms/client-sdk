@@ -94,6 +94,7 @@ export class TemplateManager {
                 attributesToRemove.push(attr.name);
             }
             attributesToRemove.forEach((name) => el.removeAttribute(name));
+            el.innerHTML = "";
         });
 
         // Replace all text nodes with empty strings
