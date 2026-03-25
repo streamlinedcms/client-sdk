@@ -8,7 +8,7 @@
  * Regression test for: https://github.com/streamlinedcms/client-sdk/issues/72
  */
 
-import { test, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { test, expect, beforeAll, beforeEach } from "vitest";
 import {
     initializeSDK,
     waitForCondition,
@@ -77,14 +77,9 @@ async function resetState(): Promise<void> {
         await clickToolbarButton("Cancel");
         await waitForCondition(() => !html.classList.contains("streamlined-editing")).catch(() => {});
     }
-    await new Promise((r) => setTimeout(r, 50));
 }
 
 beforeEach(async () => {
-    await resetState();
-});
-
-afterEach(async () => {
     await resetState();
 });
 
@@ -105,7 +100,9 @@ test("SEO modal: attribute-only changes trigger hasChanges and persist to draft"
 
     const modal = document.querySelector("scms-seo-modal") as SeoModal;
     const shadowRoot = modal.shadowRoot!;
-    await new Promise((r) => setTimeout(r, 100));
+
+    // Wait for modal to render its select element
+    await waitForCondition(() => shadowRoot.querySelector("select") !== null);
 
     // Change the rel attribute (attribute-only change, no content edit)
     const relSelect = shadowRoot.querySelector("select") as HTMLSelectElement;
@@ -115,12 +112,12 @@ test("SEO modal: attribute-only changes trigger hasChanges and persist to draft"
     // Click Apply
     clickApplyButton(modal);
     await waitForCondition(() => document.querySelector("scms-seo-modal") === null);
-    await new Promise((r) => setTimeout(r, 100));
 
     // Core assertion for issue #72: hasChanges must be true
-    expect(toolbar!.hasChanges).toBe(true);
+    await waitForCondition(() => toolbar!.hasChanges === true);
 
     // Draft must include the SEO attribute change
+    await waitForCondition(() => localStorage.getItem(getDraftKey()) !== null);
     const stored = localStorage.getItem(getDraftKey());
     expect(stored).not.toBeNull();
     const draft = JSON.parse(stored!);
@@ -141,7 +138,9 @@ test("Accessibility modal: attribute-only changes update currentContent and pers
 
     const modal = document.querySelector("scms-accessibility-modal") as AccessibilityModal;
     const shadowRoot = modal.shadowRoot!;
-    await new Promise((r) => setTimeout(r, 100));
+
+    // Wait for modal to render its inputs
+    await waitForCondition(() => shadowRoot.querySelectorAll('input[type="text"]').length > 0);
 
     // Set aria-label (text input)
     const inputs = shadowRoot.querySelectorAll('input[type="text"]');
@@ -152,9 +151,12 @@ test("Accessibility modal: attribute-only changes update currentContent and pers
     // Click Apply
     clickApplyButton(modal);
     await waitForCondition(() => document.querySelector("scms-accessibility-modal") === null);
-    await new Promise((r) => setTimeout(r, 100));
 
     // Draft must include the accessibility attribute change for the link
+    await waitForCondition(() => {
+        const s = localStorage.getItem(getDraftKey());
+        return s !== null && s.includes("aria-label");
+    });
     const stored = localStorage.getItem(getDraftKey());
     expect(stored).not.toBeNull();
     const draft = JSON.parse(stored!);
@@ -175,7 +177,9 @@ test("Attributes modal: attribute-only changes update currentContent and persist
 
     const modal = document.querySelector("scms-attributes-modal") as AttributesModal;
     const shadowRoot = modal.shadowRoot!;
-    await new Promise((r) => setTimeout(r, 100));
+
+    // Wait for modal to render its form inputs
+    await waitForCondition(() => shadowRoot.querySelectorAll(".add-form input").length >= 2);
 
     // Add a custom attribute
     const inputs = shadowRoot.querySelectorAll(".add-form input");
@@ -189,14 +193,19 @@ test("Attributes modal: attribute-only changes update currentContent and persist
 
     const addBtn = shadowRoot.querySelector(".add-form button") as HTMLButtonElement;
     addBtn.click();
-    await new Promise((r) => setTimeout(r, 100));
+
+    // Wait for attribute to be added before applying
+    await waitForCondition(() => shadowRoot.querySelectorAll(".attribute-row, .attr-item").length > 0);
 
     // Click Apply
     clickApplyButton(modal);
     await waitForCondition(() => document.querySelector("scms-attributes-modal") === null);
-    await new Promise((r) => setTimeout(r, 100));
 
     // Draft must include the custom attribute for the link element
+    await waitForCondition(() => {
+        const s = localStorage.getItem(getDraftKey());
+        return s !== null && s.includes("data-tracking");
+    });
     const stored = localStorage.getItem(getDraftKey());
     expect(stored).not.toBeNull();
     const draft = JSON.parse(stored!);
