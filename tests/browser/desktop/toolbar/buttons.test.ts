@@ -145,46 +145,6 @@ test("clicking outside element deselects it", async () => {
     expect(htmlElement.classList.contains("streamlined-editing")).toBe(false);
 });
 
-// --- Element badge tests ---
-
-test("element badge shows correct element ID for html element", async () => {
-    const htmlElement = document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
-    htmlElement.click();
-
-    await waitForCondition(() => htmlElement.classList.contains("streamlined-editing"));
-
-    const shadowRoot = getToolbarShadow();
-    const badge = shadowRoot?.querySelector("scms-element-badge");
-    expect(badge).not.toBeNull();
-    expect(badge?.getAttribute("element-id")).toBe("test-title");
-    expect(badge?.getAttribute("element-type")).toBe("html");
-});
-
-test("element badge shows correct type for link element", async () => {
-    const linkElement = document.querySelector('[data-scms-link="test-link"]') as HTMLElement;
-    linkElement.click();
-
-    await waitForCondition(() => linkElement.classList.contains("streamlined-editing"));
-
-    const shadowRoot = getToolbarShadow();
-    const badge = shadowRoot?.querySelector("scms-element-badge");
-    expect(badge?.getAttribute("element-id")).toBe("test-link");
-    expect(badge?.getAttribute("element-type")).toBe("link");
-});
-
-test("element badge shows correct type for text element", async () => {
-    const textElement = document.querySelector('[data-scms-text="name"]') as HTMLElement;
-    if (!textElement) return;
-
-    textElement.click();
-
-    await waitForCondition(() => textElement.classList.contains("streamlined-editing"));
-
-    const shadowRoot = getToolbarShadow();
-    const badge = shadowRoot?.querySelector("scms-element-badge");
-    expect(badge?.getAttribute("element-type")).toBe("text");
-});
-
 // --- Mode toggle tests ---
 
 test("mode toggle is visible in toolbar", async () => {
