@@ -628,24 +628,9 @@ export class Toolbar extends ScmsElement {
     }
 
     private renderActiveElement() {
-        // Show element badge if an element is active
-        if (this.activeElement) {
-            return html`<scms-element-badge
-                element-id=${this.activeElement}
-                element-type=${this.activeElementType || ""}
-            ></scms-element-badge>`;
-        }
-
-        // Show instance badge if only an instance is selected (no element)
-        if (this.templateId && this.instanceIndex !== null && this.instanceCount !== null) {
-            return html`<scms-instance-badge
-                instance-index=${this.instanceIndex}
-                instance-count=${this.instanceCount}
-            ></scms-instance-badge>`;
-        }
-
-        // No element or instance selected
-        return html`<span class="text-xs text-gray-400 italic">No element selected</span>`;
+        // Hidden for now — badge was too technical and confusing users.
+        // TODO: find a better way to display active element/instance details.
+        return nothing;
     }
 
     private renderDesktop() {
