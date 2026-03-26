@@ -73,6 +73,8 @@ export class EditingManager {
         ) as HTMLElement | null;
         if (parentInstance) {
             this.selectInstance(parentInstance);
+        } else {
+            this.deselectInstance();
         }
 
         // Add selection classes
