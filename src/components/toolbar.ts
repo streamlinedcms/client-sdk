@@ -12,7 +12,7 @@
 import { html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
-import { CircleHelp, ChevronUp, ChevronDown, Ellipsis, Layers, Plus, Trash2 } from "lucide-static";
+import { CircleHelp, ChevronUp, ChevronDown, Ellipsis, Layers, Plus, ScanEye, Trash2 } from "lucide-static";
 import { ScmsElement } from "./base.js";
 import type { EditorMode } from "./mode-toggle.js";
 import "./mode-toggle.js";
@@ -73,6 +73,12 @@ export class Toolbar extends ScmsElement {
 
     @property({ type: Boolean, attribute: "structure-mismatch" })
     structureMismatch = false;
+
+    @property({ type: Boolean, attribute: "content-viewer-active" })
+    contentViewerActive = false;
+
+    @property({ type: Number, attribute: "hidden-element-count" })
+    hiddenElementCount = 0;
 
     @property({ type: Boolean, reflect: true })
     expanded = false;
@@ -343,6 +349,25 @@ export class Toolbar extends ScmsElement {
         );
     }
 
+    private handleContentViewerToggle() {
+        this.dispatchEvent(
+            new CustomEvent("content-viewer-toggle", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
+    private handleShowHiddenElements(e: Event) {
+        e.stopPropagation();
+        this.dispatchEvent(
+            new CustomEvent("show-hidden-elements", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
     private handleAddInstance() {
         this.dispatchEvent(
             new CustomEvent("add-instance", {
@@ -594,6 +619,37 @@ export class Toolbar extends ScmsElement {
         `;
     }
 
+    private renderContentViewerButton() {
+        // Only show in editing mode (not viewer or when warning/readOnly)
+        if (this.warning || this.readOnly) return nothing;
+
+        const buttonClass = this.contentViewerActive
+            ? "w-8 h-8 flex items-center justify-center text-red-600 bg-red-50 rounded-full transition-colors [&>svg]:w-5 [&>svg]:h-5 relative"
+            : "w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors [&>svg]:w-5 [&>svg]:h-5 relative";
+
+        return html`
+            <button
+                class=${buttonClass}
+                @click=${this.handleContentViewerToggle}
+                title="Content Viewer"
+                aria-label="Content Viewer"
+                aria-pressed=${this.contentViewerActive}
+            >
+                ${unsafeSVG(ScanEye)}
+                ${this.contentViewerActive && this.hiddenElementCount > 0
+                    ? html`<button
+                          class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full leading-none"
+                          @click=${this.handleShowHiddenElements}
+                          title="${this.hiddenElementCount} hidden element${this.hiddenElementCount === 1 ? "" : "s"}"
+                          aria-label="Show hidden elements"
+                      >
+                          ${this.hiddenElementCount}
+                      </button>`
+                    : nothing}
+            </button>
+        `;
+    }
+
     private renderHelpButton() {
         return html`
             <button
@@ -663,7 +719,9 @@ export class Toolbar extends ScmsElement {
                                       : html`<span class="mx-2 text-gray-300">|</span>
                                             ${this.renderAdminLink()}`}
                               </div>`}
-                        <div class="ml-3">${this.renderHelpButton()}</div>
+                        <div class="ml-3 flex items-center gap-1">
+                            ${this.renderContentViewerButton()} ${this.renderHelpButton()}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1042,12 +1100,12 @@ export class Toolbar extends ScmsElement {
                         ${this.renderActiveElement()}
                     </div>
 
-                    <!-- Help (right) -->
+                    <!-- Content Viewer + Help (right) -->
                     <div
-                        class="flex items-center w-16 justify-end"
+                        class="flex items-center w-20 justify-end gap-1"
                         @click=${(e: Event) => e.stopPropagation()}
                     >
-                        ${this.renderHelpButton()}
+                        ${this.renderContentViewerButton()} ${this.renderHelpButton()}
                     </div>
                 </button>
 

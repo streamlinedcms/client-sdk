@@ -70,6 +70,8 @@ import "../components/accessibility-modal.js";
 import "../components/attributes-modal.js";
 import "../components/media-manager-modal.js";
 import "../components/help-panel.js";
+import "../components/content-viewer-badge.js";
+import "../components/content-viewer-panel.js";
 import type { Toolbar } from "../components/toolbar.js";
 import type { HelpPanel } from "../components/help-panel.js";
 import { createEditorState, type EditorState, type EditableElementInfo } from "./state.js";
@@ -81,6 +83,7 @@ import { ModalManager } from "./modal-manager.js";
 import { SaveManager } from "./save-manager.js";
 import { AuthManager } from "./auth-manager.js";
 import { AuthBridge } from "./auth-bridge.js";
+import { ContentViewerManager } from "./content-viewer-manager.js";
 import { injectEditStyles } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
 import { TourManager, getTourDefinitions } from "./tours/index.js";
@@ -133,6 +136,7 @@ class EditorController {
     private saveManager: SaveManager;
     private authManager: AuthManager;
     private tourManager: TourManager;
+    private contentViewerManager: ContentViewerManager;
     // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Double-tap delay constant
@@ -327,6 +331,20 @@ class EditorController {
 
         // Initialize tour manager
         this.tourManager = new TourManager();
+
+        // Initialize content viewer manager
+        this.contentViewerManager = new ContentViewerManager(this.state, this.log, {
+            selectAndEdit: (key, element) => {
+                this.editingManager.startEditing(key, element);
+            },
+            scrollToElement: this.scrollToElement.bind(this),
+            updateToolbarContentViewer: (active, hiddenCount) => {
+                if (this.state.toolbar) {
+                    this.state.toolbar.contentViewerActive = active;
+                    this.state.toolbar.hiddenElementCount = hiddenCount;
+                }
+            },
+        });
     }
 
     /**
@@ -866,6 +884,7 @@ class EditorController {
         this.editingManager.deselectInstance();
         this.editingManager.deselectElement();
         this.editingManager.stopEditing();
+        this.contentViewerManager.deactivate();
     }
 
     private showToolbar(): void {
@@ -957,6 +976,14 @@ class EditorController {
 
         toolbar.addEventListener("help", () => {
             this.handleHelp();
+        });
+
+        toolbar.addEventListener("content-viewer-toggle", () => {
+            this.contentViewerManager.toggle();
+        });
+
+        toolbar.addEventListener("show-hidden-elements", () => {
+            this.contentViewerManager.showHiddenPanel();
         });
 
         document.body.appendChild(toolbar);
