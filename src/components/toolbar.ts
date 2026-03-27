@@ -708,19 +708,19 @@ export class Toolbar extends ScmsElement {
                     <!-- Right: Save + Sign Out + Admin + Help (separated) -->
                     <div class="flex items-center">
                         ${this.renderSaveButton()}
+                        ${this.renderContentViewerButton()}
                         ${this.mockAuth
                             ? nothing
                             : html`<div
-                                  class="ml-6 pl-6 border-l border-gray-200 flex items-center"
+                                  class="ml-1 pl-3 border-l border-gray-200 flex items-center"
                               >
                                   ${this.renderSignOutButton()}
                                   ${this.denyAppGui
                                       ? nothing
-                                      : html`<span class="mx-2 text-gray-300">|</span>
-                                            ${this.renderAdminLink()}`}
+                                      : html`<span class="ml-2">${this.renderAdminLink()}</span>`}
                               </div>`}
                         <div class="ml-3 flex items-center gap-1">
-                            ${this.renderContentViewerButton()} ${this.renderHelpButton()}
+                            ${this.renderHelpButton()}
                         </div>
                     </div>
                 </div>
