@@ -610,8 +610,9 @@ export class TemplateManager {
                     // No more DOM elements for this key
                     this.state.editableElements.delete(key);
                     this.state.editableTypes.delete(key);
-                    // Remove from currentContent (will be detected as pending delete)
+                    // Remove from currentContent and explicitly track deletion
                     this.state.currentContent.delete(key);
+                    this.state.pendingDeletes.add(key);
                 }
             }
         });

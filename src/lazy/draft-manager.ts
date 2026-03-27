@@ -48,13 +48,7 @@ export class DraftManager {
      * Get keys that are pending deletion (in savedContentKeys but not in currentContent)
      */
     getPendingDeletes(): string[] {
-        const deletes: string[] = [];
-        this.state.savedContentKeys.forEach((key) => {
-            if (!this.state.currentContent.has(key)) {
-                deletes.push(key);
-            }
-        });
-        return deletes;
+        return Array.from(this.state.pendingDeletes);
     }
 
     /**
@@ -233,6 +227,7 @@ export class DraftManager {
         // Step 3: Apply deletes
         for (const key of draft.deleted) {
             this.state.currentContent.delete(key);
+            this.state.pendingDeletes.add(key);
         }
 
         this.log.info("Draft restored successfully");
@@ -430,6 +425,7 @@ export class DraftManager {
                     this.state.editableElements.delete(key);
                     this.state.editableTypes.delete(key);
                     this.state.currentContent.delete(key);
+                    this.state.pendingDeletes.add(key);
                 }
             }
         });

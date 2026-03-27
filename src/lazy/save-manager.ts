@@ -400,6 +400,7 @@ export class SaveManager {
                     const key = elementId;
                     this.state.originalContent.delete(key);
                     this.state.savedContentKeys.delete(key);
+                    this.state.pendingDeletes.delete(key);
                     deleted.push(key);
                 }
 
@@ -409,6 +410,7 @@ export class SaveManager {
                         const key = `${groupId}:${elementId}`;
                         this.state.originalContent.delete(key);
                         this.state.savedContentKeys.delete(key);
+                        this.state.pendingDeletes.delete(key);
                         deleted.push(key);
                     }
                 }

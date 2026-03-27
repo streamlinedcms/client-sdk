@@ -62,6 +62,7 @@ export interface EditorState {
     originalContent: Map<string, string>;
     currentContent: Map<string, string>;
     savedContentKeys: Set<string>;
+    pendingDeletes: Set<string>;
     elementAttributes: Map<string, ElementAttributes>;
 
     // Selection & editing
@@ -112,6 +113,7 @@ export function createEditorState(): EditorState {
         originalContent: new Map(),
         currentContent: new Map(),
         savedContentKeys: new Set(),
+        pendingDeletes: new Set(),
         elementAttributes: new Map(),
 
         // Selection & editing
