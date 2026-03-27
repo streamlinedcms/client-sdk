@@ -85,7 +85,11 @@ beforeAll(async () => {
 
     // Set up content that belongs to a DIFFERENT page (not in the DOM).
     // These keys exist in the API response but have no corresponding DOM elements.
-    await setContent(appId, "other-page-title", JSON.stringify({ type: "html", value: "Other Page" }));
+    await setContent(
+        appId,
+        "other-page-title",
+        JSON.stringify({ type: "html", value: "Other Page" }),
+    );
     await setContent(appId, "other-page-bio", JSON.stringify({ type: "html", value: "Bio text" }));
 
     await initializeSDK({ appId });

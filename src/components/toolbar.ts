@@ -12,7 +12,16 @@
 import { html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
-import { CircleHelp, ChevronUp, ChevronDown, Ellipsis, Layers, Plus, ScanEye, Trash2 } from "lucide-static";
+import {
+    CircleHelp,
+    ChevronUp,
+    ChevronDown,
+    Ellipsis,
+    Layers,
+    Plus,
+    ScanEye,
+    Trash2,
+} from "lucide-static";
 import { ScmsElement } from "./base.js";
 import type { EditorMode } from "./mode-toggle.js";
 import "./mode-toggle.js";
@@ -664,7 +673,10 @@ export class Toolbar extends ScmsElement {
                     ? html`<button
                           class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full leading-none"
                           @click=${this.handleShowHiddenElements}
-                          title="${this.hiddenElementCount} hidden element${this.hiddenElementCount === 1 ? "" : "s"}"
+                          title="${this.hiddenElementCount} hidden element${this
+                              .hiddenElementCount === 1
+                              ? ""
+                              : "s"}"
                           aria-label="Show hidden elements"
                       >
                           ${this.hiddenElementCount}
@@ -698,8 +710,18 @@ export class Toolbar extends ScmsElement {
                 title="Undo"
                 aria-label="Undo"
             >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 0 1 0 10H9" />
+                <svg
+                    class="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M3 10h10a5 5 0 0 1 0 10H9"
+                    />
                     <path stroke-linecap="round" stroke-linejoin="round" d="M7 6L3 10l4 4" />
                 </svg>
             </button>
@@ -749,8 +771,7 @@ export class Toolbar extends ScmsElement {
 
                     <!-- Right: Undo + Content Viewer + Save + Sign Out + Admin + Help -->
                     <div class="flex items-center">
-                        ${this.renderUndoButton()}
-                        ${this.renderContentViewerButton()}
+                        ${this.renderUndoButton()} ${this.renderContentViewerButton()}
                         ${this.hasChanges
                             ? html`<span class="mx-3">${this.renderSaveButton()}</span>`
                             : nothing}
@@ -764,9 +785,7 @@ export class Toolbar extends ScmsElement {
                                       ? nothing
                                       : html`<span class="ml-2">${this.renderAdminLink()}</span>`}
                               </div>`}
-                        <div class="ml-3 flex items-center gap-1">
-                            ${this.renderHelpButton()}
-                        </div>
+                        <div class="ml-3 flex items-center gap-1">${this.renderHelpButton()}</div>
                     </div>
                 </div>
             </div>
@@ -1141,7 +1160,10 @@ export class Toolbar extends ScmsElement {
                     </div>
 
                     <!-- Center: Undo -->
-                    <div class="flex items-center justify-center" @click=${(e: Event) => e.stopPropagation()}>
+                    <div
+                        class="flex items-center justify-center"
+                        @click=${(e: Event) => e.stopPropagation()}
+                    >
                         ${this.renderUndoButton()}
                     </div>
 

@@ -203,9 +203,7 @@ test("saving after deleting a grouped template instance succeeds", async () => {
     const deleteButton = lastInstance.querySelector(".scms-instance-delete") as HTMLElement;
     deleteButton.click();
 
-    await waitForCondition(
-        () => container?.querySelectorAll("[data-scms-instance]").length === 1,
-    );
+    await waitForCondition(() => container?.querySelectorAll("[data-scms-instance]").length === 1);
 
     expect(toolbar!.hasChanges).toBe(true);
 

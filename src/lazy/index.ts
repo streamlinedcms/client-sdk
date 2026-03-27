@@ -239,20 +239,26 @@ class EditorController {
         );
 
         // Initialize template manager
-        this.templateManager = new TemplateManager(this.state, this.log, this.contentManager, this.undoManager, {
-            getGroupIdFromElement: this.getGroupIdFromElement.bind(this),
-            getEditableInfo: this.getEditableInfo.bind(this),
-            getStorageContext: this.getStorageContext.bind(this),
-            buildStorageKey: this.buildStorageKey.bind(this),
-            normalizeDomWhitespace: this.normalizeDomWhitespace.bind(this),
-            isInstanceAlsoEditable: this.isInstanceAlsoEditable.bind(this),
-            setupElementClickHandler: this.setupElementClickHandler.bind(this),
-            selectInstance: (el) => this.editingManager.selectInstance(el),
-            stopEditing: () => this.editingManager.stopEditing(),
-            updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
-            getElementToKeyMap: () => this.elementToKey,
-            scrollToElement: this.scrollToElement.bind(this),
-        });
+        this.templateManager = new TemplateManager(
+            this.state,
+            this.log,
+            this.contentManager,
+            this.undoManager,
+            {
+                getGroupIdFromElement: this.getGroupIdFromElement.bind(this),
+                getEditableInfo: this.getEditableInfo.bind(this),
+                getStorageContext: this.getStorageContext.bind(this),
+                buildStorageKey: this.buildStorageKey.bind(this),
+                normalizeDomWhitespace: this.normalizeDomWhitespace.bind(this),
+                isInstanceAlsoEditable: this.isInstanceAlsoEditable.bind(this),
+                setupElementClickHandler: this.setupElementClickHandler.bind(this),
+                selectInstance: (el) => this.editingManager.selectInstance(el),
+                stopEditing: () => this.editingManager.stopEditing(),
+                updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
+                getElementToKeyMap: () => this.elementToKey,
+                scrollToElement: this.scrollToElement.bind(this),
+            },
+        );
 
         // Initialize draft manager
         this.draftManager = new DraftManager(this.state, this.log, this._draftStorageKey, {

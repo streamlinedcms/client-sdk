@@ -71,4 +71,3 @@ test("clicking menu button toggles expanded state", async () => {
     // Should be collapsed
     expect(menuBtn.getAttribute("aria-label")).toContain("Open");
 });
-

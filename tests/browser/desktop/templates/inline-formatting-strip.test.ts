@@ -39,22 +39,15 @@ beforeAll(async () => {
 });
 
 test("new template instance has no leftover inline formatting in editable elements", async () => {
-    const teamContainer = document.querySelector(
-        '[data-scms-template="team-inline-fmt"]',
-    );
-    const initialCount =
-        teamContainer?.querySelectorAll(".team-member").length ?? 0;
+    const teamContainer = document.querySelector('[data-scms-template="team-inline-fmt"]');
+    const initialCount = teamContainer?.querySelectorAll(".team-member").length ?? 0;
 
     // Click add button to create a new instance
-    const addButton = teamContainer?.querySelector(
-        ".scms-template-add",
-    ) as HTMLElement;
+    const addButton = teamContainer?.querySelector(".scms-template-add") as HTMLElement;
     addButton.click();
 
     await waitForCondition(
-        () =>
-            teamContainer?.querySelectorAll(".team-member").length ===
-            initialCount + 1,
+        () => teamContainer?.querySelectorAll(".team-member").length === initialCount + 1,
     );
 
     const teamMembers = teamContainer?.querySelectorAll(".team-member");
@@ -70,9 +63,7 @@ test("new template instance has no leftover inline formatting in editable elemen
 });
 
 test("new template instance preserves inline formatting in non-editable elements", async () => {
-    const teamContainer = document.querySelector(
-        '[data-scms-template="team-inline-fmt"]',
-    );
+    const teamContainer = document.querySelector('[data-scms-template="team-inline-fmt"]');
 
     // Get the last instance (added by previous test)
     const teamMembers = teamContainer?.querySelectorAll(".team-member");

@@ -28,9 +28,7 @@ interface BadgeInfo {
     key: string;
 }
 
-type ElementVisibility =
-    | { visible: true }
-    | { visible: false; reason: string };
+type ElementVisibility = { visible: true } | { visible: false; reason: string };
 
 export class ContentViewerManager {
     private active = false;

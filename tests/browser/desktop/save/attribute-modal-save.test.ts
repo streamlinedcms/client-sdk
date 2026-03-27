@@ -70,12 +70,16 @@ async function resetState(): Promise<void> {
     const link = getLinkElement();
     if (link?.classList.contains("streamlined-editing")) {
         await clickToolbarButton("Cancel");
-        await waitForCondition(() => !link.classList.contains("streamlined-editing")).catch(() => {});
+        await waitForCondition(() => !link.classList.contains("streamlined-editing")).catch(
+            () => {},
+        );
     }
     const html = getHtmlElement();
     if (html?.classList.contains("streamlined-editing")) {
         await clickToolbarButton("Cancel");
-        await waitForCondition(() => !html.classList.contains("streamlined-editing")).catch(() => {});
+        await waitForCondition(() => !html.classList.contains("streamlined-editing")).catch(
+            () => {},
+        );
     }
 }
 
@@ -195,7 +199,9 @@ test("Attributes modal: attribute-only changes update currentContent and persist
     addBtn.click();
 
     // Wait for attribute to be added before applying
-    await waitForCondition(() => shadowRoot.querySelectorAll(".attribute-row, .attr-item").length > 0);
+    await waitForCondition(
+        () => shadowRoot.querySelectorAll(".attribute-row, .attr-item").length > 0,
+    );
 
     // Click Apply
     clickApplyButton(modal);
