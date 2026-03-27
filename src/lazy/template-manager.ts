@@ -12,6 +12,7 @@ import type { Logger } from "loganite";
 import Sortable from "sortablejs";
 import type { EditorState, TemplateInfo, EditableElementInfo } from "./state.js";
 import type { ContentManager } from "./content-manager.js";
+import type { UndoManager } from "./undo-manager.js";
 import { EDITABLE_SELECTOR, IMAGE_PLACEHOLDER_DATA_URI, type EditableType } from "../types.js";
 
 /**
@@ -41,11 +42,13 @@ export interface TemplateManagerHelpers {
 
 export class TemplateManager {
     private instanceDeleteButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
+    private _skipUndoPush = false;
 
     constructor(
         private state: EditorState,
         private log: Logger,
         private contentManager: ContentManager,
+        private undoManager: UndoManager,
         private helpers: TemplateManagerHelpers,
     ) {}
 
@@ -546,6 +549,96 @@ export class TemplateManager {
     }
 
     /**
+     * Add a template instance with a specific ID.
+     * Used by draft restoration and undo to recreate instances with known IDs.
+     */
+    addInstanceWithId(templateId: string, instanceId: string): HTMLElement | null {
+        const templateInfo = this.state.templates.get(templateId);
+        if (!templateInfo) {
+            this.log.error("Template not found", { templateId });
+            return null;
+        }
+
+        const { container, templateHtml, groupId } = templateInfo;
+
+        const tempDiv = document.createElement("div");
+        tempDiv.innerHTML = templateHtml;
+        const clone = tempDiv.firstElementChild as HTMLElement;
+        if (!clone) {
+            this.log.error("Failed to create clone from template HTML");
+            return null;
+        }
+
+        clone.setAttribute("data-scms-instance", instanceId);
+        clone.removeAttribute("data-scms-template");
+
+        // Add placeholder to image elements without src
+        clone.querySelectorAll<HTMLImageElement>("img[data-scms-image]").forEach((img) => {
+            if (!img.src) {
+                img.src = IMAGE_PLACEHOLDER_DATA_URI;
+            }
+        });
+        if (
+            clone instanceof HTMLImageElement &&
+            clone.hasAttribute("data-scms-image") &&
+            !clone.src
+        ) {
+            clone.src = IMAGE_PLACEHOLDER_DATA_URI;
+        }
+
+        // Insert at end of container (will be reordered later if needed)
+        const addButton = this.state.templateAddButtons.get(templateId);
+        if (addButton && addButton.parentElement === container) {
+            container.insertBefore(clone, addButton);
+        } else {
+            container.appendChild(clone);
+        }
+
+        // Update instance tracking
+        templateInfo.instanceIds.push(instanceId);
+        templateInfo.instanceCount = templateInfo.instanceIds.length;
+
+        // Register editable elements in the new instance
+        this.registerInstanceElements(clone, templateId, instanceId, groupId);
+
+        this.log.debug("Added template instance with ID", { templateId, instanceId });
+
+        return clone;
+    }
+
+    /**
+     * Reorder template instances in the DOM to match a target order.
+     */
+    reorderInstances(templateId: string, targetOrder: string[]): void {
+        const templateInfo = this.state.templates.get(templateId);
+        if (!templateInfo) return;
+
+        const { container } = templateInfo;
+
+        const instanceElements = new Map<string, HTMLElement>();
+        container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((el) => {
+            const id = el.getAttribute("data-scms-instance");
+            if (id) instanceElements.set(id, el);
+        });
+
+        const addButton = this.state.templateAddButtons.get(templateId);
+        const insertBefore = addButton?.parentElement === container ? addButton : null;
+
+        for (const instId of targetOrder) {
+            const element = instanceElements.get(instId);
+            if (element) {
+                if (insertBefore) {
+                    container.insertBefore(element, insertBefore);
+                } else {
+                    container.appendChild(element);
+                }
+            }
+        }
+
+        templateInfo.instanceIds = targetOrder.filter((id) => instanceElements.has(id));
+    }
+
+    /**
      * Remove a template instance
      */
     async removeInstance(templateId: string, instanceId: string): Promise<void> {
@@ -589,6 +682,20 @@ export class TemplateManager {
             }
         });
 
+        // Capture state for undo before making changes
+        const contentEntries = new Map<string, string>();
+        for (const key of keysToDelete) {
+            const value = this.state.currentContent.get(key);
+            if (value !== undefined) {
+                contentEntries.set(key, value);
+            }
+        }
+        const orderKey = `${templateId}._order`;
+        const orderContentKey = templateInfo.groupId
+            ? `${templateInfo.groupId}:${orderKey}`
+            : orderKey;
+        const previousOrderValue = this.state.currentContent.get(orderContentKey) ?? "";
+
         // Stop editing if we're editing something in this instance
         if (this.state.editingKey && keysToDelete.includes(this.state.editingKey)) {
             this.helpers.stopEditing();
@@ -597,12 +704,10 @@ export class TemplateManager {
         // Remove from DOM
         instanceElement.remove();
 
-        // Update tracking - remove from currentContent to mark for deletion
-        // (deletion is derived from: key in originalContent but not in currentContent)
+        // Update tracking
         keysToDelete.forEach((key) => {
             const infos = this.state.editableElements.get(key);
             if (infos) {
-                // Remove elements that were in this instance
                 const remaining = infos.filter((info) => info.instanceId !== instanceId);
                 if (remaining.length > 0) {
                     this.state.editableElements.set(key, remaining);
@@ -627,6 +732,29 @@ export class TemplateManager {
 
         this.log.debug("Removed template instance", { templateId, instanceId });
 
+        // Push undo action (skip when called from redo)
+        if (!this._skipUndoPush) {
+            this.undoManager.push({
+                type: "remove-instance",
+                description: `Delete template instance`,
+                timestamp: Date.now(),
+                undo: () => {
+                    this.restoreInstance(
+                        templateId,
+                        instanceId,
+                        contentEntries,
+                        orderContentKey,
+                        previousOrderValue,
+                    );
+                },
+                redo: () => {
+                    this._skipUndoPush = true;
+                    this.removeInstance(templateId, instanceId);
+                    this._skipUndoPush = false;
+                },
+            });
+        }
+
         // If we're down to 1 instance, remove delete buttons and drag handles from remaining instance
         if (templateInfo.instanceCount === 1) {
             container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((el) => {
@@ -645,6 +773,81 @@ export class TemplateManager {
 
         // Update toolbar
         this.updateToolbarTemplateContext();
+    }
+
+    /**
+     * Restore a previously deleted template instance (used by undo).
+     * Follows the same pattern as draft restoration: create instance, then apply content.
+     */
+    private restoreInstance(
+        templateId: string,
+        instanceId: string,
+        contentEntries: Map<string, string>,
+        orderContentKey: string,
+        previousOrderValue: string,
+    ): void {
+        // Restore the order array first
+        this.state.currentContent.set(orderContentKey, previousOrderValue);
+
+        // Parse the order to get the target instance list
+        let targetOrder: string[] = [];
+        try {
+            const parsed = JSON.parse(previousOrderValue);
+            if (parsed.type === "order" && Array.isArray(parsed.value)) {
+                targetOrder = parsed.value;
+            }
+        } catch {
+            this.log.error("Failed to parse order value for undo", { orderContentKey });
+            return;
+        }
+
+        // Create the instance DOM and register elements
+        const clone = this.addInstanceWithId(templateId, instanceId);
+        if (!clone) return;
+
+        // Reorder to match the original order
+        this.reorderInstances(templateId, targetOrder);
+
+        // Restore content entries and sync to DOM
+        for (const [key, value] of contentEntries) {
+            this.state.currentContent.set(key, value);
+            this.contentManager.syncAllElementsFromContent(key);
+            this.state.pendingDeletes.delete(key);
+        }
+
+        // Set up author mode (delete buttons, click handlers)
+        if (this.state.currentMode === "author") {
+            this.setupInstanceForAuthorMode(clone, templateId, instanceId);
+
+            // Re-add delete buttons and drag handles to all instances if we now have 2+
+            const templateInfo = this.state.templates.get(templateId);
+            if (templateInfo && templateInfo.instanceCount >= 2) {
+                const { container } = templateInfo;
+                let hasInlineControls = false;
+                container
+                    .querySelectorAll<HTMLElement>("[data-scms-instance]")
+                    .forEach((instanceElement) => {
+                        if (this.helpers.isInstanceAlsoEditable(instanceElement)) return;
+                        hasInlineControls = true;
+                        this.addInstanceDeleteButton(instanceElement);
+                        this.addInstanceDragHandle(instanceElement);
+                    });
+                if (hasInlineControls && !this.state.sortableInstances.has(templateId)) {
+                    this.initializeSortable(templateId, container);
+                }
+            }
+        }
+
+        // Update order content to match restored state
+        const templateInfo = this.state.templates.get(templateId);
+        if (templateInfo) {
+            this.updateOrderContent(templateId, templateInfo);
+        }
+
+        this.helpers.updateToolbarHasChanges();
+        this.updateToolbarTemplateContext();
+
+        this.log.debug("Restored template instance via undo", { templateId, instanceId });
     }
 
     /**

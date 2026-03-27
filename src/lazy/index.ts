@@ -87,6 +87,7 @@ import { ContentViewerManager } from "./content-viewer-manager.js";
 import { injectEditStyles } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
 import { TourManager, getTourDefinitions } from "./tours/index.js";
+import { UndoManager } from "./undo-manager.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -137,6 +138,7 @@ class EditorController {
     private authManager: AuthManager;
     private tourManager: TourManager;
     private contentViewerManager: ContentViewerManager;
+    private undoManager: UndoManager;
     // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Double-tap delay constant
@@ -211,6 +213,9 @@ class EditorController {
         // Initialize reactive state
         this.state = createEditorState();
 
+        // Initialize undo manager
+        this.undoManager = new UndoManager(this.log, () => this.updateToolbarUndoState());
+
         // Initialize content manager
         this.contentManager = new ContentManager(this.state);
 
@@ -234,7 +239,7 @@ class EditorController {
         );
 
         // Initialize template manager
-        this.templateManager = new TemplateManager(this.state, this.log, this.contentManager, {
+        this.templateManager = new TemplateManager(this.state, this.log, this.contentManager, this.undoManager, {
             getGroupIdFromElement: this.getGroupIdFromElement.bind(this),
             getEditableInfo: this.getEditableInfo.bind(this),
             getStorageContext: this.getStorageContext.bind(this),
@@ -263,6 +268,10 @@ class EditorController {
                     instanceId,
                     groupId,
                 ),
+            addInstanceWithId: (templateId, instanceId) =>
+                this.templateManager.addInstanceWithId(templateId, instanceId),
+            reorderInstances: (templateId, targetOrder) =>
+                this.templateManager.reorderInstances(templateId, targetOrder),
         });
 
         // Initialize save manager
@@ -986,6 +995,16 @@ class EditorController {
             this.contentViewerManager.showHiddenPanel();
         });
 
+        toolbar.addEventListener("undo", () => {
+            this.undoManager.undo();
+            this.saveManager.updateToolbarHasChanges();
+        });
+
+        toolbar.addEventListener("redo", () => {
+            this.undoManager.redo();
+            this.saveManager.updateToolbarHasChanges();
+        });
+
         document.body.appendChild(toolbar);
         this.state.toolbar = toolbar;
 
@@ -995,6 +1014,13 @@ class EditorController {
         // Add body padding to prevent content overlap
         this.updateBodyPadding();
         window.addEventListener("resize", this.updateBodyPadding);
+    }
+
+    private updateToolbarUndoState(): void {
+        if (this.state.toolbar) {
+            this.state.toolbar.canUndo = this.undoManager.canUndo;
+            this.state.toolbar.canRedo = this.undoManager.canRedo;
+        }
     }
 
     private updateBodyPadding = (): void => {

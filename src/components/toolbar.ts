@@ -80,6 +80,12 @@ export class Toolbar extends ScmsElement {
     @property({ type: Number, attribute: "hidden-element-count" })
     hiddenElementCount = 0;
 
+    @property({ type: Boolean, attribute: "can-undo" })
+    canUndo = false;
+
+    @property({ type: Boolean, attribute: "can-redo" })
+    canRedo = false;
+
     @property({ type: Boolean, reflect: true })
     expanded = false;
 
@@ -262,6 +268,24 @@ export class Toolbar extends ScmsElement {
     private handleReset() {
         this.dispatchEvent(
             new CustomEvent("reset", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
+    private handleUndo() {
+        this.dispatchEvent(
+            new CustomEvent("undo", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
+    private handleRedo() {
+        this.dispatchEvent(
+            new CustomEvent("redo", {
                 bubbles: true,
                 composed: true,
             }),
@@ -664,6 +688,24 @@ export class Toolbar extends ScmsElement {
         `;
     }
 
+    private renderUndoButton() {
+        if (!this.canUndo) return nothing;
+
+        return html`
+            <button
+                class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                @click=${this.handleUndo}
+                title="Undo"
+                aria-label="Undo"
+            >
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 10h10a5 5 0 0 1 0 10H9" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 6L3 10l4 4" />
+                </svg>
+            </button>
+        `;
+    }
+
     private renderSaveButton() {
         if (!this.hasChanges) return nothing;
 
@@ -705,10 +747,13 @@ export class Toolbar extends ScmsElement {
                         ${this.renderTemplateMenu()}
                     </div>
 
-                    <!-- Right: Save + Sign Out + Admin + Help (separated) -->
+                    <!-- Right: Undo + Content Viewer + Save + Sign Out + Admin + Help -->
                     <div class="flex items-center">
-                        ${this.renderSaveButton()}
+                        ${this.renderUndoButton()}
                         ${this.renderContentViewerButton()}
+                        ${this.hasChanges
+                            ? html`<span class="mx-3">${this.renderSaveButton()}</span>`
+                            : nothing}
                         ${this.mockAuth
                             ? nothing
                             : html`<div
@@ -1095,9 +1140,9 @@ export class Toolbar extends ScmsElement {
                         ${this.hasChanges ? this.renderSaveButton() : nothing}
                     </div>
 
-                    <!-- Center: Element badge -->
-                    <div class="flex items-center justify-center">
-                        ${this.renderActiveElement()}
+                    <!-- Center: Undo -->
+                    <div class="flex items-center justify-center" @click=${(e: Event) => e.stopPropagation()}>
+                        ${this.renderUndoButton()}
                     </div>
 
                     <!-- Content Viewer + Help (right) -->
