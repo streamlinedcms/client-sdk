@@ -70,6 +70,8 @@ import "../components/accessibility-modal.js";
 import "../components/attributes-modal.js";
 import "../components/media-manager-modal.js";
 import "../components/help-panel.js";
+import "../components/content-viewer-badge.js";
+import "../components/content-viewer-panel.js";
 import type { Toolbar } from "../components/toolbar.js";
 import type { HelpPanel } from "../components/help-panel.js";
 import { createEditorState, type EditorState, type EditableElementInfo } from "./state.js";
@@ -81,9 +83,11 @@ import { ModalManager } from "./modal-manager.js";
 import { SaveManager } from "./save-manager.js";
 import { AuthManager } from "./auth-manager.js";
 import { AuthBridge } from "./auth-bridge.js";
+import { ContentViewerManager } from "./content-viewer-manager.js";
 import { injectEditStyles } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
 import { TourManager, getTourDefinitions } from "./tours/index.js";
+import { UndoManager } from "./undo-manager.js";
 
 // Toolbar height constants
 const TOOLBAR_HEIGHT_DESKTOP = 48;
@@ -133,6 +137,8 @@ class EditorController {
     private saveManager: SaveManager;
     private authManager: AuthManager;
     private tourManager: TourManager;
+    private contentViewerManager: ContentViewerManager;
+    private undoManager: UndoManager;
     // Reverse lookup: element -> key (for click handling) - WeakMap can't be reactive
     private elementToKey: WeakMap<HTMLElement, string> = new WeakMap();
     // Double-tap delay constant
@@ -207,6 +213,9 @@ class EditorController {
         // Initialize reactive state
         this.state = createEditorState();
 
+        // Initialize undo manager
+        this.undoManager = new UndoManager(this.log, () => this.updateToolbarUndoState());
+
         // Initialize content manager
         this.contentManager = new ContentManager(this.state);
 
@@ -230,20 +239,26 @@ class EditorController {
         );
 
         // Initialize template manager
-        this.templateManager = new TemplateManager(this.state, this.log, this.contentManager, {
-            getGroupIdFromElement: this.getGroupIdFromElement.bind(this),
-            getEditableInfo: this.getEditableInfo.bind(this),
-            getStorageContext: this.getStorageContext.bind(this),
-            buildStorageKey: this.buildStorageKey.bind(this),
-            normalizeDomWhitespace: this.normalizeDomWhitespace.bind(this),
-            isInstanceAlsoEditable: this.isInstanceAlsoEditable.bind(this),
-            setupElementClickHandler: this.setupElementClickHandler.bind(this),
-            selectInstance: (el) => this.editingManager.selectInstance(el),
-            stopEditing: () => this.editingManager.stopEditing(),
-            updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
-            getElementToKeyMap: () => this.elementToKey,
-            scrollToElement: this.scrollToElement.bind(this),
-        });
+        this.templateManager = new TemplateManager(
+            this.state,
+            this.log,
+            this.contentManager,
+            this.undoManager,
+            {
+                getGroupIdFromElement: this.getGroupIdFromElement.bind(this),
+                getEditableInfo: this.getEditableInfo.bind(this),
+                getStorageContext: this.getStorageContext.bind(this),
+                buildStorageKey: this.buildStorageKey.bind(this),
+                normalizeDomWhitespace: this.normalizeDomWhitespace.bind(this),
+                isInstanceAlsoEditable: this.isInstanceAlsoEditable.bind(this),
+                setupElementClickHandler: this.setupElementClickHandler.bind(this),
+                selectInstance: (el) => this.editingManager.selectInstance(el),
+                stopEditing: () => this.editingManager.stopEditing(),
+                updateToolbarHasChanges: () => this.saveManager.updateToolbarHasChanges(),
+                getElementToKeyMap: () => this.elementToKey,
+                scrollToElement: this.scrollToElement.bind(this),
+            },
+        );
 
         // Initialize draft manager
         this.draftManager = new DraftManager(this.state, this.log, this._draftStorageKey, {
@@ -259,6 +274,10 @@ class EditorController {
                     instanceId,
                     groupId,
                 ),
+            addInstanceWithId: (templateId, instanceId) =>
+                this.templateManager.addInstanceWithId(templateId, instanceId),
+            reorderInstances: (templateId, targetOrder) =>
+                this.templateManager.reorderInstances(templateId, targetOrder),
         });
 
         // Initialize save manager
@@ -327,6 +346,20 @@ class EditorController {
 
         // Initialize tour manager
         this.tourManager = new TourManager();
+
+        // Initialize content viewer manager
+        this.contentViewerManager = new ContentViewerManager(this.state, this.log, {
+            selectAndEdit: (key, element) => {
+                this.editingManager.startEditing(key, element);
+            },
+            scrollToElement: this.scrollToElement.bind(this),
+            updateToolbarContentViewer: (active, hiddenCount) => {
+                if (this.state.toolbar) {
+                    this.state.toolbar.contentViewerActive = active;
+                    this.state.toolbar.hiddenElementCount = hiddenCount;
+                }
+            },
+        });
     }
 
     /**
@@ -866,6 +899,7 @@ class EditorController {
         this.editingManager.deselectInstance();
         this.editingManager.deselectElement();
         this.editingManager.stopEditing();
+        this.contentViewerManager.deactivate();
     }
 
     private showToolbar(): void {
@@ -959,6 +993,24 @@ class EditorController {
             this.handleHelp();
         });
 
+        toolbar.addEventListener("content-viewer-toggle", () => {
+            this.contentViewerManager.toggle();
+        });
+
+        toolbar.addEventListener("show-hidden-elements", () => {
+            this.contentViewerManager.showHiddenPanel();
+        });
+
+        toolbar.addEventListener("undo", () => {
+            this.undoManager.undo();
+            this.saveManager.updateToolbarHasChanges();
+        });
+
+        toolbar.addEventListener("redo", () => {
+            this.undoManager.redo();
+            this.saveManager.updateToolbarHasChanges();
+        });
+
         document.body.appendChild(toolbar);
         this.state.toolbar = toolbar;
 
@@ -968,6 +1020,13 @@ class EditorController {
         // Add body padding to prevent content overlap
         this.updateBodyPadding();
         window.addEventListener("resize", this.updateBodyPadding);
+    }
+
+    private updateToolbarUndoState(): void {
+        if (this.state.toolbar) {
+            this.state.toolbar.canUndo = this.undoManager.canUndo;
+            this.state.toolbar.canRedo = this.undoManager.canRedo;
+        }
     }
 
     private updateBodyPadding = (): void => {

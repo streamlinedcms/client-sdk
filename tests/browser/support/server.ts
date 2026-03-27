@@ -307,7 +307,7 @@ export class TestServer {
                 const responseGroups: Record<string, { elements: Record<string, ContentElement> }> =
                     {};
                 const deletedElements: string[] = [];
-                const deletedGroups: Record<string, string[]> = {};
+                const deletedGroups: Record<string, { elements: string[] }> = {};
 
                 // Process ungrouped elements
                 if (data.elements) {
@@ -338,9 +338,9 @@ export class TestServer {
                                 // Delete
                                 this.contentStore.delete(key);
                                 if (!deletedGroups[groupId]) {
-                                    deletedGroups[groupId] = [];
+                                    deletedGroups[groupId] = { elements: [] };
                                 }
-                                deletedGroups[groupId].push(elementId);
+                                deletedGroups[groupId].elements.push(elementId);
                             } else {
                                 // Create/update
                                 const element: ContentElement = {

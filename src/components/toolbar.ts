@@ -12,7 +12,16 @@
 import { html, css, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { unsafeSVG } from "lit/directives/unsafe-svg.js";
-import { CircleHelp, ChevronUp, ChevronDown, Ellipsis, Layers, Plus, Trash2 } from "lucide-static";
+import {
+    CircleHelp,
+    ChevronUp,
+    ChevronDown,
+    Ellipsis,
+    Layers,
+    Plus,
+    ScanEye,
+    Trash2,
+} from "lucide-static";
 import { ScmsElement } from "./base.js";
 import type { EditorMode } from "./mode-toggle.js";
 import "./mode-toggle.js";
@@ -73,6 +82,18 @@ export class Toolbar extends ScmsElement {
 
     @property({ type: Boolean, attribute: "structure-mismatch" })
     structureMismatch = false;
+
+    @property({ type: Boolean, attribute: "content-viewer-active" })
+    contentViewerActive = false;
+
+    @property({ type: Number, attribute: "hidden-element-count" })
+    hiddenElementCount = 0;
+
+    @property({ type: Boolean, attribute: "can-undo" })
+    canUndo = false;
+
+    @property({ type: Boolean, attribute: "can-redo" })
+    canRedo = false;
 
     @property({ type: Boolean, reflect: true })
     expanded = false;
@@ -262,6 +283,24 @@ export class Toolbar extends ScmsElement {
         );
     }
 
+    private handleUndo() {
+        this.dispatchEvent(
+            new CustomEvent("undo", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
+    private handleRedo() {
+        this.dispatchEvent(
+            new CustomEvent("redo", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
     private handleEditHtml() {
         this.dispatchEvent(
             new CustomEvent("edit-html", {
@@ -337,6 +376,25 @@ export class Toolbar extends ScmsElement {
     private handleHelp() {
         this.dispatchEvent(
             new CustomEvent("help", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
+    private handleContentViewerToggle() {
+        this.dispatchEvent(
+            new CustomEvent("content-viewer-toggle", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
+    private handleShowHiddenElements(e: Event) {
+        e.stopPropagation();
+        this.dispatchEvent(
+            new CustomEvent("show-hidden-elements", {
                 bubbles: true,
                 composed: true,
             }),
@@ -594,6 +652,40 @@ export class Toolbar extends ScmsElement {
         `;
     }
 
+    private renderContentViewerButton() {
+        // Only show in editing mode (not viewer or when warning/readOnly)
+        if (this.warning || this.readOnly) return nothing;
+
+        const buttonClass = this.contentViewerActive
+            ? "w-8 h-8 flex items-center justify-center text-red-600 bg-red-50 rounded-full transition-colors [&>svg]:w-5 [&>svg]:h-5 relative"
+            : "w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors [&>svg]:w-5 [&>svg]:h-5 relative";
+
+        return html`
+            <button
+                class=${buttonClass}
+                @click=${this.handleContentViewerToggle}
+                title="Content Viewer"
+                aria-label="Content Viewer"
+                aria-pressed=${this.contentViewerActive}
+            >
+                ${unsafeSVG(ScanEye)}
+                ${this.contentViewerActive && this.hiddenElementCount > 0
+                    ? html`<button
+                          class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full leading-none"
+                          @click=${this.handleShowHiddenElements}
+                          title="${this.hiddenElementCount} hidden element${this
+                              .hiddenElementCount === 1
+                              ? ""
+                              : "s"}"
+                          aria-label="Show hidden elements"
+                      >
+                          ${this.hiddenElementCount}
+                      </button>`
+                    : nothing}
+            </button>
+        `;
+    }
+
     private renderHelpButton() {
         return html`
             <button
@@ -604,6 +696,34 @@ export class Toolbar extends ScmsElement {
                 aria-label="Help"
             >
                 ${unsafeSVG(CircleHelp)}
+            </button>
+        `;
+    }
+
+    private renderUndoButton() {
+        if (!this.canUndo) return nothing;
+
+        return html`
+            <button
+                class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                @click=${this.handleUndo}
+                title="Undo"
+                aria-label="Undo"
+            >
+                <svg
+                    class="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    stroke-width="2"
+                >
+                    <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        d="M3 10h10a5 5 0 0 1 0 10H9"
+                    />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M7 6L3 10l4 4" />
+                </svg>
             </button>
         `;
     }
@@ -628,24 +748,9 @@ export class Toolbar extends ScmsElement {
     }
 
     private renderActiveElement() {
-        // Show element badge if an element is active
-        if (this.activeElement) {
-            return html`<scms-element-badge
-                element-id=${this.activeElement}
-                element-type=${this.activeElementType || ""}
-            ></scms-element-badge>`;
-        }
-
-        // Show instance badge if only an instance is selected (no element)
-        if (this.templateId && this.instanceIndex !== null && this.instanceCount !== null) {
-            return html`<scms-instance-badge
-                instance-index=${this.instanceIndex}
-                instance-count=${this.instanceCount}
-            ></scms-instance-badge>`;
-        }
-
-        // No element or instance selected
-        return html`<span class="text-xs text-gray-400 italic">No element selected</span>`;
+        // Hidden for now — badge was too technical and confusing users.
+        // TODO: find a better way to display active element/instance details.
+        return nothing;
     }
 
     private renderDesktop() {
@@ -664,21 +769,23 @@ export class Toolbar extends ScmsElement {
                         ${this.renderTemplateMenu()}
                     </div>
 
-                    <!-- Right: Save + Sign Out + Admin + Help (separated) -->
+                    <!-- Right: Undo + Content Viewer + Save + Sign Out + Admin + Help -->
                     <div class="flex items-center">
-                        ${this.renderSaveButton()}
+                        ${this.renderUndoButton()} ${this.renderContentViewerButton()}
+                        ${this.hasChanges
+                            ? html`<span class="mx-3">${this.renderSaveButton()}</span>`
+                            : nothing}
                         ${this.mockAuth
                             ? nothing
                             : html`<div
-                                  class="ml-6 pl-6 border-l border-gray-200 flex items-center"
+                                  class="ml-1 pl-3 border-l border-gray-200 flex items-center"
                               >
                                   ${this.renderSignOutButton()}
                                   ${this.denyAppGui
                                       ? nothing
-                                      : html`<span class="mx-2 text-gray-300">|</span>
-                                            ${this.renderAdminLink()}`}
+                                      : html`<span class="ml-2">${this.renderAdminLink()}</span>`}
                               </div>`}
-                        <div class="ml-3">${this.renderHelpButton()}</div>
+                        <div class="ml-3 flex items-center gap-1">${this.renderHelpButton()}</div>
                     </div>
                 </div>
             </div>
@@ -1052,17 +1159,20 @@ export class Toolbar extends ScmsElement {
                         ${this.hasChanges ? this.renderSaveButton() : nothing}
                     </div>
 
-                    <!-- Center: Element badge -->
-                    <div class="flex items-center justify-center">
-                        ${this.renderActiveElement()}
-                    </div>
-
-                    <!-- Help (right) -->
+                    <!-- Center: Undo -->
                     <div
-                        class="flex items-center w-16 justify-end"
+                        class="flex items-center justify-center"
                         @click=${(e: Event) => e.stopPropagation()}
                     >
-                        ${this.renderHelpButton()}
+                        ${this.renderUndoButton()}
+                    </div>
+
+                    <!-- Content Viewer + Help (right) -->
+                    <div
+                        class="flex items-center w-20 justify-end gap-1"
+                        @click=${(e: Event) => e.stopPropagation()}
+                    >
+                        ${this.renderContentViewerButton()} ${this.renderHelpButton()}
                     </div>
                 </button>
 

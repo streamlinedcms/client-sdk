@@ -34,6 +34,8 @@ export interface DraftManagerHelpers {
         instanceId: string,
         groupId: string | null,
     ) => void;
+    addInstanceWithId: (templateId: string, instanceId: string) => HTMLElement | null;
+    reorderInstances: (templateId: string, targetOrder: string[]) => void;
 }
 
 export class DraftManager {
@@ -48,13 +50,7 @@ export class DraftManager {
      * Get keys that are pending deletion (in savedContentKeys but not in currentContent)
      */
     getPendingDeletes(): string[] {
-        const deletes: string[] = [];
-        this.state.savedContentKeys.forEach((key) => {
-            if (!this.state.currentContent.has(key)) {
-                deletes.push(key);
-            }
-        });
-        return deletes;
+        return Array.from(this.state.pendingDeletes);
     }
 
     /**
@@ -233,6 +229,7 @@ export class DraftManager {
         // Step 3: Apply deletes
         for (const key of draft.deleted) {
             this.state.currentContent.delete(key);
+            this.state.pendingDeletes.add(key);
         }
 
         this.log.info("Draft restored successfully");
@@ -327,60 +324,10 @@ export class DraftManager {
     }
 
     /**
-     * Add a template instance with a specific ID (for draft restoration).
-     * Similar to addInstance() but uses a provided ID instead of generating one.
+     * Add a template instance with a specific ID (delegates to TemplateManager).
      */
     private addInstanceWithId(templateId: string, instanceId: string): void {
-        const templateInfo = this.state.templates.get(templateId);
-        if (!templateInfo) {
-            this.log.error("Template not found", { templateId });
-            return;
-        }
-
-        const { container, templateHtml, groupId } = templateInfo;
-
-        // Create new instance from original template HTML
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = templateHtml;
-        const clone = tempDiv.firstElementChild as HTMLElement;
-        if (!clone) {
-            this.log.error("Failed to create clone from template HTML");
-            return;
-        }
-
-        clone.setAttribute("data-scms-instance", instanceId);
-        clone.removeAttribute("data-scms-template");
-
-        // Add placeholder to image elements without src
-        clone.querySelectorAll<HTMLImageElement>("img[data-scms-image]").forEach((img) => {
-            if (!img.src) {
-                img.src = IMAGE_PLACEHOLDER_DATA_URI;
-            }
-        });
-        if (
-            clone instanceof HTMLImageElement &&
-            clone.hasAttribute("data-scms-image") &&
-            !clone.src
-        ) {
-            clone.src = IMAGE_PLACEHOLDER_DATA_URI;
-        }
-
-        // Insert at end of container (will be reordered later)
-        const addButton = this.state.templateAddButtons.get(templateId);
-        if (addButton && addButton.parentElement === container) {
-            container.insertBefore(clone, addButton);
-        } else {
-            container.appendChild(clone);
-        }
-
-        // Update instance tracking
-        templateInfo.instanceIds.push(instanceId);
-        templateInfo.instanceCount = templateInfo.instanceIds.length;
-
-        // Register editable elements in the new instance
-        this.helpers.registerInstanceElements(clone, templateId, instanceId, groupId);
-
-        this.log.debug("Added template instance from draft", { templateId, instanceId });
+        this.helpers.addInstanceWithId(templateId, instanceId);
     }
 
     /**
@@ -430,6 +377,7 @@ export class DraftManager {
                     this.state.editableElements.delete(key);
                     this.state.editableTypes.delete(key);
                     this.state.currentContent.delete(key);
+                    this.state.pendingDeletes.add(key);
                 }
             }
         });
@@ -442,38 +390,9 @@ export class DraftManager {
     }
 
     /**
-     * Reorder template instances to match a specific order.
+     * Reorder template instances to match a specific order (delegates to TemplateManager).
      */
     private reorderInstances(templateId: string, targetOrder: string[]): void {
-        const templateInfo = this.state.templates.get(templateId);
-        if (!templateInfo) return;
-
-        const { container } = templateInfo;
-
-        // Get current instance elements
-        const instanceElements = new Map<string, HTMLElement>();
-        container.querySelectorAll<HTMLElement>("[data-scms-instance]").forEach((el) => {
-            const id = el.getAttribute("data-scms-instance");
-            if (id) instanceElements.set(id, el);
-        });
-
-        // Find insertion point (before add button or at end)
-        const addButton = this.state.templateAddButtons.get(templateId);
-        const insertBefore = addButton?.parentElement === container ? addButton : null;
-
-        // Reorder by removing and re-inserting in correct order
-        for (const instanceId of targetOrder) {
-            const element = instanceElements.get(instanceId);
-            if (element) {
-                if (insertBefore) {
-                    container.insertBefore(element, insertBefore);
-                } else {
-                    container.appendChild(element);
-                }
-            }
-        }
-
-        // Update templateInfo.instanceIds to match
-        templateInfo.instanceIds = targetOrder.filter((id) => instanceElements.has(id));
+        this.helpers.reorderInstances(templateId, targetOrder);
     }
 }
