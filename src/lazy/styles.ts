@@ -96,6 +96,11 @@ export function injectEditStyles(): void {
             }
         }
 
+        [data-scms-instance].scms-instance-selected {
+            outline: 2px dashed #ef4444;
+            outline-offset: -2px;
+        }
+
         /* Touch devices: show when instance is selected */
         @media (hover: none) {
             [data-scms-instance].scms-instance-selected > .scms-instance-delete {

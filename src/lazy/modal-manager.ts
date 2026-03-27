@@ -441,6 +441,9 @@ export class ModalManager {
             for (const info of infos) {
                 applyAttributesToElement(info.element, e.detail.attributes);
             }
+            // Update currentContent so dirty detection and drafts capture the change
+            const content = this.contentManager.getElementContent(key, primaryInfo);
+            this.contentManager.setContent(key, content);
             this.closeModal("seoModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("SEO attributes applied", {
@@ -500,6 +503,9 @@ export class ModalManager {
             for (const info of infos) {
                 applyAttributesToElement(info.element, e.detail.attributes);
             }
+            // Update currentContent so dirty detection and drafts capture the change
+            const content = this.contentManager.getElementContent(key, primaryInfo);
+            this.contentManager.setContent(key, content);
             this.closeModal("accessibilityModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("Accessibility attributes applied", {
@@ -556,6 +562,9 @@ export class ModalManager {
             for (const info of infos) {
                 applyAttributesToElement(info.element, e.detail.attributes);
             }
+            // Update currentContent so dirty detection and drafts capture the change
+            const content = this.contentManager.getElementContent(key, primaryInfo);
+            this.contentManager.setContent(key, content);
             this.closeModal("attributesModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("Custom attributes applied", {

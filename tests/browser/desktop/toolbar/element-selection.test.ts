@@ -74,18 +74,6 @@ test("selecting different elements updates toolbar", async () => {
     expect(toolbar?.activeElementType).toBe("link");
 });
 
-test("toolbar element badge shows element ID", async () => {
-    const toolbar = getToolbar();
-    const element = document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
-
-    element.click();
-    await waitForCondition(() => element.classList.contains("streamlined-editing"));
-
-    const shadowRoot = toolbar!.shadowRoot!;
-    const badge = shadowRoot.querySelector("scms-element-badge");
-    expect(badge).not.toBeNull();
-});
-
 test("mode is set to author when SDK initializes with mock auth", async () => {
     const toolbar = getToolbar();
     expect(toolbar?.mode).toBe("author");

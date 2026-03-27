@@ -237,10 +237,24 @@ export class SaveManager {
         const templatesWithOrderChanges = this.templateManager.getTemplatesWithOrderChanges();
         const hasOrderChanges = templatesWithOrderChanges.length > 0;
 
+        // Also include templates that have dirty elements (not just order changes),
+        // so unsaved sibling fields are persisted alongside the edited field.
+        // Fixes: https://github.com/streamlinedcms/client-sdk/issues/70
+        const templatesWithDirtyElements = new Set<string>();
+        for (const [, { info }] of dirtyElements) {
+            if (info.templateId) {
+                templatesWithDirtyElements.add(info.templateId);
+            }
+        }
+        const templatesNeedingUnsavedElements = [
+            ...new Set([...templatesWithOrderChanges, ...templatesWithDirtyElements]),
+        ];
+
         // Get unsaved template elements (HTML-derived items that need to be persisted
-        // when the template order changes)
-        const unsavedTemplateElements =
-            this.contentManager.getUnsavedTemplateElements(templatesWithOrderChanges);
+        // when the template has order changes or dirty elements)
+        const unsavedTemplateElements = this.contentManager.getUnsavedTemplateElements(
+            templatesNeedingUnsavedElements,
+        );
 
         if (dirtyElements.size === 0 && pendingDeletes.length === 0 && !hasOrderChanges) {
             return;
@@ -386,15 +400,17 @@ export class SaveManager {
                     const key = elementId;
                     this.state.originalContent.delete(key);
                     this.state.savedContentKeys.delete(key);
+                    this.state.pendingDeletes.delete(key);
                     deleted.push(key);
                 }
 
                 // Process deleted grouped elements from response
-                for (const [groupId, elementIds] of Object.entries(result.deleted?.groups ?? {})) {
-                    for (const elementId of elementIds) {
+                for (const [groupId, group] of Object.entries(result.deleted?.groups ?? {})) {
+                    for (const elementId of group.elements) {
                         const key = `${groupId}:${elementId}`;
                         this.state.originalContent.delete(key);
                         this.state.savedContentKeys.delete(key);
+                        this.state.pendingDeletes.delete(key);
                         deleted.push(key);
                     }
                 }

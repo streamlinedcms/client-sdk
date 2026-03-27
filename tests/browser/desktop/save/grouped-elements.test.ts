@@ -32,6 +32,34 @@ beforeAll(async () => {
         JSON.stringify({ type: "text", value: "Acme Corp" }),
     );
 
+    // Seed testimonials template instances inside the sidebar group
+    // (used by the grouped deletion test)
+    await setContent(
+        appId,
+        "sidebar:testimonials.test1.quote",
+        JSON.stringify({ type: "text", value: "Great product!" }),
+    );
+    await setContent(
+        appId,
+        "sidebar:testimonials.test1.author",
+        JSON.stringify({ type: "text", value: "John Doe" }),
+    );
+    await setContent(
+        appId,
+        "sidebar:testimonials.test2.quote",
+        JSON.stringify({ type: "text", value: "Love it!" }),
+    );
+    await setContent(
+        appId,
+        "sidebar:testimonials.test2.author",
+        JSON.stringify({ type: "text", value: "Jane Smith" }),
+    );
+    await setContent(
+        appId,
+        "sidebar:testimonials._order",
+        JSON.stringify({ type: "order", value: ["test1", "test2"] }),
+    );
+
     await initializeSDK({ appId });
 });
 
@@ -153,6 +181,33 @@ test("multiple grouped elements can be edited and saved together", async () => {
     expect(toolbar!.hasChanges).toBe(true);
 
     // Save both
+    await clickToolbarButton("Save");
+
+    await waitForCondition(() => !toolbar!.hasChanges, 5000);
+
+    expect(toolbar!.hasChanges).toBe(false);
+});
+
+test("saving after deleting a grouped template instance succeeds", async () => {
+    // The sidebar group contains a testimonials template with 2 instances.
+    // Deleting an instance produces grouped element deletions in the API response
+    // (deleted.groups = { sidebar: { elements: ["testimonials.test2.quote", ...] } }).
+    const container = document.querySelector('[data-scms-template="testimonials"]');
+    const instances = container?.querySelectorAll("[data-scms-instance]");
+    const toolbar = getToolbar();
+
+    expect(instances?.length).toBe(2);
+
+    // Click delete on the last instance
+    const lastInstance = instances![instances!.length - 1];
+    const deleteButton = lastInstance.querySelector(".scms-instance-delete") as HTMLElement;
+    deleteButton.click();
+
+    await waitForCondition(() => container?.querySelectorAll("[data-scms-instance]").length === 1);
+
+    expect(toolbar!.hasChanges).toBe(true);
+
+    // Save — this exercises the deleted.groups response path
     await clickToolbarButton("Save");
 
     await waitForCondition(() => !toolbar!.hasChanges, 5000);

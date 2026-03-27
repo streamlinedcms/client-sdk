@@ -130,7 +130,7 @@ export interface BatchUpdateResponse {
     groups: Record<string, { elements: Record<string, ContentElement> }>;
     deleted: {
         elements: string[];
-        groups: Record<string, string[]>;
+        groups: Record<string, { elements: string[] }>;
     };
 }
 
