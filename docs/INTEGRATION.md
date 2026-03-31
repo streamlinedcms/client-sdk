@@ -357,23 +357,69 @@ The SDK is designed to work on all modern browsers (desktop and mobile).
 
 ## JavaScript API
 
-The SDK exposes a `window.StreamlinedCMS` object for programmatic control. Wait for the `streamlined-cms:ready` event before accessing it.
+The SDK loads in two phases:
+
+1. **Loader** (synchronous script) — fetches saved content from the API, populates the DOM, and removes FOUC-hiding styles. This is the critical rendering path.
+2. **ESM module** (async, injected by the loader) — handles authentication, editing UI, and cross-origin bridges. This phase creates the `window.StreamlinedCMS` object.
+
+The loader always finishes before the ESM module begins, so any `StreamlinedCMS.ready()` stage implicitly guarantees that content is already populated in the DOM.
+
+### SDK Lifecycle Timeline
+
+```
+Loader phase:
+  1. Fetch content from API
+  2. Clone template instances
+  3. Populate DOM elements with saved content
+  4. Remove hiding styles (content is now visible)
+  5. Dispatch 'streamlined-cms:loader-complete' event
+  6. Inject ESM module script
+
+ESM phase:
+  7. ready('loaded')  — SDK controller created
+  8. ready('auth')     — authentication status determined
+  9. ready('editing')  — editing setup complete (auth required)
+ 10. ready('bridges')  — cross-origin bridges ready (auth required)
+```
+
+### Choosing the Right Event
+
+| You need to... | Use |
+|---|---|
+| Read content from the DOM after it has been populated | `streamlined-cms:loader-complete` event |
+| Access the `StreamlinedCMS` API object | `streamlined-cms:ready` event or `await StreamlinedCMS.ready()` |
+| Check if the user is authenticated | `await StreamlinedCMS.ready('auth')` then read `StreamlinedCMS.isAuthenticated` |
+| Wait for editing to be fully set up | `await StreamlinedCMS.ready('editing')` |
+| Make cross-origin API calls via bridges | `await StreamlinedCMS.ready('bridges')` |
+
+### Loader Event
+
+The `streamlined-cms:loader-complete` event fires when the loader has finished populating the DOM. This is the earliest point at which saved content is visible. The `StreamlinedCMS` object does not exist yet at this point.
+
+```javascript
+document.addEventListener('streamlined-cms:loader-complete', function() {
+    // Content is populated and visible in the DOM
+    // StreamlinedCMS API is NOT yet available
+});
+```
 
 ### Waiting for the SDK
 
+The `streamlined-cms:ready` event fires once the ESM module has loaded and the `StreamlinedCMS` controller is created. Content is already populated at this point.
+
 ```javascript
 document.addEventListener('streamlined-cms:ready', function() {
-    // StreamlinedCMS is now available
+    // StreamlinedCMS is now available, content is already in the DOM
     console.log('SDK version:', StreamlinedCMS.version);
 });
 ```
 
 ### Lifecycle Stages
 
-Use `ready(stage)` to wait for specific SDK lifecycle stages:
+Use `ready(stage)` to wait for specific stages within the ESM module:
 
 ```javascript
-// Wait for SDK to load (default)
+// Wait for SDK to load — content is already populated (default)
 await StreamlinedCMS.ready();
 
 // Wait for authentication status to be determined
@@ -387,10 +433,10 @@ await StreamlinedCMS.ready('bridges');
 ```
 
 **Stages:**
-- `loaded` - SDK module loaded, controller created (default)
-- `auth` - Authentication status determined (check `isAuthenticated` after)
-- `editing` - Editing setup complete (requires authentication)
-- `bridges` - Penpal bridges ready for API calls (requires authentication)
+- `loaded` — SDK controller created; content is already in the DOM (default)
+- `auth` — authentication status determined (check `isAuthenticated` after)
+- `editing` — editing setup complete (throws if not authenticated)
+- `bridges` — cross-origin bridges ready for API calls (throws if not authenticated)
 
 ### State Getters
 
