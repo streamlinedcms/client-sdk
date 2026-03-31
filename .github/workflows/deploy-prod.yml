@@ -28,9 +28,18 @@ jobs:
                   fi
 
                   # Look up PR associated with this merge commit
+                  # (retry a few times — the API may not be immediately consistent after merge)
                   echo "Looking up PR for merge commit: ${{ github.sha }}"
 
-                  PR_DATA=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0]' 2>/dev/null || echo "")
+                  PR_DATA=""
+                  for i in 1 2 3; do
+                      PR_DATA=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0]' 2>/dev/null || echo "")
+                      if [ -n "$PR_DATA" ] && [ "$PR_DATA" != "null" ]; then
+                          break
+                      fi
+                      echo "Attempt $i: PR not found yet, retrying in 10s..."
+                      sleep 10
+                  done
 
                   if [ -z "$PR_DATA" ] || [ "$PR_DATA" = "null" ]; then
                       echo "::error::No PR found for commit ${{ github.sha }}"
@@ -154,7 +163,6 @@ jobs:
 
     sync-develop:
         needs: [get-pr-info, deploy]
-        if: startsWith(needs.get-pr-info.outputs.head_ref, 'release/')
         runs-on: ubuntu-latest
         environment: production
 
@@ -186,6 +194,7 @@ jobs:
                   fi
 
             - name: Delete release branch
+              if: startsWith(needs.get-pr-info.outputs.head_ref, 'release/')
               env:
                   GH_TOKEN: ${{ secrets.RELEASE_PAT }}
               run: |
