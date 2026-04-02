@@ -63,6 +63,7 @@ function getConfigFromScriptTag(): ViewerConfig | null {
 // Import Lit components to register them
 import "../components/toolbar.js";
 import "../components/sign-in-link.js";
+import "../components/rich-text-editor.js";
 import "../components/html-editor-modal.js";
 import "../components/link-editor-modal.js";
 import "../components/seo-modal.js";

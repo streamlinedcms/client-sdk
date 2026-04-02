@@ -50,17 +50,17 @@ beforeEach(async () => {
 
 // --- HTML element tests ---
 
-test("Edit HTML button appears for html-type elements", async () => {
+test("Edit Content button appears for html-type elements", async () => {
     const htmlElement = document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
     htmlElement.click();
 
     await waitForCondition(() => htmlElement.classList.contains("streamlined-editing"));
 
     const buttonTexts = getToolbarButtonTexts();
-    expect(buttonTexts.some((t) => t.includes("Edit HTML"))).toBe(true);
+    expect(buttonTexts.some((t) => t.includes("Edit Content"))).toBe(true);
 });
 
-test("Edit HTML button does NOT appear for text-type elements", async () => {
+test("Edit Content button does NOT appear for text-type elements", async () => {
     const textElement = document.querySelector('[data-scms-text="name"]') as HTMLElement;
     if (!textElement) {
         // Skip if no text element available
@@ -71,7 +71,7 @@ test("Edit HTML button does NOT appear for text-type elements", async () => {
     await waitForCondition(() => textElement.classList.contains("streamlined-editing"));
 
     const buttonTexts = getToolbarButtonTexts();
-    expect(buttonTexts.some((t) => t.includes("Edit HTML"))).toBe(false);
+    expect(buttonTexts.some((t) => t.includes("Edit Content"))).toBe(false);
 });
 
 // --- Link element tests ---

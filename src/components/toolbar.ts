@@ -6,7 +6,7 @@
  * - Mobile: collapses secondary actions into expandable drawer
  *
  * Primary actions (always visible): Save, Reset
- * Secondary actions (collapsible on mobile): Mode toggle, Edit HTML, Sign Out
+ * Secondary actions (collapsible on mobile): Mode toggle, Edit Content, Sign Out
  */
 
 import { html, css, nothing } from "lit";
@@ -461,7 +461,7 @@ export class Toolbar extends ScmsElement {
                 data-action="edit-html"
                 @click=${this.handleEditHtml}
             >
-                Edit HTML
+                Edit Content
             </button>
         `;
     }
@@ -878,7 +878,7 @@ export class Toolbar extends ScmsElement {
                         data-action="edit-html"
                         @click=${this.handleEditHtml}
                     >
-                        Edit HTML
+                        Edit Content
                     </button>
                 `;
             }

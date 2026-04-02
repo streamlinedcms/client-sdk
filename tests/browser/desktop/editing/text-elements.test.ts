@@ -138,7 +138,7 @@ test("toolbar shows Reset button for text elements", async () => {
     expect(holdButton).not.toBeNull();
 });
 
-test("text elements do not show Edit HTML button", async () => {
+test("text elements do not show Edit Content button", async () => {
     const element = getTextElement();
     const toolbar = getToolbar();
 
@@ -150,12 +150,12 @@ test("text elements do not show Edit HTML button", async () => {
 
     let hasEditHtmlButton = false;
     for (const btn of buttons) {
-        if (btn.textContent?.includes("Edit HTML")) {
+        if (btn.textContent?.includes("Edit Content")) {
             hasEditHtmlButton = true;
             break;
         }
     }
 
-    // Text elements should NOT have Edit HTML button
+    // Text elements should NOT have Edit Content button
     expect(hasEditHtmlButton).toBe(false);
 });
