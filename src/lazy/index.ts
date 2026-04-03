@@ -797,12 +797,10 @@ class EditorController {
                         now - this.state.lastTapTime < this.doubleTapDelay;
 
                     if (isDoubleTap && isMobile) {
-                        // Mobile double-tap: open media manager for images, navigate for links
-                        // (Desktop uses native dblclick event instead)
+                        // Mobile double-tap: open media manager for images
+                        // (Link "go to" is handled by the formatting toolbar)
                         if (elementType === "image") {
                             this.modalManager.handleChangeImage();
-                        } else if (elementType === "link") {
-                            this.modalManager.handleGoToLink();
                         }
                         this.state.lastTapKey = null;
                         this.state.lastTapTime = 0;
@@ -845,17 +843,7 @@ class EditorController {
             element.dataset.scmsDblClickHandler = "true";
         }
 
-        // Double-click handler for links to navigate (desktop)
-        if (elementType === "link" && !element.dataset.scmsDblClickHandler) {
-            element.addEventListener("dblclick", (e) => {
-                if (this.state.editingEnabled) {
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    this.modalManager.handleGoToLink();
-                }
-            });
-            element.dataset.scmsDblClickHandler = "true";
-        }
+        // Link "go to" is handled by the formatting toolbar's Go to Link button
     }
 
     /**
@@ -1094,7 +1082,7 @@ class EditorController {
     ): void {
         if (elementType === "html" || elementType === "link") {
             const toolbar = this.ensureFormattingToolbar();
-            const compact = elementType === "link";
+            const linkMode = elementType === "link";
 
             // Wire up content sync for this element
             toolbar.onContentUpdate = () => {
@@ -1106,7 +1094,7 @@ class EditorController {
             };
 
             // Attach (reuses existing editor if available, creates new otherwise)
-            toolbar.attach(element, compact);
+            toolbar.attach(element, linkMode);
 
             // Register editor in state so content manager can use Tiptap's API.
             if (toolbar.editor) {

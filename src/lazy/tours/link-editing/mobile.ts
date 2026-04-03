@@ -171,21 +171,6 @@ export function linkEditorStepMobile(ctx: TourContext): TourStep {
     };
 }
 
-/**
- * Step mentioning double-tap behavior
- */
-export function goToLinkTipMobile(ctx: TourContext): TourStep {
-    return {
-        element: () => ctx.findVisibleElement(".streamlined-editing[data-scms-link]"),
-        popover: {
-            title: "Quick Tip",
-            description: "You can double-tap any link to go to its destination.",
-            side: "bottom",
-            align: "center",
-            showButtons: ["next", "close"],
-        },
-    };
-}
 
 /**
  * Step pointing to Save button

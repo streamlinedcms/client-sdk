@@ -5,7 +5,7 @@
  * Mounts Tiptap directly on the page element being edited, providing
  * inline rich text formatting with clean HTML output.
  * Positioned fixed at the top of the viewport with a detached/hovering look.
- * Supports full and compact toolbar modes, and is draggable.
+ * Supports full and link toolbar modes, and is draggable.
  *
  * Uses custom schema extensions to prevent HTML normalization on load.
  * See src/extensions/tiptap-schema.ts for details.
@@ -38,6 +38,8 @@ import {
     ListOrdered,
     Quote,
     Link as LinkIcon,
+    ExternalLink,
+    Pilcrow,
     Minus,
     Undo2,
     Redo2,
@@ -47,7 +49,7 @@ import {
 @customElement("scms-formatting-toolbar")
 export class FormattingToolbar extends ScmsElement {
     @property({ type: Boolean })
-    compact = false;
+    linkMode = false;
 
     @state()
     private activeFormats: Set<string> = new Set();
@@ -130,8 +132,8 @@ export class FormattingToolbar extends ScmsElement {
      * Reuses existing editor for the same element (preserves undo history).
      * Creates a new editor for new elements without destroying others.
      */
-    attach(element: HTMLElement, compact: boolean): void {
-        this.compact = compact;
+    attach(element: HTMLElement, linkMode: boolean): void {
+        this.linkMode = linkMode;
         this.targetElement = element;
 
         // Reuse existing editor for this element
@@ -287,6 +289,7 @@ export class FormattingToolbar extends ScmsElement {
         if (this.editor.isActive("heading", { level: 1 })) formats.add("h1");
         if (this.editor.isActive("heading", { level: 2 })) formats.add("h2");
         if (this.editor.isActive("heading", { level: 3 })) formats.add("h3");
+        if (this.editor.isActive("paragraph")) formats.add("paragraph");
         if (this.editor.isActive("bulletList")) formats.add("bulletList");
         if (this.editor.isActive("orderedList")) formats.add("orderedList");
         if (this.editor.isActive("blockquote")) formats.add("blockquote");
@@ -342,13 +345,32 @@ export class FormattingToolbar extends ScmsElement {
                 chain.toggleCode().run();
                 break;
             case "h1":
-                chain.toggleHeading({ level: 1 }).run();
+                if (this.editor.isActive("heading", { level: 1 })) {
+                    chain.setNode("spanParagraph").run();
+                } else {
+                    chain.setHeading({ level: 1 }).run();
+                }
                 break;
             case "h2":
-                chain.toggleHeading({ level: 2 }).run();
+                if (this.editor.isActive("heading", { level: 2 })) {
+                    chain.setNode("spanParagraph").run();
+                } else {
+                    chain.setHeading({ level: 2 }).run();
+                }
                 break;
             case "h3":
-                chain.toggleHeading({ level: 3 }).run();
+                if (this.editor.isActive("heading", { level: 3 })) {
+                    chain.setNode("spanParagraph").run();
+                } else {
+                    chain.setHeading({ level: 3 }).run();
+                }
+                break;
+            case "paragraph":
+                if (this.editor.isActive("paragraph")) {
+                    chain.setNode("spanParagraph").run();
+                } else {
+                    chain.setNode("paragraph").run();
+                }
                 break;
             case "bulletList":
                 chain.toggleBulletList().run();
@@ -379,6 +401,11 @@ export class FormattingToolbar extends ScmsElement {
                 }
                 break;
             }
+            case "goToLink":
+                if (this.targetElement instanceof HTMLAnchorElement) {
+                    window.open(this.targetElement.href, "_blank");
+                }
+                return;
             case "undo":
                 chain.undo().run();
                 break;
@@ -440,10 +467,11 @@ export class FormattingToolbar extends ScmsElement {
                 ${this.renderButton("strike", Strikethrough, "Strikethrough")}
                 ${this.renderButton("code", Code, "Inline Code")}
                 ${this.renderSeparator()}
+                ${this.renderButton("paragraph", Pilcrow, "Paragraph")}
                 ${this.renderButton("h1", Heading1, "Heading 1")}
                 ${this.renderButton("h2", Heading2, "Heading 2")}
                 ${this.renderButton("h3", Heading3, "Heading 3")}
-                ${this.compact
+                ${this.linkMode
                     ? nothing
                     : html`
                           ${this.renderSeparator()}
@@ -451,9 +479,11 @@ export class FormattingToolbar extends ScmsElement {
                           ${this.renderButton("orderedList", ListOrdered, "Ordered List")}
                           ${this.renderButton("blockquote", Quote, "Blockquote")}
                       `}
-                ${this.compact ? nothing : this.renderSeparator()}
-                ${this.compact ? nothing : this.renderButton("link", LinkIcon, "Link")}
-                ${this.compact ? nothing : this.renderButton("horizontalRule", Minus, "Horizontal Rule")}
+                ${this.linkMode ? nothing : this.renderSeparator()}
+                ${this.linkMode ? nothing : this.renderButton("link", LinkIcon, "Link")}
+                ${this.linkMode ? nothing : this.renderButton("horizontalRule", Minus, "Horizontal Rule")}
+                ${this.linkMode ? this.renderSeparator() : nothing}
+                ${this.linkMode ? this.renderButton("goToLink", ExternalLink, "Go to Link") : nothing}
                 ${this.renderSeparator()}
                 ${this.renderButton("undo", Undo2, "Undo")}
                 ${this.renderButton("redo", Redo2, "Redo")}
