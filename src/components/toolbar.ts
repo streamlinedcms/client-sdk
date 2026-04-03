@@ -6,7 +6,7 @@
  * - Mobile: collapses secondary actions into expandable drawer
  *
  * Primary actions (always visible): Save, Reset
- * Secondary actions (collapsible on mobile): Mode toggle, Edit Content, Sign Out
+ * Secondary actions (collapsible on mobile): Mode toggle, View Source, Sign Out
  */
 
 import { html, css, nothing } from "lit";
@@ -453,15 +453,15 @@ export class Toolbar extends ScmsElement {
     }
 
     private renderEditHtmlButton() {
-        // Show only for html type (not for text, image, or link)
-        if (!this.activeElement || this.activeElementType !== "html") return nothing;
+        // Show for html and link types (not for text or image)
+        if (!this.activeElement || (this.activeElementType !== "html" && this.activeElementType !== "link")) return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
                 data-action="edit-html"
                 @click=${this.handleEditHtml}
             >
-                Edit Content
+                View Source
             </button>
         `;
     }
@@ -871,14 +871,14 @@ export class Toolbar extends ScmsElement {
                 `;
             }
 
-            if (this.activeElementType === "html") {
+            if (this.activeElementType === "html" || this.activeElementType === "link") {
                 return html`
                     <button
                         class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-white transition-colors"
                         data-action="edit-html"
                         @click=${this.handleEditHtml}
                     >
-                        Edit Content
+                        View Source
                     </button>
                 `;
             }

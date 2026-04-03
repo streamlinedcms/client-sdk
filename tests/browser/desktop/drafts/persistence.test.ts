@@ -9,6 +9,7 @@ import { test, expect, beforeAll, afterEach } from "vitest";
 import {
     initializeSDK,
     waitForCondition,
+    setElementContent,
     setupTestHelpers,
     getController,
 } from "~/@browser-support/sdk-helpers.js";
@@ -55,8 +56,7 @@ async function editContent(element: HTMLElement, newContent: string): Promise<vo
     element.click();
     await waitForCondition(() => element.classList.contains("streamlined-editing"));
 
-    element.innerHTML = newContent;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    setElementContent(element, newContent);
 
     await new Promise((r) => setTimeout(r, 100));
 }
@@ -77,8 +77,7 @@ test("draft is saved to localStorage when content changes", async () => {
     expect(Object.keys(draft.content).length).toBeGreaterThan(0);
 
     // Reset content
-    element.innerHTML = originalContent;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    setElementContent(element, originalContent);
 });
 
 test("draft contains the edited content", async () => {
@@ -97,8 +96,7 @@ test("draft contains the edited content", async () => {
     expect(hasContent).toBe(true);
 
     // Reset
-    element.innerHTML = originalContent;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    setElementContent(element, originalContent);
 });
 
 test("draft is removed when content matches original", async () => {
@@ -111,9 +109,13 @@ test("draft is removed when content matches original", async () => {
     // Verify draft exists
     expect(localStorage.getItem(getDraftKey())).not.toBeNull();
 
-    // Revert to original
-    element.innerHTML = originalContent;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    // Revert to original content
+    setElementContent(element, originalContent);
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Stop editing so content syncs
+    document.body.click();
+    await waitForCondition(() => !element.classList.contains("streamlined-editing"));
     await new Promise((r) => setTimeout(r, 100));
 
     // Draft should be removed
@@ -136,9 +138,13 @@ test("toolbar hasChanges reflects unsaved state", async () => {
     // hasChanges should be true
     expect(toolbar!.hasChanges).toBe(true);
 
-    // Revert
-    element.innerHTML = originalContent;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    // Revert to original
+    setElementContent(element, originalContent);
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Stop editing so content syncs
+    document.body.click();
+    await waitForCondition(() => !element.classList.contains("streamlined-editing"));
     await new Promise((r) => setTimeout(r, 100));
 
     // hasChanges should be false
@@ -159,8 +165,7 @@ test("draft structure includes content and deleted arrays", async () => {
     expect(Array.isArray(draft.deleted)).toBe(true);
 
     // Reset
-    element.innerHTML = originalContent;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    setElementContent(element, originalContent);
 });
 
 test("multiple edits update the same draft", async () => {
@@ -172,8 +177,7 @@ test("multiple edits update the same draft", async () => {
     const firstDraft = localStorage.getItem(getDraftKey());
 
     // Second edit
-    element.innerHTML = "Second edit";
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    setElementContent(element, "Second edit");
     await new Promise((r) => setTimeout(r, 100));
 
     const secondDraft = localStorage.getItem(getDraftKey());
@@ -187,8 +191,7 @@ test("multiple edits update the same draft", async () => {
     expect(hasSecondEdit).toBe(true);
 
     // Reset
-    element.innerHTML = originalContent;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    setElementContent(element, originalContent);
 });
 
 test("invalid draft JSON in localStorage is handled gracefully", async () => {

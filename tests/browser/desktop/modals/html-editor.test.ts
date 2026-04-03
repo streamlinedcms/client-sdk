@@ -10,9 +10,11 @@ import {
     waitForCondition,
     waitForSelector,
     clickToolbarButton,
+    setElementContent,
     setupTestHelpers,
 } from "~/@browser-support/sdk-helpers.js";
 import type { HtmlEditorModal } from "~/src/components/html-editor-modal.js";
+import type { FormattingToolbar } from "~/src/components/rich-text-editor.js";
 
 beforeAll(async () => {
     setupTestHelpers();
@@ -42,7 +44,7 @@ async function openHtmlEditorModal(): Promise<HtmlEditorModal> {
     element.click();
     await waitForCondition(() => element.classList.contains("streamlined-editing"));
 
-    const clicked = await clickToolbarButton("Edit HTML");
+    const clicked = await clickToolbarButton("View Source");
     expect(clicked).toBe(true);
 
     await waitForSelector("scms-html-editor-modal");
@@ -71,7 +73,7 @@ beforeEach(async () => {
     await resetState();
 });
 
-test("clicking Edit HTML opens the modal", async () => {
+test("clicking View Source opens the modal", async () => {
     const modal = await openHtmlEditorModal();
 
     expect(modal).not.toBeNull();
@@ -80,7 +82,6 @@ test("clicking Edit HTML opens the modal", async () => {
 
 test("modal shows current HTML content", async () => {
     const element = getHtmlElement();
-    const originalContent = element.innerHTML;
 
     const modal = await openHtmlEditorModal();
     const shadowRoot = modal.shadowRoot!;
@@ -88,7 +89,9 @@ test("modal shows current HTML content", async () => {
     await new Promise((r) => setTimeout(r, 100));
 
     const textarea = shadowRoot.querySelector("textarea") as HTMLTextAreaElement;
-    expect(textarea.value).toBe(originalContent);
+    // The modal shows the element's text content (may differ from innerHTML
+    // if Tiptap has normalized the DOM, e.g., wrapping bare text in <p>)
+    expect(textarea.value).toContain(element.textContent?.trim() || "");
 });
 
 test("can edit HTML content in textarea", async () => {
@@ -221,10 +224,68 @@ test("clicking backdrop cancels the modal", async () => {
     expect(cancelCalled).toBe(true);
 });
 
-test("modal displays the element ID", async () => {
+test("Tiptap to modal sync: inline edits appear in View Source", async () => {
+    const element = getHtmlElement();
+
+    // Click element to start editing (Tiptap attaches)
+    element.click();
+    await waitForCondition(() => element.classList.contains("streamlined-editing"));
+
+    // Edit content via Tiptap
+    setElementContent(element, "<p>Edited inline via Tiptap</p>");
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Open View Source modal
+    const clicked = await clickToolbarButton("View Source");
+    expect(clicked).toBe(true);
+    await waitForSelector("scms-html-editor-modal");
+
+    const modal = getHtmlEditorModal()!;
+    const shadowRoot = modal.shadowRoot!;
+    await new Promise((r) => setTimeout(r, 100));
+
+    // Modal textarea should show the Tiptap content
+    const textarea = shadowRoot.querySelector("textarea") as HTMLTextAreaElement;
+    expect(textarea.value).toContain("Edited inline via Tiptap");
+});
+
+test("modal to Tiptap sync: View Source edits update inline editor", async () => {
+    const element = getHtmlElement();
+
+    // Open modal (this clicks element first, attaching Tiptap)
     const modal = await openHtmlEditorModal();
     const shadowRoot = modal.shadowRoot!;
+    await new Promise((r) => setTimeout(r, 100));
 
-    const elementIdSpan = shadowRoot.querySelector(".font-mono") as HTMLElement;
-    expect(elementIdSpan.textContent?.trim()).toBe("test-title");
+    // Edit content in the modal textarea
+    const textarea = shadowRoot.querySelector("textarea") as HTMLTextAreaElement;
+    textarea.value = "<p>Edited in View Source modal</p>";
+    textarea.dispatchEvent(new Event("input", { bubbles: true }));
+
+    // Click Apply
+    const buttons = shadowRoot.querySelectorAll("button");
+    let applyBtn: HTMLButtonElement | null = null;
+    for (const btn of buttons) {
+        if (btn.textContent?.trim() === "Apply") {
+            applyBtn = btn;
+            break;
+        }
+    }
+    expect(applyBtn).not.toBeNull();
+    applyBtn!.click();
+
+    // Wait for modal to close and content to sync
+    await waitForCondition(() => getHtmlEditorModal() === null);
+    await new Promise((r) => setTimeout(r, 100));
+
+    // The formatting toolbar (Tiptap) should reflect the modal's content
+    const toolbar = document.querySelector(
+        "scms-formatting-toolbar",
+    ) as FormattingToolbar | null;
+    if (toolbar?.editor) {
+        expect(toolbar.getHTML()).toContain("Edited in View Source modal");
+    }
+
+    // The element's visible text should also reflect the change
+    expect(element.textContent).toContain("Edited in View Source modal");
 });

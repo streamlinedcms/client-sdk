@@ -10,6 +10,7 @@ import {
     initializeSDK,
     waitForCondition,
     clickToolbarButton,
+    setElementContent,
     setupTestHelpers,
 } from "~/@browser-support/sdk-helpers.js";
 import { ERROR_TRIGGERS } from "~/@browser-support/test-helpers.js";
@@ -60,8 +61,7 @@ async function editContent(element: HTMLElement, content: string): Promise<void>
 
     element.click();
     await waitForCondition(() => element.classList.contains("streamlined-editing"), 3000);
-    element.innerHTML = content;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    setElementContent(element, content);
     await new Promise((r) => setTimeout(r, 100));
 }
 
@@ -119,8 +119,8 @@ test("content is preserved after 500 error", async () => {
     // Wait for error to be processed
     await new Promise((r) => setTimeout(r, 500));
 
-    // Content should still be there
-    expect(element.innerHTML).toBe(editedContent);
+    // Content should still be there (may be wrapped in tags by the editor)
+    expect(element.textContent).toContain("Preserved content after error");
 });
 
 test("can retry save after 500 error", async () => {

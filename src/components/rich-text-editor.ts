@@ -1,9 +1,14 @@
 /**
- * Rich Text Editor Component
+ * Formatting Toolbar Component
  *
- * A shared WYSIWYG editor built on Tiptap (ProseMirror).
- * Used by both the HTML editor modal and link editor modal.
- * Supports full and compact toolbar modes, plus a raw HTML source toggle.
+ * A floating WYSIWYG formatting toolbar powered by Tiptap (ProseMirror).
+ * Mounts Tiptap directly on the page element being edited, providing
+ * inline rich text formatting with clean HTML output.
+ * Positioned fixed at the top of the viewport with a detached/hovering look.
+ * Supports full and compact toolbar modes, and is draggable.
+ *
+ * Uses custom schema extensions to prevent HTML normalization on load.
+ * See src/extensions/tiptap-schema.ts for details.
  */
 
 import { html, css, nothing } from "lit";
@@ -13,7 +18,13 @@ import { ScmsElement } from "./base.js";
 import { Editor } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import Link from "@tiptap/extension-link";
-import Underline from "@tiptap/extension-underline";
+import {
+    SpanParagraph,
+    FlexDocument,
+    ListParagraph,
+    FlexListItem,
+    FlexBlockquote,
+} from "../extensions/tiptap-schema.js";
 import {
     Bold,
     Italic,
@@ -30,156 +41,82 @@ import {
     Minus,
     Undo2,
     Redo2,
-    Code2,
+    GripHorizontal,
 } from "lucide-static";
 
-@customElement("scms-rich-text-editor")
-export class RichTextEditor extends ScmsElement {
-    @property({ type: String })
-    content = "";
-
+@customElement("scms-formatting-toolbar")
+export class FormattingToolbar extends ScmsElement {
     @property({ type: Boolean })
     compact = false;
 
     @state()
-    private sourceMode = false;
-
-    @state()
-    private sourceContent = "";
-
-    @state()
     private activeFormats: Set<string> = new Set();
 
-    private editor: Editor | null = null;
+    @state()
+    private posX = -1;
+
+    @state()
+    private posY = 12;
+
+    /** The Tiptap editor for the currently active element. */
+    editor: Editor | null = null;
+
+    /** The element currently being edited. */
+    targetElement: HTMLElement | null = null;
+
+    /** The HTML at the time the current editor was created, for change detection. */
     private initialHTML = "";
+
+    /** All active editors, keyed by element. Preserved across blur/focus for undo history. */
+    editors: Map<HTMLElement, { editor: Editor; initialHTML: string }> = new Map();
+
+    private dragStartX = 0;
+    private dragStartY = 0;
+    private dragStartPosX = 0;
+    private dragStartPosY = 0;
+    /**
+     * Callback fired on each content update. Set by the controller
+     * to sync content changes back to the content manager.
+     */
+    onContentUpdate: (() => void) | null = null;
 
     static styles = [
         ...ScmsElement.styles,
         css`
-            .editor-wrapper {
-                border: 1px solid #d1d5db;
-                border-radius: 0.375rem;
-                overflow: hidden;
-            }
-
-            .editor-wrapper:focus-within {
-                border-color: #9ca3af;
-                box-shadow: 0 0 0 1px #9ca3af;
-            }
-
-            .ProseMirror {
-                outline: none;
-                padding: 0.75rem;
-                font-size: 14px;
-                line-height: 1.6;
-            }
-
-            :host([compact]) .ProseMirror {
-                min-height: 80px;
-                max-height: 200px;
-                overflow-y: auto;
-            }
-
-            :host(:not([compact])) .ProseMirror {
-                min-height: 200px;
-                max-height: 50vh;
-                overflow-y: auto;
-            }
-
-            .ProseMirror p {
-                margin: 0.25em 0;
-            }
-
-            .ProseMirror h1 {
-                font-size: 1.5em;
-                font-weight: 700;
-                margin: 0.5em 0 0.25em;
-            }
-
-            .ProseMirror h2 {
-                font-size: 1.25em;
-                font-weight: 600;
-                margin: 0.5em 0 0.25em;
-            }
-
-            .ProseMirror h3 {
-                font-size: 1.1em;
-                font-weight: 600;
-                margin: 0.5em 0 0.25em;
-            }
-
-            .ProseMirror ul {
-                list-style: disc;
-                padding-left: 1.5em;
-                margin: 0.25em 0;
-            }
-
-            .ProseMirror ol {
-                list-style: decimal;
-                padding-left: 1.5em;
-                margin: 0.25em 0;
-            }
-
-            .ProseMirror li {
-                margin: 0.1em 0;
-            }
-
-            .ProseMirror blockquote {
-                border-left: 3px solid #d1d5db;
-                padding-left: 1em;
-                color: #6b7280;
-                margin: 0.5em 0;
-            }
-
-            .ProseMirror a {
-                color: #2563eb;
-                text-decoration: underline;
-            }
-
-            .ProseMirror code {
-                background: #f3f4f6;
-                padding: 0.15em 0.35em;
-                border-radius: 0.25em;
-                font-size: 0.875em;
-                font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-                    monospace;
-            }
-
-            .ProseMirror hr {
-                border: none;
-                border-top: 1px solid #d1d5db;
-                margin: 1em 0;
-            }
-
-            .ProseMirror p.is-editor-empty:first-child::before {
-                content: attr(data-placeholder);
-                color: #9ca3af;
+            :host {
+                position: fixed;
+                z-index: 10000;
+                display: block;
                 pointer-events: none;
-                float: left;
-                height: 0;
             }
 
-            .source-textarea {
-                font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-                    monospace;
-                font-size: 13px;
-                line-height: 1.5;
-                tab-size: 2;
-                padding: 0.75rem;
-                width: 100%;
-                border: none;
-                outline: none;
-                resize: none;
+            .toolbar-container {
+                pointer-events: auto;
+                display: inline-flex;
+                align-items: center;
+                gap: 2px;
+                padding: 4px 8px;
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                box-shadow:
+                    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+                    0 2px 4px -2px rgba(0, 0, 0, 0.1);
+                flex-wrap: wrap;
             }
 
-            :host([compact]) .source-textarea {
-                min-height: 80px;
-                max-height: 200px;
+            .drag-handle {
+                cursor: grab;
+                padding: 4px 2px;
+                color: #9ca3af;
+                display: flex;
+                align-items: center;
+                user-select: none;
+                -webkit-user-select: none;
             }
 
-            :host(:not([compact])) .source-textarea {
-                min-height: 200px;
-                max-height: 50vh;
+            .drag-handle:active {
+                cursor: grabbing;
             }
 
             button {
@@ -188,80 +125,154 @@ export class RichTextEditor extends ScmsElement {
         `,
     ];
 
-    firstUpdated() {
-        const editorElement = this.shadowRoot!.querySelector("#editor") as HTMLElement;
-        if (!editorElement) return;
+    /**
+     * Attach Tiptap to a page element and show the toolbar.
+     * Reuses existing editor for the same element (preserves undo history).
+     * Creates a new editor for new elements without destroying others.
+     */
+    attach(element: HTMLElement, compact: boolean): void {
+        this.compact = compact;
+        this.targetElement = element;
 
+        // Reuse existing editor for this element
+        const existing = this.editors.get(element);
+        if (existing) {
+            this.editor = existing.editor;
+            this.initialHTML = existing.initialHTML;
+            this.editor.commands.focus();
+            this.updateActiveFormats();
+            this.style.display = "block";
+            return;
+        }
+
+        // Create new editor
         this.editor = new Editor({
-            element: editorElement,
+            element: { mount: element },
+            content: element.innerHTML,
             extensions: [
                 StarterKit.configure({
-                    heading: this.compact ? false : { levels: [1, 2, 3] },
-                    bulletList: this.compact ? false : undefined,
-                    orderedList: this.compact ? false : undefined,
-                    blockquote: this.compact ? false : undefined,
-                    horizontalRule: this.compact ? false : undefined,
-                    strike: this.compact ? false : undefined,
-                    code: this.compact ? false : undefined,
+                    document: false,
+                    listItem: false,
+                    blockquote: false,
+                    trailingNode: false,
+                    link: false,
+                    heading: { levels: [1, 2, 3] },
                 }),
+                FlexDocument,
+                SpanParagraph,
+                ListParagraph,
+                FlexListItem,
+                FlexBlockquote,
                 Link.configure({
                     openOnClick: false,
-                    HTMLAttributes: {
-                        rel: null,
-                        target: null,
-                    },
+                    HTMLAttributes: { rel: null, target: null },
                 }),
-                Underline,
             ],
-            content: this.content,
-            onTransaction: () => {
+            onUpdate: () => {
                 this.updateActiveFormats();
-                this.dispatchEvent(
-                    new CustomEvent("content-change", {
-                        detail: { content: this.editor!.getHTML() },
-                        bubbles: true,
-                        composed: true,
-                    }),
-                );
+                this.onContentUpdate?.();
+            },
+            onSelectionUpdate: () => {
+                this.updateActiveFormats();
             },
         });
 
         this.initialHTML = this.editor.getHTML();
+        this.editors.set(element, { editor: this.editor, initialHTML: this.initialHTML });
+
+        // Center horizontally on first show
+        if (this.posX === -1) {
+            requestAnimationFrame(() => {
+                const toolbar = this.shadowRoot?.querySelector(
+                    ".toolbar-container",
+                ) as HTMLElement | null;
+                if (toolbar) {
+                    this.posX = Math.max(
+                        12,
+                        (window.innerWidth - toolbar.offsetWidth) / 2,
+                    );
+                }
+            });
+        }
+
         this.updateActiveFormats();
+        this.style.display = "block";
+    }
+
+    /**
+     * Whether the current editor's content has changed from when it was loaded.
+     */
+    hasChanges(): boolean {
+        if (!this.editor) return false;
+        return this.editor.getHTML() !== this.initialHTML;
+    }
+
+    /**
+     * Check if a specific element's editor has changes.
+     */
+    hasChangesFor(element: HTMLElement): boolean {
+        const entry = this.editors.get(element);
+        if (!entry) return false;
+        return entry.editor.getHTML() !== entry.initialHTML;
+    }
+
+    /**
+     * Destroy the editor for a specific element and restore its HTML.
+     */
+    detachElement(element: HTMLElement): void {
+        const entry = this.editors.get(element);
+        if (!entry) return;
+
+        const finalHTML = entry.editor.getHTML();
+        entry.editor.destroy();
+        this.editors.delete(element);
+        element.innerHTML = finalHTML;
+
+        // If this was the active element, clear current state
+        if (this.targetElement === element) {
+            this.editor = null;
+            this.targetElement = null;
+            this.activeFormats = new Set();
+            this.style.display = "none";
+        }
+    }
+
+    /**
+     * Destroy all editors and clean up.
+     */
+    detach(): void {
+        for (const [element, entry] of this.editors) {
+            const finalHTML = entry.editor.getHTML();
+            entry.editor.destroy();
+            element.innerHTML = finalHTML;
+        }
+        this.editors.clear();
+        this.editor = null;
+        this.targetElement = null;
+        this.activeFormats = new Set();
+        this.style.display = "none";
+    }
+
+    /**
+     * Get the current content as HTML.
+     */
+    getHTML(): string {
+        return this.editor?.getHTML() || "";
+    }
+
+    /**
+     * Programmatically set the editor content.
+     */
+    setContent(htmlContent: string): void {
+        if (this.editor) {
+            this.editor.commands.setContent(htmlContent, { emitUpdate: true });
+        }
     }
 
     disconnectedCallback() {
         super.disconnectedCallback();
-        this.editor?.destroy();
-        this.editor = null;
-    }
+        this.detach();
 
-    updated(changedProperties: Map<string, unknown>) {
-        if (changedProperties.has("content") && this.editor) {
-            const currentHTML = this.editor.getHTML();
-            if (currentHTML !== this.content) {
-                this.editor.commands.setContent(this.content, { emitUpdate: false });
-            }
-        }
-    }
-
-    /**
-     * Get the current editor content as HTML
-     */
-    getHTML(): string {
-        if (this.sourceMode) {
-            return this.sourceContent;
-        }
-        return this.editor?.getHTML() || this.content;
-    }
-
-    /**
-     * Whether the editor content has changed from what was initially loaded.
-     * Compares against Tiptap-normalized HTML to avoid false positives from
-     * normalization (e.g. "Hello" → "<p>Hello</p>").
-     */
-    hasChanges(): boolean {
-        return this.getHTML() !== this.initialHTML;
     }
 
     private updateActiveFormats() {
@@ -284,33 +295,33 @@ export class RichTextEditor extends ScmsElement {
         this.activeFormats = formats;
     }
 
-    private toggleSourceMode() {
-        if (this.sourceMode) {
-            // Switching back to rich text: apply source content to editor
-            if (this.editor) {
-                this.editor.commands.setContent(this.sourceContent, { emitUpdate: false });
-            }
-            this.sourceMode = false;
-        } else {
-            // Switching to source: capture editor HTML
-            this.sourceContent = this.editor?.getHTML() || this.content;
-            this.sourceMode = true;
-        }
+    // --- Drag handling ---
+
+    private handleDragStart(e: PointerEvent) {
+        this.dragStartX = e.clientX;
+        this.dragStartY = e.clientY;
+        this.dragStartPosX = this.posX;
+        this.dragStartPosY = this.posY;
+
+        const onMove = (ev: PointerEvent) => {
+            const dx = ev.clientX - this.dragStartX;
+            const dy = ev.clientY - this.dragStartY;
+            this.posX = Math.max(0, this.dragStartPosX + dx);
+            this.posY = Math.max(0, this.dragStartPosY + dy);
+        };
+
+        const onUp = () => {
+            window.removeEventListener("pointermove", onMove);
+            window.removeEventListener("pointerup", onUp);
+        };
+
+        window.addEventListener("pointermove", onMove);
+        window.addEventListener("pointerup", onUp);
     }
 
-    private handleSourceInput(e: Event) {
-        const textarea = e.target as HTMLTextAreaElement;
-        this.sourceContent = textarea.value;
-        this.dispatchEvent(
-            new CustomEvent("content-change", {
-                detail: { content: this.sourceContent },
-                bubbles: true,
-                composed: true,
-            }),
-        );
-    }
+    // --- Command execution ---
 
-    private exec(command: string, options?: Record<string, unknown>) {
+    private exec(command: string) {
         if (!this.editor) return;
         const chain = this.editor.chain().focus();
 
@@ -352,14 +363,19 @@ export class RichTextEditor extends ScmsElement {
                 chain.setHorizontalRule().run();
                 break;
             case "link": {
-                if (this.editor.isActive("link")) {
+                const currentHref = this.editor.getAttributes("link").href || "";
+                const message = currentHref
+                    ? "Edit URL (clear to remove link):"
+                    : "Enter URL:";
+                const href = prompt(message, currentHref);
+                if (href === null) {
+                    // User cancelled — do nothing
+                } else if (href === "") {
+                    // Empty input — remove link
                     chain.unsetLink().run();
                 } else {
-                    const url = options?.href as string | undefined;
-                    const href = url || prompt("Enter URL:");
-                    if (href) {
-                        chain.setLink({ href }).run();
-                    }
+                    // Set or update link
+                    chain.setLink({ href }).run();
                 }
                 break;
             }
@@ -372,12 +388,9 @@ export class RichTextEditor extends ScmsElement {
         }
     }
 
-    private renderToolbarButton(
-        command: string,
-        icon: string,
-        title: string,
-        options?: Record<string, unknown>,
-    ) {
+    // --- Rendering ---
+
+    private renderButton(command: string, icon: string, title: string) {
         const isActive = this.activeFormats.has(command);
         return html`
             <button
@@ -386,7 +399,8 @@ export class RichTextEditor extends ScmsElement {
                     ? "bg-gray-200 text-gray-900"
                     : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}"
                 title=${title}
-                @click=${() => this.exec(command, options)}
+                @mousedown=${(e: Event) => e.preventDefault()}
+                @click=${() => this.exec(command)}
             >
                 <span class="[&>svg]:w-4 [&>svg]:h-4 flex items-center justify-center">
                     ${unsafeSVG(icon)}
@@ -399,90 +413,50 @@ export class RichTextEditor extends ScmsElement {
         return html`<span class="w-px h-5 bg-gray-200 mx-0.5"></span>`;
     }
 
-    private renderToolbar() {
-        if (this.compact) {
-            return html`
-                <div
-                    class="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50 flex-wrap"
-                >
-                    <div class="flex items-center gap-0.5">
-                        ${this.renderToolbarButton("bold", Bold, "Bold")}
-                        ${this.renderToolbarButton("italic", Italic, "Italic")}
-                        ${this.renderToolbarButton("underline", UnderlineIcon, "Underline")}
-                        ${this.renderSeparator()}
-                        ${this.renderToolbarButton("link", LinkIcon, "Link")}
-                    </div>
-                    <div class="flex-1"></div>
-                    ${this.renderSourceToggle()}
-                </div>
-            `;
-        }
+    render() {
+        if (!this.editor) return nothing;
+
+        const left = this.posX === -1 ? "50%" : `${this.posX}px`;
+        const transform = this.posX === -1 ? "translateX(-50%)" : "none";
 
         return html`
             <div
-                class="flex items-center gap-0.5 px-2 py-1.5 border-b border-gray-200 bg-gray-50 flex-wrap"
+                class="toolbar-container"
+                style="position:fixed; top:${this.posY}px; left:${left}; transform:${transform};"
             >
-                <div class="flex items-center gap-0.5">
-                    ${this.renderToolbarButton("bold", Bold, "Bold")}
-                    ${this.renderToolbarButton("italic", Italic, "Italic")}
-                    ${this.renderToolbarButton("underline", UnderlineIcon, "Underline")}
-                    ${this.renderToolbarButton("strike", Strikethrough, "Strikethrough")}
-                    ${this.renderToolbarButton("code", Code, "Inline Code")}
-                    ${this.renderSeparator()}
-                    ${this.renderToolbarButton("h1", Heading1, "Heading 1")}
-                    ${this.renderToolbarButton("h2", Heading2, "Heading 2")}
-                    ${this.renderToolbarButton("h3", Heading3, "Heading 3")}
-                    ${this.renderSeparator()}
-                    ${this.renderToolbarButton("bulletList", List, "Bullet List")}
-                    ${this.renderToolbarButton("orderedList", ListOrdered, "Ordered List")}
-                    ${this.renderToolbarButton("blockquote", Quote, "Blockquote")}
-                    ${this.renderSeparator()}
-                    ${this.renderToolbarButton("link", LinkIcon, "Link")}
-                    ${this.renderToolbarButton("horizontalRule", Minus, "Horizontal Rule")}
-                    ${this.renderSeparator()}
-                    ${this.renderToolbarButton("undo", Undo2, "Undo")}
-                    ${this.renderToolbarButton("redo", Redo2, "Redo")}
+                <div
+                    class="drag-handle"
+                    @pointerdown=${this.handleDragStart}
+                    title="Drag to reposition"
+                >
+                    <span class="[&>svg]:w-4 [&>svg]:h-4">
+                        ${unsafeSVG(GripHorizontal)}
+                    </span>
                 </div>
-                <div class="flex-1"></div>
-                ${this.renderSourceToggle()}
-            </div>
-        `;
-    }
-
-    private renderSourceToggle() {
-        return html`
-            <button
-                type="button"
-                class="flex items-center gap-1 px-2 py-1 text-xs font-medium rounded transition-colors ${this
-                    .sourceMode
-                    ? "bg-gray-200 text-gray-900"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}"
-                title=${this.sourceMode ? "Switch to rich text" : "View HTML source"}
-                @click=${this.toggleSourceMode}
-            >
-                <span class="[&>svg]:w-3.5 [&>svg]:h-3.5 flex items-center">
-                    ${unsafeSVG(Code2)}
-                </span>
-                ${this.sourceMode ? "Rich Text" : "Source"}
-            </button>
-        `;
-    }
-
-    render() {
-        return html`
-            <div class="editor-wrapper">
-                ${this.renderToolbar()}
-                <div id="editor" style=${this.sourceMode ? "display:none" : nothing}></div>
-                ${this.sourceMode
-                    ? html`
-                          <textarea
-                              class="source-textarea"
-                              .value=${this.sourceContent}
-                              @input=${this.handleSourceInput}
-                              spellcheck="false"
-                          ></textarea>
-                      `
-                    : nothing}
+                ${this.renderSeparator()}
+                ${this.renderButton("bold", Bold, "Bold")}
+                ${this.renderButton("italic", Italic, "Italic")}
+                ${this.renderButton("underline", UnderlineIcon, "Underline")}
+                ${this.renderButton("strike", Strikethrough, "Strikethrough")}
+                ${this.renderButton("code", Code, "Inline Code")}
+                ${this.renderSeparator()}
+                ${this.renderButton("h1", Heading1, "Heading 1")}
+                ${this.renderButton("h2", Heading2, "Heading 2")}
+                ${this.renderButton("h3", Heading3, "Heading 3")}
+                ${this.compact
+                    ? nothing
+                    : html`
+                          ${this.renderSeparator()}
+                          ${this.renderButton("bulletList", List, "Bullet List")}
+                          ${this.renderButton("orderedList", ListOrdered, "Ordered List")}
+                          ${this.renderButton("blockquote", Quote, "Blockquote")}
+                      `}
+                ${this.compact ? nothing : this.renderSeparator()}
+                ${this.compact ? nothing : this.renderButton("link", LinkIcon, "Link")}
+                ${this.compact ? nothing : this.renderButton("horizontalRule", Minus, "Horizontal Rule")}
+                ${this.renderSeparator()}
+                ${this.renderButton("undo", Undo2, "Undo")}
+                ${this.renderButton("redo", Redo2, "Redo")}
             </div>
         `;
     }
@@ -490,6 +464,6 @@ export class RichTextEditor extends ScmsElement {
 
 declare global {
     interface HTMLElementTagNameMap {
-        "scms-rich-text-editor": RichTextEditor;
+        "scms-formatting-toolbar": FormattingToolbar;
     }
 }

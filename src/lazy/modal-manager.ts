@@ -197,7 +197,7 @@ export class ModalManager {
         if (storedContent) {
             try {
                 const data = JSON.parse(storedContent) as { type?: string; value?: string };
-                if ((data.type === "html" || data.type === "text") && data.value !== undefined) {
+                if ((data.type === "html" || data.type === "text" || data.type === "link") && data.value !== undefined) {
                     htmlValue = data.value;
                 }
             } catch {
@@ -216,14 +216,30 @@ export class ModalManager {
         });
 
         modal.addEventListener("apply", ((e: CustomEvent<{ content: string }>) => {
-            // Build content and update via setContent
+            const elementType = this.state.editableTypes?.get(key) || "html";
             const attributes = this.state.elementAttributes.get(key);
-            const data: HtmlContentData = {
-                type: "html",
-                value: e.detail.content,
-                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
-            };
-            this.contentManager.setContent(key, JSON.stringify(data));
+
+            let content: string;
+            if (elementType === "link" && primaryInfo.element instanceof HTMLAnchorElement) {
+                // For links, update the value (innerHTML) while preserving href/target
+                const data: LinkContentData = {
+                    type: "link",
+                    href: primaryInfo.element.getAttribute("href") || "",
+                    target: primaryInfo.element.target,
+                    value: e.detail.content,
+                    ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
+                };
+                content = JSON.stringify(data);
+            } else {
+                const data: HtmlContentData = {
+                    type: "html",
+                    value: e.detail.content,
+                    ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
+                };
+                content = JSON.stringify(data);
+            }
+
+            this.contentManager.setContent(key, content);
             this.closeModal("htmlEditorModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("HTML applied", {
@@ -270,10 +286,25 @@ export class ModalManager {
         // Create and show modal
         const modal = document.createElement("scms-link-editor-modal") as LinkEditorModal;
         modal.elementId = key;
+        // Read link value from stored content if available (avoids Tiptap normalization),
+        // fall back to DOM innerHTML
+        let linkValue = primaryAnchor.innerHTML;
+        const storedContent = this.state.currentContent.get(key);
+        if (storedContent) {
+            try {
+                const data = JSON.parse(storedContent) as { type?: string; value?: string };
+                if (data.type === "link" && data.value !== undefined) {
+                    linkValue = data.value;
+                }
+            } catch {
+                // Use DOM fallback
+            }
+        }
+
         modal.linkData = {
             href: primaryAnchor.getAttribute("href") || "",
             target: primaryAnchor.target,
-            value: primaryAnchor.innerHTML,
+            value: linkValue,
         };
 
         // Prevent clicks inside modal from deselecting the element

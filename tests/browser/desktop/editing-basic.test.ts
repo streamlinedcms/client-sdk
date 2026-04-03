@@ -7,6 +7,7 @@ import {
     initializeSDK,
     waitForCondition,
     clickToolbarButton,
+    setElementContent,
     setupTestHelpers,
 } from "~/@browser-support/sdk-helpers.js";
 
@@ -44,11 +45,8 @@ test("user can edit and save content", async () => {
         await waitForCondition(() => testTitle.classList.contains("streamlined-editing"));
     }
 
-    // Edit the content - use innerHTML for html-type elements
-    testTitle.innerHTML = "Test Edit - Browser Test";
-
-    // Trigger input event to notify SDK of changes
-    testTitle.dispatchEvent(new Event("input", { bubbles: true }));
+    // Edit the content
+    setElementContent(testTitle, "Test Edit - Browser Test");
 
     // Click save button (helper waits for Lit re-render)
     await clickToolbarButton("Save");

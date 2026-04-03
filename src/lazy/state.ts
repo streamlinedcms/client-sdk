@@ -11,7 +11,9 @@ import type Sortable from "sortablejs";
 import type { EditorMode } from "../key-storage.js";
 import type { AppPermissions, EditableType, ElementAttributes } from "../types.js";
 import type { Toolbar } from "../components/toolbar.js";
+import type { FormattingToolbar } from "../components/rich-text-editor.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
+
 import type { LinkEditorModal } from "../components/link-editor-modal.js";
 import type { SeoModal } from "../components/seo-modal.js";
 import type { AccessibilityModal } from "../components/accessibility-modal.js";
@@ -43,6 +45,18 @@ export interface TemplateInfo {
 }
 
 /**
+ * Minimal interface for a rich text editor attached to an element.
+ * Used by the content manager to read/write content via Tiptap
+ * without importing the full Tiptap dependency.
+ */
+export interface RichTextEditorHandle {
+    getHTML(): string;
+    commands: {
+        setContent(content: string, options?: { emitUpdate?: boolean }): boolean;
+    };
+}
+
+/**
  * The reactive state shared across all managers
  */
 export interface EditorState {
@@ -70,6 +84,9 @@ export interface EditorState {
     editingKey: string | null;
     selectedInstance: HTMLElement | null;
 
+    // Rich text editors attached to elements (Tiptap)
+    tiptapEditors: Map<HTMLElement, RichTextEditorHandle>;
+
     // Templates
     templates: Map<string, TemplateInfo>;
     templateAddButtons: Map<string, HTMLButtonElement>;
@@ -77,6 +94,7 @@ export interface EditorState {
 
     // UI components
     toolbar: Toolbar | null;
+    formattingToolbar: FormattingToolbar | null;
     htmlEditorModal: HtmlEditorModal | null;
     linkEditorModal: LinkEditorModal | null;
     seoModal: SeoModal | null;
@@ -121,6 +139,9 @@ export function createEditorState(): EditorState {
         editingKey: null,
         selectedInstance: null,
 
+        // Rich text editors
+        tiptapEditors: new Map(),
+
         // Templates
         templates: new Map(),
         templateAddButtons: new Map(),
@@ -128,6 +149,7 @@ export function createEditorState(): EditorState {
 
         // UI components
         toolbar: null,
+        formattingToolbar: null,
         htmlEditorModal: null,
         linkEditorModal: null,
         seoModal: null,

@@ -72,6 +72,14 @@ export class ContentManager {
      * Returns JSON string with type field for all element types.
      * Includes attributes if any have been set.
      */
+    /**
+     * Get the HTML content of an element, using Tiptap's clean output if available.
+     */
+    private getElementHTML(element: HTMLElement): string {
+        const editor = this.state.tiptapEditors.get(element);
+        return editor ? editor.getHTML() : element.innerHTML;
+    }
+
     getElementContent(key: string, info: EditableElementInfo): string {
         const elementType = this.state.editableTypes.get(key) || "html";
         const attributes = this.state.elementAttributes.get(key);
@@ -88,7 +96,7 @@ export class ContentManager {
                 type: "link",
                 href: info.element.getAttribute("href") || "",
                 target: info.element.target,
-                value: info.element.innerHTML,
+                value: this.getElementHTML(info.element),
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
@@ -103,10 +111,22 @@ export class ContentManager {
             // html (default)
             const data: HtmlContentData = {
                 type: "html",
-                value: info.element.innerHTML,
+                value: this.getElementHTML(info.element),
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
+        }
+    }
+
+    /**
+     * Set the HTML content of an element, using Tiptap's API if available.
+     */
+    private setElementHTML(element: HTMLElement, htmlContent: string): void {
+        const editor = this.state.tiptapEditors.get(element);
+        if (editor) {
+            editor.commands.setContent(htmlContent, { emitUpdate: false });
+        } else {
+            element.innerHTML = htmlContent;
         }
     }
 
@@ -131,14 +151,14 @@ export class ContentManager {
             if (data.type === "text") {
                 info.element.textContent = (data as TextContentData).value;
             } else if (data.type === "html") {
-                info.element.innerHTML = (data as HtmlContentData).value;
+                this.setElementHTML(info.element, (data as HtmlContentData).value);
             } else if (data.type === "image" && info.element instanceof HTMLImageElement) {
                 info.element.src = (data as ImageContentData).src;
             } else if (data.type === "link" && info.element instanceof HTMLAnchorElement) {
                 const linkData = data as LinkContentData;
                 info.element.href = linkData.href;
                 info.element.target = linkData.target;
-                info.element.innerHTML = linkData.value;
+                this.setElementHTML(info.element, linkData.value);
             } else if (!data.type) {
                 // No type field in JSON - use element's declared type
                 if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
@@ -146,7 +166,7 @@ export class ContentManager {
                     if (linkData.href !== undefined) {
                         info.element.href = linkData.href;
                         info.element.target = linkData.target || "";
-                        info.element.innerHTML = linkData.value || "";
+                        this.setElementHTML(info.element, linkData.value || "");
                         return;
                     }
                 } else if (elementType === "image" && info.element instanceof HTMLImageElement) {
@@ -164,7 +184,7 @@ export class ContentManager {
                 } else if (elementType === "html") {
                     const htmlData = data as { value?: string };
                     if (htmlData.value !== undefined) {
-                        info.element.innerHTML = htmlData.value;
+                        this.setElementHTML(info.element, htmlData.value);
                         return;
                     }
                 }

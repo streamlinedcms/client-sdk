@@ -147,8 +147,7 @@ export class LinkEditorModal extends ScmsElement {
     private hasChanges(): boolean {
         return (
             this.editedHref !== this.linkData.href ||
-            this.editedTarget !== this.linkData.target ||
-            this.editedValue !== this.linkData.value
+            this.editedTarget !== this.linkData.target
         );
     }
 
@@ -176,14 +175,7 @@ export class LinkEditorModal extends ScmsElement {
             >
                 <!-- Header -->
                 <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-gray-900">Edit Link</span>
-                        <span
-                            class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded"
-                        >
-                            ${this.elementId}
-                        </span>
-                    </div>
+                    <span class="text-sm font-medium text-gray-900">Edit Link</span>
                     <button
                         class="text-gray-400 hover:text-gray-600 p-1"
                         @click=${this.handleCancel}
@@ -202,20 +194,6 @@ export class LinkEditorModal extends ScmsElement {
 
                 <!-- Form -->
                 <div class="p-4 space-y-4">
-                    <!-- Link Content -->
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">
-                            Link Content (HTML)
-                        </label>
-                        <textarea
-                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 font-mono text-sm"
-                            rows="3"
-                            .value=${this.editedValue}
-                            @input=${this.handleValueInput}
-                            placeholder="Click here"
-                        ></textarea>
-                    </div>
-
                     <!-- URL -->
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1"> URL </label>

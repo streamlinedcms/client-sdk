@@ -21,6 +21,8 @@ export interface EditingManagerHelpers {
     updateToolbarTemplateContext: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
     scrollToElement: (element: HTMLElement, delay?: number) => void;
+    onStartEditing: (key: string, element: HTMLElement, elementType: string) => void;
+    onStopEditing: (key: string) => void;
 }
 
 export class EditingManager {
@@ -216,7 +218,7 @@ export class EditingManager {
                 info.element.classList.add("streamlined-editing-sibling");
             }
 
-            // Add input listener to all elements for change tracking and synchronization
+            // Add input listener for text and html elements for change tracking
             if (
                 (elementType === "text" || elementType === "html") &&
                 !info.element.dataset.scmsInputHandler
@@ -241,7 +243,6 @@ export class EditingManager {
             }
 
             // Make text and html elements contenteditable (not images or links)
-            // Only the primary element is focused, but all are editable for consistency
             if (elementType === "text" || elementType === "html") {
                 info.element.setAttribute("contenteditable", "true");
             }
@@ -254,6 +255,9 @@ export class EditingManager {
 
         // Focus the primary element (all types need focus for keyboard navigation)
         primaryInfo.element.focus();
+
+        // Notify controller that editing started (for formatting toolbar, etc.)
+        this.helpers.onStartEditing(key, primaryInfo.element, elementType);
 
         // On mobile, scroll the element into view after keyboard opens
         if (window.innerWidth < 640) {
@@ -301,6 +305,9 @@ export class EditingManager {
         }
 
         this.log.trace("Stopping edit");
+
+        // Notify controller before cleanup (for formatting toolbar detach, etc.)
+        this.helpers.onStopEditing(this.state.editingKey);
 
         const infos = this.state.editableElements.get(this.state.editingKey);
         if (infos) {
