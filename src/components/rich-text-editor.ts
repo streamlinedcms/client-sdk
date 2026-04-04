@@ -55,6 +55,9 @@ export class FormattingToolbar extends ScmsElement {
     private activeFormats: Set<string> = new Set();
 
     @state()
+    private isMobile = false;
+
+    @state()
     private posX = -1;
 
     @state()
@@ -76,6 +79,35 @@ export class FormattingToolbar extends ScmsElement {
     private dragStartY = 0;
     private dragStartPosX = 0;
     private dragStartPosY = 0;
+
+    /** Clamp toolbar position to stay within the visual viewport (handles keyboard open/close). */
+    private handleViewportChange = () => {
+        this.isMobile = window.innerWidth < 640;
+
+        const vv = window.visualViewport;
+        if (!vv) return;
+
+        const toolbar = this.shadowRoot?.querySelector(".toolbar-container") as HTMLElement | null;
+        const toolbarHeight = toolbar?.offsetHeight ?? 48;
+        const toolbarWidth = toolbar?.offsetWidth ?? 200;
+
+        const visibleTop = vv.offsetTop;
+        const visibleBottom = vv.offsetTop + vv.height;
+        const visibleRight = vv.offsetLeft + vv.width;
+
+        const maxY = visibleBottom - toolbarHeight;
+        const clampedY = Math.max(visibleTop, Math.min(this.posY, maxY));
+
+        let clampedX = this.posX;
+        if (!this.isMobile && this.posX !== -1) {
+            const maxX = visibleRight - toolbarWidth;
+            clampedX = Math.max(vv.offsetLeft, Math.min(this.posX, maxX));
+        }
+
+        if (clampedY !== this.posY) this.posY = clampedY;
+        if (clampedX !== this.posX) this.posX = clampedX;
+    };
+
     /**
      * Callback fired on each content update. Set by the controller
      * to sync content changes back to the content manager.
@@ -94,7 +126,8 @@ export class FormattingToolbar extends ScmsElement {
 
             .toolbar-container {
                 pointer-events: auto;
-                display: inline-flex;
+                display: flex;
+                flex-direction: column;
                 align-items: center;
                 gap: 2px;
                 padding: 4px 8px;
@@ -104,17 +137,27 @@ export class FormattingToolbar extends ScmsElement {
                 box-shadow:
                     0 4px 6px -1px rgba(0, 0, 0, 0.1),
                     0 2px 4px -2px rgba(0, 0, 0, 0.1);
+            }
+
+            .toolbar-buttons {
+                display: flex;
                 flex-wrap: wrap;
+                justify-content: center;
+                align-items: center;
+                gap: 2px;
             }
 
             .drag-handle {
                 cursor: grab;
-                padding: 4px 2px;
+                padding: 2px 0;
                 color: #9ca3af;
                 display: flex;
                 align-items: center;
+                justify-content: center;
+                width: 40px;
                 user-select: none;
                 -webkit-user-select: none;
+                touch-action: none;
             }
 
             .drag-handle:active {
@@ -134,6 +177,7 @@ export class FormattingToolbar extends ScmsElement {
      */
     attach(element: HTMLElement, linkMode: boolean): void {
         this.linkMode = linkMode;
+        this.isMobile = window.innerWidth < 640;
         this.targetElement = element;
 
         // Reuse existing editor for this element
@@ -271,10 +315,17 @@ export class FormattingToolbar extends ScmsElement {
         }
     }
 
+    connectedCallback() {
+        super.connectedCallback();
+        window.visualViewport?.addEventListener("resize", this.handleViewportChange);
+        window.visualViewport?.addEventListener("scroll", this.handleViewportChange);
+    }
+
     disconnectedCallback() {
         super.disconnectedCallback();
+        window.visualViewport?.removeEventListener("resize", this.handleViewportChange);
+        window.visualViewport?.removeEventListener("scroll", this.handleViewportChange);
         this.detach();
-
     }
 
     private updateActiveFormats() {
@@ -309,8 +360,25 @@ export class FormattingToolbar extends ScmsElement {
         const onMove = (ev: PointerEvent) => {
             const dx = ev.clientX - this.dragStartX;
             const dy = ev.clientY - this.dragStartY;
-            this.posX = Math.max(0, this.dragStartPosX + dx);
-            this.posY = Math.max(0, this.dragStartPosY + dy);
+
+            const toolbar = this.shadowRoot?.querySelector(
+                ".toolbar-container",
+            ) as HTMLElement | null;
+            const toolbarHeight = toolbar?.offsetHeight ?? 48;
+            const toolbarWidth = toolbar?.offsetWidth ?? 200;
+
+            const vv = window.visualViewport;
+            const minY = vv?.offsetTop ?? 0;
+            const maxY = (vv ? vv.offsetTop + vv.height : window.innerHeight) - toolbarHeight;
+
+            this.posY = Math.max(minY, Math.min(this.dragStartPosY + dy, maxY));
+
+            if (!this.isMobile) {
+                const minX = vv?.offsetLeft ?? 0;
+                const maxX =
+                    (vv ? vv.offsetLeft + vv.width : window.innerWidth) - toolbarWidth;
+                this.posX = Math.max(minX, Math.min(this.dragStartPosX + dx, maxX));
+            }
         };
 
         const onUp = () => {
@@ -440,53 +508,62 @@ export class FormattingToolbar extends ScmsElement {
         return html`<span class="w-px h-5 bg-gray-200 mx-0.5"></span>`;
     }
 
+    private renderDragHandle() {
+        return html`
+            <div
+                class="drag-handle"
+                @pointerdown=${this.handleDragStart}
+                title="Drag to reposition"
+            >
+                <span class="[&>svg]:w-4 [&>svg]:h-4">
+                    ${unsafeSVG(GripHorizontal)}
+                </span>
+            </div>
+        `;
+    }
+
     render() {
         if (!this.editor) return nothing;
 
-        const left = this.posX === -1 ? "50%" : `${this.posX}px`;
-        const transform = this.posX === -1 ? "translateX(-50%)" : "none";
+        const mobile = this.isMobile;
+        const left = mobile ? "0" : this.posX === -1 ? "50%" : `${this.posX}px`;
+        const right = mobile ? "0" : "auto";
+        const transform = !mobile && this.posX === -1 ? "translateX(-50%)" : "none";
 
         return html`
             <div
                 class="toolbar-container"
-                style="position:fixed; top:${this.posY}px; left:${left}; transform:${transform};"
+                style="position:fixed; top:${this.posY}px; left:${left}; right:${right}; transform:${transform};"
             >
-                <div
-                    class="drag-handle"
-                    @pointerdown=${this.handleDragStart}
-                    title="Drag to reposition"
-                >
-                    <span class="[&>svg]:w-4 [&>svg]:h-4">
-                        ${unsafeSVG(GripHorizontal)}
-                    </span>
+                ${this.renderDragHandle()}
+                <div class="toolbar-buttons">
+                    ${this.renderButton("bold", Bold, "Bold")}
+                    ${this.renderButton("italic", Italic, "Italic")}
+                    ${this.renderButton("underline", UnderlineIcon, "Underline")}
+                    ${this.renderButton("strike", Strikethrough, "Strikethrough")}
+                    ${this.renderButton("code", Code, "Inline Code")}
+                    ${this.renderSeparator()}
+                    ${this.renderButton("paragraph", Pilcrow, "Paragraph")}
+                    ${this.renderButton("h1", Heading1, "Heading 1")}
+                    ${this.renderButton("h2", Heading2, "Heading 2")}
+                    ${this.renderButton("h3", Heading3, "Heading 3")}
+                    ${this.linkMode
+                        ? nothing
+                        : html`
+                              ${this.renderSeparator()}
+                              ${this.renderButton("bulletList", List, "Bullet List")}
+                              ${this.renderButton("orderedList", ListOrdered, "Ordered List")}
+                              ${this.renderButton("blockquote", Quote, "Blockquote")}
+                          `}
+                    ${this.linkMode ? nothing : this.renderSeparator()}
+                    ${this.linkMode ? nothing : this.renderButton("link", LinkIcon, "Link")}
+                    ${this.linkMode ? nothing : this.renderButton("horizontalRule", Minus, "Horizontal Rule")}
+                    ${this.linkMode ? this.renderSeparator() : nothing}
+                    ${this.linkMode ? this.renderButton("goToLink", ExternalLink, "Go to Link") : nothing}
+                    ${this.renderSeparator()}
+                    ${this.renderButton("undo", Undo2, "Undo")}
+                    ${this.renderButton("redo", Redo2, "Redo")}
                 </div>
-                ${this.renderSeparator()}
-                ${this.renderButton("bold", Bold, "Bold")}
-                ${this.renderButton("italic", Italic, "Italic")}
-                ${this.renderButton("underline", UnderlineIcon, "Underline")}
-                ${this.renderButton("strike", Strikethrough, "Strikethrough")}
-                ${this.renderButton("code", Code, "Inline Code")}
-                ${this.renderSeparator()}
-                ${this.renderButton("paragraph", Pilcrow, "Paragraph")}
-                ${this.renderButton("h1", Heading1, "Heading 1")}
-                ${this.renderButton("h2", Heading2, "Heading 2")}
-                ${this.renderButton("h3", Heading3, "Heading 3")}
-                ${this.linkMode
-                    ? nothing
-                    : html`
-                          ${this.renderSeparator()}
-                          ${this.renderButton("bulletList", List, "Bullet List")}
-                          ${this.renderButton("orderedList", ListOrdered, "Ordered List")}
-                          ${this.renderButton("blockquote", Quote, "Blockquote")}
-                      `}
-                ${this.linkMode ? nothing : this.renderSeparator()}
-                ${this.linkMode ? nothing : this.renderButton("link", LinkIcon, "Link")}
-                ${this.linkMode ? nothing : this.renderButton("horizontalRule", Minus, "Horizontal Rule")}
-                ${this.linkMode ? this.renderSeparator() : nothing}
-                ${this.linkMode ? this.renderButton("goToLink", ExternalLink, "Go to Link") : nothing}
-                ${this.renderSeparator()}
-                ${this.renderButton("undo", Undo2, "Undo")}
-                ${this.renderButton("redo", Redo2, "Redo")}
             </div>
         `;
     }
