@@ -242,10 +242,7 @@ export class FormattingToolbar extends ScmsElement {
                     ".toolbar-container",
                 ) as HTMLElement | null;
                 if (toolbar) {
-                    this.posX = Math.max(
-                        12,
-                        (window.innerWidth - toolbar.offsetWidth) / 2,
-                    );
+                    this.posX = Math.max(12, (window.innerWidth - toolbar.offsetWidth) / 2);
                 }
             });
         }
@@ -384,8 +381,7 @@ export class FormattingToolbar extends ScmsElement {
 
             if (!this.isMobile) {
                 const minX = vv?.offsetLeft ?? 0;
-                const maxX =
-                    (vv ? vv.offsetLeft + vv.width : window.innerWidth) - toolbarWidth;
+                const maxX = (vv ? vv.offsetLeft + vv.width : window.innerWidth) - toolbarWidth;
                 this.posX = Math.max(minX, Math.min(this.dragStartPosX + dx, maxX));
             }
         };
@@ -463,9 +459,7 @@ export class FormattingToolbar extends ScmsElement {
                 break;
             case "link": {
                 const currentHref = this.editor.getAttributes("link").href || "";
-                const message = currentHref
-                    ? "Edit URL (clear to remove link):"
-                    : "Enter URL:";
+                const message = currentHref ? "Edit URL (clear to remove link):" : "Enter URL:";
                 const href = prompt(message, currentHref);
                 if (href === null) {
                     // User cancelled — do nothing
@@ -524,9 +518,7 @@ export class FormattingToolbar extends ScmsElement {
                 @pointerdown=${this.handleDragStart}
                 title="Drag to reposition"
             >
-                <span class="[&>svg]:w-4 [&>svg]:h-4">
-                    ${unsafeSVG(GripHorizontal)}
-                </span>
+                <span class="[&>svg]:w-4 [&>svg]:h-4"> ${unsafeSVG(GripHorizontal)} </span>
             </div>
         `;
     }
@@ -542,7 +534,8 @@ export class FormattingToolbar extends ScmsElement {
         return html`
             <div
                 class="toolbar-container"
-                style="position:fixed; top:${this.posY}px; left:${left}; right:${right}; transform:${transform};"
+                style="position:fixed; top:${this
+                    .posY}px; left:${left}; right:${right}; transform:${transform};"
             >
                 ${this.renderDragHandle()}
                 <div class="toolbar-buttons">
@@ -550,8 +543,7 @@ export class FormattingToolbar extends ScmsElement {
                     ${this.renderButton("italic", Italic, "Italic")}
                     ${this.renderButton("underline", UnderlineIcon, "Underline")}
                     ${this.renderButton("strike", Strikethrough, "Strikethrough")}
-                    ${this.renderButton("code", Code, "Inline Code")}
-                    ${this.renderSeparator()}
+                    ${this.renderButton("code", Code, "Inline Code")} ${this.renderSeparator()}
                     ${this.renderButton("paragraph", Pilcrow, "Paragraph")}
                     ${this.renderButton("h1", Heading1, "Heading 1")}
                     ${this.renderButton("h2", Heading2, "Heading 2")}
@@ -566,11 +558,14 @@ export class FormattingToolbar extends ScmsElement {
                           `}
                     ${this.linkMode ? nothing : this.renderSeparator()}
                     ${this.linkMode ? nothing : this.renderButton("link", LinkIcon, "Link")}
-                    ${this.linkMode ? nothing : this.renderButton("horizontalRule", Minus, "Horizontal Rule")}
+                    ${this.linkMode
+                        ? nothing
+                        : this.renderButton("horizontalRule", Minus, "Horizontal Rule")}
                     ${this.linkMode ? this.renderSeparator() : nothing}
-                    ${this.linkMode ? this.renderButton("goToLink", ExternalLink, "Go to Link") : nothing}
-                    ${this.renderSeparator()}
-                    ${this.renderButton("undo", Undo2, "Undo")}
+                    ${this.linkMode
+                        ? this.renderButton("goToLink", ExternalLink, "Go to Link")
+                        : nothing}
+                    ${this.renderSeparator()} ${this.renderButton("undo", Undo2, "Undo")}
                     ${this.renderButton("redo", Redo2, "Redo")}
                 </div>
             </div>

@@ -279,9 +279,7 @@ test("modal to Tiptap sync: View Source edits update inline editor", async () =>
     await new Promise((r) => setTimeout(r, 100));
 
     // The formatting toolbar (Tiptap) should reflect the modal's content
-    const toolbar = document.querySelector(
-        "scms-formatting-toolbar",
-    ) as FormattingToolbar | null;
+    const toolbar = document.querySelector("scms-formatting-toolbar") as FormattingToolbar | null;
     if (toolbar?.editor) {
         expect(toolbar.getHTML()).toContain("Edited in View Source modal");
     }

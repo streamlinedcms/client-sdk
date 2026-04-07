@@ -171,7 +171,6 @@ export function linkEditorStepMobile(ctx: TourContext): TourStep {
     };
 }
 
-
 /**
  * Step pointing to Save button
  */

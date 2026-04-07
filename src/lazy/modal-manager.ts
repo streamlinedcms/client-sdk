@@ -197,7 +197,10 @@ export class ModalManager {
         if (storedContent) {
             try {
                 const data = JSON.parse(storedContent) as { type?: string; value?: string };
-                if ((data.type === "html" || data.type === "text" || data.type === "link") && data.value !== undefined) {
+                if (
+                    (data.type === "html" || data.type === "text" || data.type === "link") &&
+                    data.value !== undefined
+                ) {
                     htmlValue = data.value;
                 }
             } catch {

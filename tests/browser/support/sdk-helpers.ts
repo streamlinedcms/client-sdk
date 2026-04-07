@@ -167,11 +167,13 @@ export async function clickToolbarButton(text: string): Promise<boolean> {
  */
 export function setElementContent(element: HTMLElement, newContent: string): void {
     const toolbar = document.querySelector("scms-formatting-toolbar") as HTMLElement | null;
-    const target = toolbar && (toolbar as unknown as { targetElement: HTMLElement | null }).targetElement;
+    const target =
+        toolbar && (toolbar as unknown as { targetElement: HTMLElement | null }).targetElement;
 
     if (target === element) {
         // Tiptap is managing this element — use its API
-        const setContent = (toolbar as unknown as { setContent: (html: string) => void }).setContent;
+        const setContent = (toolbar as unknown as { setContent: (html: string) => void })
+            .setContent;
         setContent.call(toolbar, newContent);
     } else {
         // No Tiptap — set innerHTML directly

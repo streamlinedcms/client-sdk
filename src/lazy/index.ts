@@ -1060,9 +1060,7 @@ class EditorController {
      */
     private ensureFormattingToolbar(): FormattingToolbar {
         if (!this.state.formattingToolbar) {
-            const toolbar = document.createElement(
-                "scms-formatting-toolbar",
-            ) as FormattingToolbar;
+            const toolbar = document.createElement("scms-formatting-toolbar") as FormattingToolbar;
             toolbar.style.display = "none";
             document.body.appendChild(toolbar);
             this.state.formattingToolbar = toolbar;
@@ -1075,11 +1073,7 @@ class EditorController {
      * Attaches or reuses a Tiptap editor for html/link element types.
      * Editors are preserved across blur/focus to maintain undo history.
      */
-    private handleEditingStarted(
-        key: string,
-        element: HTMLElement,
-        elementType: string,
-    ): void {
+    private handleEditingStarted(key: string, element: HTMLElement, elementType: string): void {
         if (elementType === "html" || elementType === "link") {
             const toolbar = this.ensureFormattingToolbar();
             const linkMode = elementType === "link";

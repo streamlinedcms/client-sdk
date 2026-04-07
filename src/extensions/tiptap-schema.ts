@@ -201,9 +201,7 @@ export const ParagraphSplitBlock = Extension.create({
                     deflt = getDefault();
 
                     let types =
-                        atEnd && deflt
-                            ? [{ type: deflt, attrs: $from.node().attrs }]
-                            : undefined;
+                        atEnd && deflt ? [{ type: deflt, attrs: $from.node().attrs }] : undefined;
 
                     let can = canSplit(tr.doc, tr.mapping.map($from.pos), 1, types);
 

@@ -309,4 +309,3 @@ test("clicking backdrop cancels the modal", async () => {
     await waitForCondition(() => cancelCalled);
     expect(cancelCalled).toBe(true);
 });
-

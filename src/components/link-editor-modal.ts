@@ -140,10 +140,7 @@ export class LinkEditorModal extends ScmsElement {
     }
 
     private hasChanges(): boolean {
-        return (
-            this.editedHref !== this.linkData.href ||
-            this.editedTarget !== this.linkData.target
-        );
+        return this.editedHref !== this.linkData.href || this.editedTarget !== this.linkData.target;
     }
 
     private handleBackdropClick(e: Event) {

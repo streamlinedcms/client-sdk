@@ -101,7 +101,6 @@ export function linkEditorStepDesktop(ctx: TourContext): TourStep {
     };
 }
 
-
 /**
  * Step pointing to Save button
  */
