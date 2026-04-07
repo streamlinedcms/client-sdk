@@ -242,8 +242,10 @@ export class EditingManager {
                 info.element.dataset.scmsKeydownHandler = "true";
             }
 
-            // Make text and html elements contenteditable (not images or links)
-            if (elementType === "text" || elementType === "html") {
+            // Make text elements contenteditable. For html elements, tiptap
+            // owns contenteditable — managing it here causes conflicts with
+            // tiptap's view, leading to states where the cursor disappears.
+            if (elementType === "text") {
                 info.element.setAttribute("contenteditable", "true");
             }
 
@@ -309,12 +311,16 @@ export class EditingManager {
         // Notify controller before cleanup (for formatting toolbar detach, etc.)
         this.helpers.onStopEditing(this.state.editingKey);
 
+        const elementType = this.state.editableTypes.get(this.state.editingKey) || "html";
         const infos = this.state.editableElements.get(this.state.editingKey);
         if (infos) {
             for (const info of infos) {
                 info.element.classList.remove("streamlined-editing");
                 info.element.classList.remove("streamlined-editing-sibling");
-                info.element.setAttribute("contenteditable", "false");
+                // Only manage contenteditable for text elements; tiptap owns it for html.
+                if (elementType === "text") {
+                    info.element.setAttribute("contenteditable", "false");
+                }
             }
         }
 
