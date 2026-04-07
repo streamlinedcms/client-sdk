@@ -79,7 +79,7 @@ import type { FormattingToolbar } from "../components/rich-text-editor.js";
 import type { HelpPanel } from "../components/help-panel.js";
 import { createEditorState, type EditorState, type EditableElementInfo } from "./state.js";
 import { DraftManager } from "./draft-manager.js";
-import { ContentManager } from "./content-manager.js";
+import { ContentManager, updateEmptyState } from "./content-manager.js";
 import { TemplateManager } from "./template-manager.js";
 import { EditingManager } from "./editing-manager.js";
 import { ModalManager } from "./modal-manager.js";
@@ -856,6 +856,7 @@ class EditorController {
         this.state.editableElements.forEach((infos, key) => {
             for (const info of infos) {
                 info.element.classList.add("streamlined-editable");
+                updateEmptyState(info.element);
                 this.setupElementClickHandler(info.element, key);
             }
         });
@@ -877,6 +878,7 @@ class EditorController {
             for (const info of infos) {
                 info.element.classList.remove(
                     "streamlined-editable",
+                    "streamlined-empty",
                     "streamlined-selected",
                     "streamlined-selected-sibling",
                     "streamlined-editing",

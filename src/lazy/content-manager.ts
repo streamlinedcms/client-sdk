@@ -55,6 +55,36 @@ function readTextWithBreaks(element: HTMLElement): string {
     return (clone.textContent || "").replace(/\u00a0/g, " ");
 }
 
+/**
+ * Whether an editable element has no visible content. Used to toggle the
+ * "Click to edit" placeholder. Treats stray <br> tags (left behind by
+ * contenteditable when the last character is deleted) and Tiptap's empty
+ * `<p></p>` / `<p><br></p>` shells as empty.
+ */
+export function isVisuallyEmpty(element: HTMLElement): boolean {
+    for (const node of Array.from(element.childNodes)) {
+        if (node.nodeType === Node.TEXT_NODE) {
+            if ((node.textContent || "").replace(/\u00a0/g, " ").trim() !== "") {
+                return false;
+            }
+        } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const el = node as HTMLElement;
+            if (el.tagName === "BR") continue;
+            if (el.tagName === "P" && isVisuallyEmpty(el)) continue;
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
+ * Toggle the `streamlined-empty` class so the placeholder rule in styles.ts
+ * matches when the element has no visible content.
+ */
+export function updateEmptyState(element: HTMLElement): void {
+    element.classList.toggle("streamlined-empty", isVisuallyEmpty(element));
+}
+
 function writeTextWithBreaks(element: HTMLElement, text: string): void {
     element.textContent = "";
     const parts = text.split("\n");
@@ -85,6 +115,10 @@ export class ContentManager {
 
         // Sync all other DOM elements from currentContent
         this.syncAllElementsFromContent(key, sourceElement);
+
+        // Refresh placeholder state for the element the user just typed in
+        // (sync handles the others via applyElementContent).
+        updateEmptyState(sourceElement);
     }
 
     /**
@@ -213,31 +247,29 @@ export class ContentManager {
                         info.element.href = linkData.href;
                         info.element.target = linkData.target || "";
                         this.setElementHTML(info.element, linkData.value || "");
-                        return;
                     }
                 } else if (elementType === "image" && info.element instanceof HTMLImageElement) {
                     const imageData = data as { src?: string };
                     if (imageData.src !== undefined) {
                         info.element.src = imageData.src;
-                        return;
                     }
                 } else if (elementType === "text") {
                     const textData = data as { value?: string };
                     if (textData.value !== undefined) {
                         writeTextWithBreaks(info.element, textData.value);
-                        return;
                     }
                 } else if (elementType === "html") {
                     const htmlData = data as { value?: string };
                     if (htmlData.value !== undefined) {
                         this.setElementHTML(info.element, htmlData.value);
-                        return;
                     }
                 }
             }
         } catch {
             // Not JSON - ignore, content should always be JSON
         }
+
+        updateEmptyState(info.element);
     }
 
     /**
