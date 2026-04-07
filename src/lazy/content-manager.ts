@@ -57,24 +57,27 @@ function readTextWithBreaks(element: HTMLElement): string {
 
 /**
  * Whether an editable element has no visible content. Used to toggle the
- * "Click to edit" placeholder. Treats stray <br> tags (left behind by
- * contenteditable when the last character is deleted) and Tiptap's empty
- * `<p></p>` / `<p><br></p>` shells as empty.
+ * "Click to edit" placeholder so an emptied element retains a clickable area.
+ *
+ * Treats as empty:
+ * - Truly empty elements
+ * - Stray <br> from contenteditable after the last character is deleted
+ * - Tiptap's empty wrappers (<p></p>, <p><br></p>, <span><br></span>, etc.)
+ * - Whitespace-only / nbsp-only text nodes
+ *
+ * Treats as non-empty:
+ * - Any visible text (after trimming whitespace and nbsp)
+ * - Any media-like child (img, video, svg, iframe, input, button, etc.)
  */
 export function isVisuallyEmpty(element: HTMLElement): boolean {
-    for (const node of Array.from(element.childNodes)) {
-        if (node.nodeType === Node.TEXT_NODE) {
-            if ((node.textContent || "").replace(/\u00a0/g, " ").trim() !== "") {
-                return false;
-            }
-        } else if (node.nodeType === Node.ELEMENT_NODE) {
-            const el = node as HTMLElement;
-            if (el.tagName === "BR") continue;
-            if (el.tagName === "P" && isVisuallyEmpty(el)) continue;
-            return false;
-        }
+    if (
+        element.querySelector(
+            "img, video, audio, canvas, svg, iframe, input, button, picture, object, embed",
+        )
+    ) {
+        return false;
     }
-    return true;
+    return (element.textContent || "").replace(/\u00a0/g, " ").trim() === "";
 }
 
 /**
