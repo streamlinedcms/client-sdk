@@ -186,6 +186,13 @@ export class FormattingToolbar extends ScmsElement {
         if (existing) {
             this.editor = existing.editor;
             this.initialHTML = existing.initialHTML;
+            // Defensive: ensure the element is still editable. Something can
+            // leave contenteditable=false on a tiptap-managed element, which
+            // hides the cursor and blocks typing even though the editor and
+            // toolbar are still alive.
+            if (element.getAttribute("contenteditable") !== "true") {
+                element.setAttribute("contenteditable", "true");
+            }
             this.editor.commands.focus();
             this.updateActiveFormats();
             this.style.display = "block";
