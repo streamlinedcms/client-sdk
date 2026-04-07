@@ -53,7 +53,9 @@ function dumpDOM(el: HTMLElement, label: string): void {
     for (let i = 0; i < el.childNodes.length; i++) {
         const n = el.childNodes[i];
         if (n.nodeType === Node.ELEMENT_NODE) {
-            console.log(`  [${i}] <${(n as Element).tagName.toLowerCase()}> innerHTML=${JSON.stringify((n as Element).innerHTML)}`);
+            console.log(
+                `  [${i}] <${(n as Element).tagName.toLowerCase()}> innerHTML=${JSON.stringify((n as Element).innerHTML)}`,
+            );
         } else {
             console.log(`  [${i}] text: ${JSON.stringify(n.textContent)}`);
         }
@@ -65,11 +67,7 @@ beforeAll(async () => {
     const { generateTestAppId } = await import("~/@browser-support/sdk-helpers.js");
     appId = generateTestAppId();
 
-    await setContent(
-        appId,
-        "kb-test",
-        JSON.stringify({ type: "text", value: "Initial text" }),
-    );
+    await setContent(appId, "kb-test", JSON.stringify({ type: "text", value: "Initial text" }));
 
     await initializeSDK({ appId });
 });
@@ -455,10 +453,10 @@ async function restoreAndEdit(storedValue: string): Promise<HTMLElement> {
 
     // Simulate restore: write via the SDK's own writeTextWithBreaks path
     // by setting currentContent and syncing
-    const state = (getController() as unknown as {
+    const state = getController() as unknown as {
         state: { currentContent: Map<string, string>; originalContent: Map<string, string> };
         contentManager: { syncAllElementsFromContent: (key: string) => void };
-    });
+    };
     const json = JSON.stringify({ type: "text", value: storedValue });
     state.state.currentContent.set("kb-test", json);
     state.state.originalContent.set("kb-test", json);

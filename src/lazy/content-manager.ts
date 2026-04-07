@@ -27,8 +27,7 @@ function readTextWithBreaks(element: HTMLElement): string {
     // A <div>text</div> is a line of content.
     // Handle these before standalone <br> tags.
     clone.querySelectorAll("div").forEach((div) => {
-        const isEmptyDiv =
-            div.childNodes.length === 1 && div.firstChild instanceof HTMLBRElement;
+        const isEmptyDiv = div.childNodes.length === 1 && div.firstChild instanceof HTMLBRElement;
         // A <br> immediately before a content-bearing <div> is redundant —
         // Chrome inserts it to end the inline flow, but the block boundary
         // already creates the line break. However, before an empty

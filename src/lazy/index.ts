@@ -1124,9 +1124,7 @@ class EditorController {
         if (type === "text") {
             // Check for HTML elements other than <br> (which we allow for line breaks)
             const hasNonBrElements = Array.from(element.childNodes).some(
-                (node) =>
-                    node.nodeType === Node.ELEMENT_NODE &&
-                    (node as Element).tagName !== "BR",
+                (node) => node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName !== "BR",
             );
             if (hasNonBrElements) {
                 const id = element.getAttribute("data-scms-text");
