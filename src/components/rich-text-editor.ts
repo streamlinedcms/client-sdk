@@ -24,6 +24,7 @@ import {
     ListParagraph,
     FlexListItem,
     FlexBlockquote,
+    ParagraphSplitBlock,
 } from "../extensions/tiptap-schema.js";
 import {
     Bold,
@@ -209,6 +210,7 @@ export class FormattingToolbar extends ScmsElement {
                 ListParagraph,
                 FlexListItem,
                 FlexBlockquote,
+                ParagraphSplitBlock,
                 Link.configure({
                     openOnClick: false,
                     HTMLAttributes: { rel: null, target: null },

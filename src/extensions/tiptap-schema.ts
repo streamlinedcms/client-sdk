@@ -18,7 +18,9 @@
  *   - "<blockquote>text</bq>"   → <bq><span>text</span></bq>(no visual change)
  */
 
-import { Node, mergeAttributes } from "@tiptap/core";
+import { Extension, Node, mergeAttributes } from "@tiptap/core";
+import { NodeSelection, TextSelection } from "@tiptap/pm/state";
+import { canSplit } from "@tiptap/pm/transform";
 
 /**
  * A block node that renders as <span> instead of <p>.
@@ -127,4 +129,129 @@ export const InlineDocument = Node.create({
     name: "doc",
     topNode: true,
     content: "inline*",
+});
+
+/**
+ * Overrides Tiptap's default splitBlock command so pressing Enter creates a
+ * <p> instead of a <span>. The schema lists spanParagraph first (so bare text
+ * loads without <p> wrapping), but ProseMirror's defaultBlockAt picks the
+ * first textblock from the parent's content match — which is spanParagraph.
+ *
+ * This extension replaces splitBlock with a copy of Tiptap's implementation
+ * that forces the new node type to "paragraph" when available, falling back
+ * to defaultBlockAt otherwise. List item splitting is unaffected (it has its
+ * own splitListItem command).
+ */
+export const ParagraphSplitBlock = Extension.create({
+    name: "paragraphSplitBlock",
+
+    addCommands() {
+        return {
+            splitBlock:
+                ({ keepMarks = true } = {}) =>
+                ({ tr, state, dispatch, editor }) => {
+                    const { selection, doc } = tr;
+                    const { $from, $to } = selection;
+
+                    const ensureMarks = () => {
+                        const marks =
+                            state.storedMarks ||
+                            (state.selection.$to.parentOffset && state.selection.$from.marks());
+                        if (marks) {
+                            const splittable = editor.extensionManager.splittableMarks;
+                            const filtered = marks.filter((m) => splittable?.includes(m.type.name));
+                            state.tr.ensureMarks(filtered);
+                        }
+                    };
+
+                    if (selection instanceof NodeSelection && selection.node.isBlock) {
+                        if (!$from.parentOffset || !canSplit(doc, $from.pos)) {
+                            return false;
+                        }
+                        if (dispatch) {
+                            if (keepMarks) ensureMarks();
+                            tr.split($from.pos).scrollIntoView();
+                        }
+                        return true;
+                    }
+
+                    if (!$from.parent.isBlock) return false;
+
+                    const atEnd = $to.parentOffset === $to.parent.content.size;
+
+                    // Pick the new block type: prefer "paragraph" if it's a valid
+                    // child of the parent at this position; otherwise fall back to
+                    // the parent's default textblock.
+                    let deflt = undefined as ReturnType<typeof getDefault>;
+                    function getDefault() {
+                        if ($from.depth === 0) return undefined;
+                        const match = $from.node(-1).contentMatchAt($from.indexAfter(-1));
+                        const paragraphType = editor.schema.nodes.paragraph;
+                        if (paragraphType && match.matchType(paragraphType)) {
+                            return paragraphType;
+                        }
+                        for (let i = 0; i < match.edgeCount; i += 1) {
+                            const { type } = match.edge(i);
+                            if (type.isTextblock && !type.hasRequiredAttrs()) {
+                                return type;
+                            }
+                        }
+                        return undefined;
+                    }
+                    deflt = getDefault();
+
+                    let types =
+                        atEnd && deflt
+                            ? [{ type: deflt, attrs: $from.node().attrs }]
+                            : undefined;
+
+                    let can = canSplit(tr.doc, tr.mapping.map($from.pos), 1, types);
+
+                    if (
+                        !types &&
+                        !can &&
+                        canSplit(
+                            tr.doc,
+                            tr.mapping.map($from.pos),
+                            1,
+                            deflt ? [{ type: deflt }] : undefined,
+                        )
+                    ) {
+                        can = true;
+                        types = deflt ? [{ type: deflt, attrs: $from.node().attrs }] : undefined;
+                    }
+
+                    if (dispatch) {
+                        if (can) {
+                            if (selection instanceof TextSelection) {
+                                tr.deleteSelection();
+                            }
+                            tr.split(tr.mapping.map($from.pos), 1, types);
+
+                            if (
+                                deflt &&
+                                !atEnd &&
+                                !$from.parentOffset &&
+                                $from.parent.type !== deflt
+                            ) {
+                                const first = tr.mapping.map($from.before());
+                                const $first = tr.doc.resolve(first);
+                                if (
+                                    $from
+                                        .node(-1)
+                                        .canReplaceWith($first.index(), $first.index() + 1, deflt)
+                                ) {
+                                    tr.setNodeMarkup(tr.mapping.map($from.before()), deflt);
+                                }
+                            }
+                        }
+
+                        if (keepMarks) ensureMarks();
+                        tr.scrollIntoView();
+                    }
+
+                    return can;
+                },
+        };
+    },
 });
