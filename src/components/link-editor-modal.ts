@@ -108,11 +108,6 @@ export class LinkEditorModal extends ScmsElement {
         this.editedTarget = select.value;
     }
 
-    private handleValueInput(e: Event) {
-        const textarea = e.target as HTMLTextAreaElement;
-        this.editedValue = textarea.value;
-    }
-
     private handleApply() {
         this.dispatchEvent(
             new CustomEvent("apply", {

@@ -292,15 +292,6 @@ export class Toolbar extends ScmsElement {
         );
     }
 
-    private handleRedo() {
-        this.dispatchEvent(
-            new CustomEvent("redo", {
-                bubbles: true,
-                composed: true,
-            }),
-        );
-    }
-
     private handleEditHtml() {
         this.dispatchEvent(
             new CustomEvent("edit-html", {
