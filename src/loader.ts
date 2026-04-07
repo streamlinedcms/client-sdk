@@ -136,6 +136,19 @@
     }
 
     /**
+     * Set text content with \n converted to <br> elements.
+     * Uses DOM APIs (createTextNode + createElement) to avoid XSS from innerHTML.
+     */
+    function setTextWithBreaks(element: HTMLElement, text: string): void {
+        element.textContent = "";
+        const parts = text.split("\n");
+        for (let i = 0; i < parts.length; i++) {
+            if (i > 0) element.appendChild(document.createElement("br"));
+            if (parts[i]) element.appendChild(document.createTextNode(parts[i]));
+        }
+    }
+
+    /**
      * Strip content from template HTML for cloning new instances.
      * - Removes text content
      * - Strips instance IDs
@@ -557,7 +570,7 @@
             const data = JSON.parse(content) as { type?: string };
 
             if (data.type === "text") {
-                element.textContent = (data as { type: "text"; value: string }).value;
+                setTextWithBreaks(element, (data as { type: "text"; value: string }).value);
                 return element;
             } else if (data.type === "html") {
                 element.innerHTML = (data as { type: "html"; value: string }).value;
@@ -611,7 +624,7 @@
             } else if (type === "text") {
                 const textData = data as { value?: string };
                 if (textData.value !== undefined) {
-                    element.textContent = textData.value;
+                    setTextWithBreaks(element, textData.value);
                 }
             } else if (type === "html") {
                 const htmlData = data as { value?: string };

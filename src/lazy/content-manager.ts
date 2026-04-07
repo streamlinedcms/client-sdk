@@ -18,6 +18,52 @@ import type {
 } from "../types.js";
 import { applyAttributesToElement } from "../types.js";
 
+function readTextWithBreaks(element: HTMLElement): string {
+    const clone = document.createElement("div");
+    clone.innerHTML = element.innerHTML;
+
+    // Chrome's contenteditable wraps each Enter in a <div>.
+    // A <div><br></div> is an empty line (the <br> is just a height placeholder).
+    // A <div>text</div> is a line of content.
+    // Handle these before standalone <br> tags.
+    clone.querySelectorAll("div").forEach((div) => {
+        const isEmptyDiv = div.childNodes.length === 1 && div.firstChild instanceof HTMLBRElement;
+        // A <br> immediately before a content-bearing <div> is redundant —
+        // Chrome inserts it to end the inline flow, but the block boundary
+        // already creates the line break. However, before an empty
+        // <div><br></div> (blank line), the <br> IS a real line break.
+        const prev = div.previousSibling;
+        if (prev instanceof HTMLBRElement && !isEmptyDiv) {
+            prev.remove();
+        }
+        const newline = document.createTextNode("\n");
+        div.before(newline);
+        // Remove placeholder <br> inside otherwise-empty divs
+        if (isEmptyDiv) {
+            div.firstChild!.remove();
+        }
+        // Unwrap: move children out, remove the div shell
+        while (div.firstChild) div.before(div.firstChild);
+        div.remove();
+    });
+
+    // Handle standalone <br> tags (e.g. from our own writeTextWithBreaks or Shift+Enter)
+    clone.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
+
+    // Normalize &nbsp; (U+00A0) to regular spaces — Chrome's contenteditable
+    // inserts &nbsp; for leading/trailing spaces when splitting lines
+    return (clone.textContent || "").replace(/\u00a0/g, " ");
+}
+
+function writeTextWithBreaks(element: HTMLElement, text: string): void {
+    element.textContent = "";
+    const parts = text.split("\n");
+    for (let i = 0; i < parts.length; i++) {
+        if (i > 0) element.appendChild(document.createElement("br"));
+        if (parts[i]) element.appendChild(document.createTextNode(parts[i]));
+    }
+}
+
 export class ContentManager {
     constructor(private state: EditorState) {}
 
@@ -95,7 +141,7 @@ export class ContentManager {
         } else if (elementType === "text") {
             const data: TextContentData = {
                 type: "text",
-                value: info.element.textContent || "",
+                value: readTextWithBreaks(info.element),
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
@@ -129,7 +175,7 @@ export class ContentManager {
             }
 
             if (data.type === "text") {
-                info.element.textContent = (data as TextContentData).value;
+                writeTextWithBreaks(info.element, (data as TextContentData).value);
             } else if (data.type === "html") {
                 info.element.innerHTML = (data as HtmlContentData).value;
             } else if (data.type === "image" && info.element instanceof HTMLImageElement) {
@@ -158,7 +204,7 @@ export class ContentManager {
                 } else if (elementType === "text") {
                     const textData = data as { value?: string };
                     if (textData.value !== undefined) {
-                        info.element.textContent = textData.value;
+                        writeTextWithBreaks(info.element, textData.value);
                         return;
                     }
                 } else if (elementType === "html") {

@@ -1122,18 +1122,28 @@ class EditorController {
      */
     private normalizeDomWhitespace(element: HTMLElement, type: EditableType): void {
         if (type === "text") {
-            // Check for actual HTML elements (not just entity-encoded text like &amp;)
-            const hasHtmlElements = Array.from(element.childNodes).some(
-                (node) => node.nodeType === Node.ELEMENT_NODE,
+            // Check for HTML elements other than <br> (which we allow for line breaks)
+            const hasNonBrElements = Array.from(element.childNodes).some(
+                (node) => node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName !== "BR",
             );
-            if (hasHtmlElements) {
+            if (hasNonBrElements) {
                 const id = element.getAttribute("data-scms-text");
                 this.log.warn(
                     `Element "${id}" has data-scms-text but contains HTML. Use data-scms-html to preserve formatting.`,
                     { innerHTML: element.innerHTML },
                 );
             }
-            element.textContent = normalizeWhitespace(element.textContent || "");
+            // Normalize each text node's whitespace while preserving <br> line breaks
+            const hasBr = element.querySelector("br") !== null;
+            if (hasBr) {
+                for (const node of Array.from(element.childNodes)) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        node.textContent = normalizeWhitespace(node.textContent || "");
+                    }
+                }
+            } else {
+                element.textContent = normalizeWhitespace(element.textContent || "");
+            }
         } else if (type === "html") {
             element.innerHTML = normalizeHtmlWhitespace(element.innerHTML);
         } else if (type === "link" && element instanceof HTMLAnchorElement) {
