@@ -9,6 +9,7 @@
  * - Editing functionality
  */
 
+import { markRaw } from "@vue/reactivity";
 import { Logger } from "loganite";
 import { KeyStorage, type EditorMode } from "../key-storage.js";
 import { PopupManager, type MediaFile } from "../popup-manager.js";
@@ -63,6 +64,7 @@ function getConfigFromScriptTag(): ViewerConfig | null {
 // Import Lit components to register them
 import "../components/toolbar.js";
 import "../components/sign-in-link.js";
+import "../components/rich-text-editor.js";
 import "../components/html-editor-modal.js";
 import "../components/link-editor-modal.js";
 import "../components/seo-modal.js";
@@ -73,6 +75,7 @@ import "../components/help-panel.js";
 import "../components/content-viewer-badge.js";
 import "../components/content-viewer-panel.js";
 import type { Toolbar } from "../components/toolbar.js";
+import type { FormattingToolbar } from "../components/rich-text-editor.js";
 import type { HelpPanel } from "../components/help-panel.js";
 import { createEditorState, type EditorState, type EditableElementInfo } from "./state.js";
 import { DraftManager } from "./draft-manager.js";
@@ -225,6 +228,9 @@ class EditorController {
             updateToolbarTemplateContext: () => this.templateManager.updateToolbarTemplateContext(),
             getElementToKeyMap: () => this.elementToKey,
             scrollToElement: this.scrollToElement.bind(this),
+            onStartEditing: (key, element, elementType) =>
+                this.handleEditingStarted(key, element, elementType),
+            onStopEditing: (key) => this.handleEditingStopped(key),
         });
 
         // Initialize modal manager
@@ -791,12 +797,10 @@ class EditorController {
                         now - this.state.lastTapTime < this.doubleTapDelay;
 
                     if (isDoubleTap && isMobile) {
-                        // Mobile double-tap: open media manager for images, navigate for links
-                        // (Desktop uses native dblclick event instead)
+                        // Mobile double-tap: open media manager for images
+                        // (Link "go to" is handled by the formatting toolbar)
                         if (elementType === "image") {
                             this.modalManager.handleChangeImage();
-                        } else if (elementType === "link") {
-                            this.modalManager.handleGoToLink();
                         }
                         this.state.lastTapKey = null;
                         this.state.lastTapTime = 0;
@@ -839,17 +843,7 @@ class EditorController {
             element.dataset.scmsDblClickHandler = "true";
         }
 
-        // Double-click handler for links to navigate (desktop)
-        if (elementType === "link" && !element.dataset.scmsDblClickHandler) {
-            element.addEventListener("dblclick", (e) => {
-                if (this.state.editingEnabled) {
-                    e.preventDefault();
-                    e.stopImmediatePropagation();
-                    this.modalManager.handleGoToLink();
-                }
-            });
-            element.dataset.scmsDblClickHandler = "true";
-        }
+        // Link "go to" is handled by the formatting toolbar's Go to Link button
     }
 
     /**
@@ -1052,6 +1046,95 @@ class EditorController {
             this.spacerElement.remove();
             this.spacerElement = null;
         }
+        // Also remove formatting toolbar
+        this.detachFormattingToolbar();
+        if (this.state.formattingToolbar) {
+            this.state.formattingToolbar.remove();
+            this.state.formattingToolbar = null;
+        }
+    }
+
+    /**
+     * Ensure the formatting toolbar component exists in the DOM.
+     * Created once and reused across editing sessions.
+     */
+    private ensureFormattingToolbar(): FormattingToolbar {
+        if (!this.state.formattingToolbar) {
+            const toolbar = document.createElement("scms-formatting-toolbar") as FormattingToolbar;
+            toolbar.style.display = "none";
+            document.body.appendChild(toolbar);
+            this.state.formattingToolbar = toolbar;
+        }
+        return this.state.formattingToolbar;
+    }
+
+    /**
+     * Called when editing starts on an element.
+     * Attaches or reuses a Tiptap editor for html/link element types.
+     * Editors are preserved across blur/focus to maintain undo history.
+     */
+    private handleEditingStarted(key: string, element: HTMLElement, elementType: string): void {
+        if (elementType === "html" || elementType === "link") {
+            const toolbar = this.ensureFormattingToolbar();
+            const linkMode = elementType === "link";
+
+            // Wire up content sync for this element
+            toolbar.onContentUpdate = () => {
+                const infos = this.state.editableElements.get(key);
+                if (!infos || infos.length === 0) return;
+                const sourceInfo = infos.find((i) => i.element === element) || infos[0];
+                this.contentManager.updateContentFromElement(key, sourceInfo.element);
+                this.saveManager.updateToolbarHasChanges();
+            };
+
+            // Attach (reuses existing editor if available, creates new otherwise)
+            toolbar.attach(element, linkMode);
+
+            // Register editor in state so content manager can use Tiptap's API.
+            if (toolbar.editor) {
+                this.state.tiptapEditors.set(element, markRaw(toolbar.editor));
+            }
+        }
+    }
+
+    /**
+     * Called when editing stops on an element.
+     * Hides the formatting toolbar but keeps the editor alive for undo history.
+     */
+    private handleEditingStopped(_key: string): void {
+        if (!this.state.formattingToolbar) return;
+        this.state.formattingToolbar.style.display = "none";
+    }
+
+    /**
+     * Destroy all formatting toolbar editors, sync changed content, and clean up.
+     * Called when editing is disabled (sign out, mode change).
+     */
+    private detachFormattingToolbar(): void {
+        if (!this.state.formattingToolbar) return;
+
+        const toolbar = this.state.formattingToolbar;
+
+        // Sync and unregister each editor that has changes
+        for (const [element] of toolbar.editors) {
+            this.state.tiptapEditors.delete(element);
+
+            // Find the key for this element
+            if (toolbar.hasChangesFor(element)) {
+                for (const [k, infos] of this.state.editableElements) {
+                    if (infos.some((i) => i.element === element)) {
+                        toolbar.detachElement(element);
+                        this.contentManager.updateContentFromElement(k, infos[0].element);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Destroy any remaining editors
+        toolbar.detach();
+        toolbar.onContentUpdate = null;
+        this.saveManager.updateToolbarHasChanges();
     }
 
     /**

@@ -309,14 +309,7 @@ export class SeoModal extends ScmsElement {
             >
                 <!-- Header -->
                 <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-                    <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-gray-900">SEO Attributes</span>
-                        <span
-                            class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-0.5 rounded"
-                        >
-                            ${this.elementId}
-                        </span>
-                    </div>
+                    <span class="text-sm font-medium text-gray-900">SEO Attributes</span>
                     <button
                         class="text-gray-400 hover:text-gray-600 p-1"
                         @click=${this.handleCancel}

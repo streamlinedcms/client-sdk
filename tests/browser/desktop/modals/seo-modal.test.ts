@@ -317,14 +317,6 @@ test("clicking backdrop cancels the modal", async () => {
     expect(cancelCalled).toBe(true);
 });
 
-test("modal displays the element ID", async () => {
-    const modal = await openSeoModalForLink();
-    const shadowRoot = modal.shadowRoot!;
-
-    const elementIdSpan = shadowRoot.querySelector(".font-mono") as HTMLElement;
-    expect(elementIdSpan.textContent?.trim()).toBe("test-link");
-});
-
 test("can toggle not-applicable fields section", async () => {
     const modal = await openSeoModalForLink();
     const shadowRoot = modal.shadowRoot!;

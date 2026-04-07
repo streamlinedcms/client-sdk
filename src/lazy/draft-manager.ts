@@ -9,7 +9,7 @@
 
 import type { Logger } from "loganite";
 import type { EditorState } from "./state.js";
-import { EDITABLE_SELECTOR, IMAGE_PLACEHOLDER_DATA_URI, type EditableType } from "../types.js";
+import { EDITABLE_SELECTOR, type EditableType } from "../types.js";
 
 /**
  * Storage context for an element (used for building keys)

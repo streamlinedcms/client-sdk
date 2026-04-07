@@ -102,22 +102,6 @@ export function linkEditorStepDesktop(ctx: TourContext): TourStep {
 }
 
 /**
- * Step mentioning double-click behavior
- */
-export function goToLinkTipDesktop(ctx: TourContext): TourStep {
-    return {
-        element: () => ctx.findVisibleElement(".streamlined-editing[data-scms-link]"),
-        popover: {
-            title: "Quick Tip",
-            description: "You can double-click any link to go to its destination.",
-            side: "bottom",
-            align: "center",
-            showButtons: ["next", "close"],
-        },
-    };
-}
-
-/**
  * Step pointing to Save button
  */
 export function saveStepDesktop(): TourStep {

@@ -50,17 +50,17 @@ beforeEach(async () => {
 
 // --- HTML element tests ---
 
-test("Edit HTML button appears for html-type elements", async () => {
+test("View Source button appears for html-type elements", async () => {
     const htmlElement = document.querySelector('[data-scms-html="test-title"]') as HTMLElement;
     htmlElement.click();
 
     await waitForCondition(() => htmlElement.classList.contains("streamlined-editing"));
 
     const buttonTexts = getToolbarButtonTexts();
-    expect(buttonTexts.some((t) => t.includes("Edit HTML"))).toBe(true);
+    expect(buttonTexts.some((t) => t.includes("View Source"))).toBe(true);
 });
 
-test("Edit HTML button does NOT appear for text-type elements", async () => {
+test("View Source button does NOT appear for text-type elements", async () => {
     const textElement = document.querySelector('[data-scms-text="name"]') as HTMLElement;
     if (!textElement) {
         // Skip if no text element available
@@ -71,7 +71,7 @@ test("Edit HTML button does NOT appear for text-type elements", async () => {
     await waitForCondition(() => textElement.classList.contains("streamlined-editing"));
 
     const buttonTexts = getToolbarButtonTexts();
-    expect(buttonTexts.some((t) => t.includes("Edit HTML"))).toBe(false);
+    expect(buttonTexts.some((t) => t.includes("View Source"))).toBe(false);
 });
 
 // --- Link element tests ---
@@ -120,8 +120,8 @@ test("Save button appears when there are changes", async () => {
     await waitForCondition(() => htmlElement.classList.contains("streamlined-editing"));
 
     // Make a change
-    htmlElement.innerHTML = "Modified content for save test";
-    htmlElement.dispatchEvent(new Event("input", { bubbles: true }));
+    const { setElementContent } = await import("~/@browser-support/sdk-helpers.js");
+    setElementContent(htmlElement, "Modified content for save test");
 
     await new Promise((r) => setTimeout(r, 100));
 
