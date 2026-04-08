@@ -57,12 +57,15 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 test("non-empty elements do not have streamlined-empty on init", () => {
-    expect(getEl("data-scms-text", "placeholder-text").classList.contains("streamlined-empty"))
-        .toBe(false);
-    expect(getEl("data-scms-html", "placeholder-html").classList.contains("streamlined-empty"))
-        .toBe(false);
-    expect(getEl("data-scms-link", "placeholder-link").classList.contains("streamlined-empty"))
-        .toBe(false);
+    expect(
+        getEl("data-scms-text", "placeholder-text").classList.contains("streamlined-empty"),
+    ).toBe(false);
+    expect(
+        getEl("data-scms-html", "placeholder-html").classList.contains("streamlined-empty"),
+    ).toBe(false);
+    expect(
+        getEl("data-scms-link", "placeholder-link").classList.contains("streamlined-empty"),
+    ).toBe(false);
     expect(
         getEl("data-scms-html", "placeholder-inline-html").classList.contains("streamlined-empty"),
     ).toBe(false);
