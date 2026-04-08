@@ -35,7 +35,7 @@ export function injectEditStyles(): void {
             outline-color: #ef4444;
         }
 
-        .streamlined-editable:empty::before {
+        .streamlined-editable.streamlined-empty::before {
             content: "Click to edit";
             color: #9ca3af;
             font-style: italic;

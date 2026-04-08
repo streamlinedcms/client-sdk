@@ -12,6 +12,7 @@ import type { Logger } from "loganite";
 import Sortable from "sortablejs";
 import type { EditorState, TemplateInfo, EditableElementInfo } from "./state.js";
 import type { ContentManager } from "./content-manager.js";
+import { updateEmptyState } from "./content-manager.js";
 import type { UndoManager } from "./undo-manager.js";
 import { EDITABLE_SELECTOR, IMAGE_PLACEHOLDER_DATA_URI, type EditableType } from "../types.js";
 
@@ -1043,6 +1044,7 @@ export class TemplateManager {
             if (!key) return;
 
             element.classList.add("streamlined-editable");
+            updateEmptyState(element);
             this.helpers.setupElementClickHandler(element, key);
         });
 
