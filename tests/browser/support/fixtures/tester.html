@@ -31,6 +31,55 @@
             <a href="https://example.com" data-scms-link="test-link">Default Link Text</a>
         </div>
 
+        <!-- Href element: link metadata only, inner content is developer-authored -->
+        <div class="test-section">
+            <a href="https://example.com/href" data-scms-href="test-href">
+                <i class="icon-star" data-testid="href-icon"></i>
+                <span data-testid="href-label">Learn more</span>
+            </a>
+        </div>
+
+        <!-- Href conflict: also has data-scms-text (should warn; text wins) -->
+        <div class="test-section">
+            <a
+                href="https://example.com/conflict"
+                data-scms-href="test-href-conflict"
+                data-scms-text="test-conflict-text"
+                >Conflicting Link</a
+            >
+        </div>
+
+        <!-- Href on non-anchor (should warn and skip) -->
+        <div class="test-section">
+            <div data-scms-href="test-href-nonanchor">Not an anchor</div>
+        </div>
+
+        <!-- Href containing html as an immediate child (tests outer-select navigation) -->
+        <div class="test-section">
+            <a
+                href="https://example.com/wrap"
+                data-scms-href="test-href-wrapper"
+                style="display: block"
+            >
+                <div data-scms-html="test-wrapped-html" style="padding: 10px">
+                    <strong>Wrapped</strong> HTML content
+                </div>
+            </a>
+        </div>
+
+        <!-- Template containing a data-scms-href with rich inner layout -->
+        <div class="test-section">
+            <h2>Href-in-template</h2>
+            <div data-scms-template="href-cards" class="href-card-container">
+                <div class="href-card">
+                    <a href="https://example.com/card" data-scms-href="cta">
+                        <i class="icon-arrow" data-testid="href-tmpl-icon"></i>
+                        <span data-testid="href-tmpl-label">Card CTA</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <!-- Elements for content-parsing tests (isolated) -->
         <div class="test-section">
             <a href="https://example.com" data-scms-link="test-link-parsing">Default Link Text</a>

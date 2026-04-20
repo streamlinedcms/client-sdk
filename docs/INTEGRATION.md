@@ -70,7 +70,7 @@ Use HTML only when the author needs to control the actual HTML code, or when a c
 
 **When NOT to use HTML:**
 - Individual headings, paragraphs, or labels (use `data-scms-text`)
-- A paragraph that just needs one link (use `data-scms-text` + `data-scms-link`)
+- A paragraph that just needs one link (use a `data-scms-href` anchor with a nested `data-scms-text` label)
 - Multiple separate elements that could each be their own editable (use multiple `data-scms-text`)
 
 ### Images (`data-scms-image`)
@@ -85,12 +85,63 @@ For `<img>` elements. Authors can select new images from the media manager.
 />
 ```
 
-### Links (`data-scms-link`)
+### Links (`data-scms-href`)
 
-For `<a>` elements. Authors can edit the URL, link text, and target.
+For `<a>` elements. `data-scms-href` tracks only the link's URL and target — the anchor's inner content is left entirely under your control. To make the link text editable, nest a `data-scms-text` (or `data-scms-html`) child inside the anchor.
 
 ```html
+<!-- Simple editable link: metadata on the anchor, text in a nested editable -->
+<a data-scms-href="cta" href="/signup">
+    <span data-scms-text="cta-label">Sign Up</span>
+</a>
+
+<!-- Icon + editable label -->
+<a data-scms-href="docs" href="/docs">
+    <i class="fa fa-book"></i>
+    <span data-scms-text="docs-label">Read the Docs</span>
+</a>
+
+<!-- Rich editable body inside a link -->
+<a data-scms-href="promo" href="/promo">
+    <div data-scms-html="promo-body">
+        <strong>Limited time:</strong> 20% off your first order
+    </div>
+</a>
+
+<!-- Link wrapping a logo or image (nothing editable inside) -->
+<a data-scms-href="logo-link" href="/">
+    <img src="/logo.svg" alt="Company Logo" />
+</a>
+```
+
+**Why this split?** The `<a>` element's job is navigation. Its URL/target is metadata; whatever markup sits inside is your layout. Separating them means icons, images, multi-element compositions, and rich formatted text all work inside a link without the SDK having to assume the anchor owns a single text value.
+
+**Nesting rule:** putting `data-scms-href` and another `data-scms-*` attribute on the **same element** isn't supported — only the first matching attribute will register and a console warning is emitted. Nest a child editable inside the anchor instead:
+
+```html
+<!-- Not supported — only one of the two will register -->
+<a data-scms-href="cta" data-scms-text="label" href="/x">Sign Up</a>
+
+<!-- Do this instead -->
+<a data-scms-href="cta" href="/x">
+    <span data-scms-text="label">Sign Up</span>
+</a>
+```
+
+**Selecting the outer anchor:** when a nested editable fills the entire interior of the `<a>` (e.g. a `data-scms-html` block that stretches edge-to-edge), clicks land on the inner editable. Select any inner editable and use the **Select outer element** button in the toolbar (icon with arrows pointing outward, next to the Content Viewer) to walk up to the anchor.
+
+### Deprecated: `data-scms-link`
+
+> **Legacy — prefer `data-scms-href`.** `data-scms-link` treats the anchor's inner HTML as an editable value, which conflates structure with metadata and causes rich inner markup (icons, nested editables) to be wiped when the link is inside a template. It is kept for backward compatibility; new code should use `data-scms-href` with a nested `data-scms-text` (or `data-scms-html`) for the label.
+
+```html
+<!-- Legacy -->
 <a data-scms-link="cta-button" href="/get-started">Get Started</a>
+
+<!-- Preferred -->
+<a data-scms-href="cta-button" href="/get-started">
+    <span data-scms-text="cta-label">Get Started</span>
+</a>
 ```
 
 ## Groups (`data-scms-group`)
@@ -107,9 +158,15 @@ Use the same group ID across multiple pages to share content. Edit once, update 
 <header data-scms-group="header">
     <div data-scms-text="logo">Company Name</div>
     <nav>
-        <a data-scms-link="nav-home" href="/">Home</a>
-        <a data-scms-link="nav-about" href="/about">About</a>
-        <a data-scms-link="nav-contact" href="/contact">Contact</a>
+        <a data-scms-href="nav-home" href="/">
+            <span data-scms-text="nav-home-label">Home</span>
+        </a>
+        <a data-scms-href="nav-about" href="/about">
+            <span data-scms-text="nav-about-label">About</span>
+        </a>
+        <a data-scms-href="nav-contact" href="/contact">
+            <span data-scms-text="nav-contact-label">Contact</span>
+        </a>
     </nav>
 </header>
 ```
@@ -201,6 +258,28 @@ You can use groups inside templates for content that should be identical across 
 
 In this example, the promo banner text is shared across all product cards, while the image, name, and price are unique to each instance.
 
+### Links Inside Templates
+
+Use `data-scms-href` for links inside templates. The SDK preserves the anchor's inner markup (icons, images, nested editables) across instance creation, so developer-authored layout survives. `data-scms-link` has a known issue where rich inner markup is wiped when new instances are cloned — don't use it in templates.
+
+```html
+<div data-scms-template="feature-cards">
+    <article class="feature-card">
+        <img data-scms-image="icon" src="placeholder.svg" alt="Feature icon" />
+        <h3 data-scms-text="title">Feature title</h3>
+        <div data-scms-html="description">
+            <p>Feature description with <strong>rich</strong> formatting.</p>
+        </div>
+        <!-- Link metadata on the anchor; label as a nested editable -->
+        <a data-scms-href="cta" href="/learn-more" class="btn">
+            <span data-scms-text="cta-label">Learn more</span>
+        </a>
+    </article>
+</div>
+```
+
+Each instance independently stores its own `href`, `target`, and child editable values. The icon, button styling, and surrounding layout come from the template definition and remain untouched.
+
 ## Sign-In Link
 
 Authors need a way to sign in to enable editing. You should add a sign-in link to your footer, typically in the copyright line. Add the `data-scms-signin` attribute to a link element:
@@ -237,8 +316,12 @@ The SDK automatically:
     <header data-scms-group="header">
         <div data-scms-text="logo">My Company</div>
         <nav>
-            <a data-scms-link="nav-1" href="/">Home</a>
-            <a data-scms-link="nav-2" href="/about">About</a>
+            <a data-scms-href="nav-1" href="/">
+                <span data-scms-text="nav-1-label">Home</span>
+            </a>
+            <a data-scms-href="nav-2" href="/about">
+                <span data-scms-text="nav-2-label">About</span>
+            </a>
         </nav>
     </header>
 
@@ -285,31 +368,44 @@ Keep logically separate elements as separate editables. Don't combine unrelated 
 ### Logo + Company Name
 
 ```html
-<!-- CORRECT: Separate editables for logo and name -->
+<!-- Separate editables for logo image and company name -->
 <div class="logo-container">
     <img data-scms-image="logo" src="logo.png" alt="Logo" />
     <span data-scms-text="company-name">Acme Services</span>
 </div>
 
-<!-- WRONG: Combined into one link loses individual editability -->
-<a href="/" data-scms-link="logo">
-    <img src="logo.png" />
-    <span>Acme</span>
+<!-- If the logo itself is a link, use data-scms-href so the URL is editable
+     while the image stays intact -->
+<a data-scms-href="logo-link" href="/">
+    <img data-scms-image="logo" src="logo.png" alt="Logo" />
 </a>
 ```
 
 ### Text + Link Combinations
 
 ```html
-<!-- CORRECT: Separate text and link -->
+<!-- Text before the link, link's label is its own editable -->
 <p>
     <span data-scms-text="powered-by-text">Powered by</span>
-    <a href="https://example.com" data-scms-link="powered-by-link">Example CMS</a>
+    <a data-scms-href="powered-by-link" href="https://example.com">
+        <span data-scms-text="powered-by-label">Example CMS</span>
+    </a>
 </p>
-
-<!-- WRONG: Can't edit text and link separately -->
-<a href="https://example.com" data-scms-link="powered-by">Powered by Example CMS</a>
 ```
+
+### Rich HTML inside a link
+
+When the link's body needs formatted content (bold, italic, mixed elements), nest a `data-scms-html` child. The outer `<a>` keeps its URL/target editable; the inner block gets rich-text editing.
+
+```html
+<a data-scms-href="feature-card" href="/features/analytics">
+    <div data-scms-html="feature-card-body">
+        <strong>Analytics</strong> — see everything in one dashboard.
+    </div>
+</a>
+```
+
+When a nested editable fills the entire interior of a link, clicks land on the inner editable. Select the inner element, then use the **Select outer element** button in the toolbar to jump up to the `<a>` and edit its URL.
 
 ## Link Clickability
 
@@ -318,14 +414,22 @@ For the best editing experience, put padding inside links rather than using gap 
 ```html
 <!-- CORRECT: Padding inside the link -->
 <nav class="flex items-center">
-    <a data-scms-link="nav-1" href="/" class="px-4 py-2">Home</a>
-    <a data-scms-link="nav-2" href="/about" class="px-4 py-2">About</a>
+    <a data-scms-href="nav-1" href="/" class="px-4 py-2">
+        <span data-scms-text="nav-1-label">Home</span>
+    </a>
+    <a data-scms-href="nav-2" href="/about" class="px-4 py-2">
+        <span data-scms-text="nav-2-label">About</span>
+    </a>
 </nav>
 
 <!-- WRONG: Gap creates unclickable dead zones between links -->
 <nav class="flex items-center gap-8">
-    <a data-scms-link="nav-1" href="/">Home</a>
-    <a data-scms-link="nav-2" href="/about">About</a>
+    <a data-scms-href="nav-1" href="/">
+        <span data-scms-text="nav-1-label">Home</span>
+    </a>
+    <a data-scms-href="nav-2" href="/about">
+        <span data-scms-text="nav-2-label">About</span>
+    </a>
 </nav>
 ```
 
@@ -334,14 +438,30 @@ For vertical link lists:
 ```html
 <!-- CORRECT: Block links with padding -->
 <ul>
-    <li><a data-scms-link="menu-1" href="/services" class="block py-2">Services</a></li>
-    <li><a data-scms-link="menu-2" href="/contact" class="block py-2">Contact</a></li>
+    <li>
+        <a data-scms-href="menu-1" href="/services" class="block py-2">
+            <span data-scms-text="menu-1-label">Services</span>
+        </a>
+    </li>
+    <li>
+        <a data-scms-href="menu-2" href="/contact" class="block py-2">
+            <span data-scms-text="menu-2-label">Contact</span>
+        </a>
+    </li>
 </ul>
 
 <!-- WRONG: Spacing on list items creates unclickable gaps -->
 <ul class="space-y-4">
-    <li><a data-scms-link="menu-1" href="/services">Services</a></li>
-    <li><a data-scms-link="menu-2" href="/contact">Contact</a></li>
+    <li>
+        <a data-scms-href="menu-1" href="/services">
+            <span data-scms-text="menu-1-label">Services</span>
+        </a>
+    </li>
+    <li>
+        <a data-scms-href="menu-2" href="/contact">
+            <span data-scms-text="menu-2-label">Contact</span>
+        </a>
+    </li>
 </ul>
 ```
 

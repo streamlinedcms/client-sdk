@@ -649,6 +649,55 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="info-box">
+                    <h3>Link metadata only (<code>data-scms-href</code>)</h3>
+                    <p>
+                        Use <code>data-scms-href="element-id"</code> when the link's inner content
+                        isn't editable — for example, when it contains an icon, an image, or a
+                        separately editable label. Authors can edit the URL and target, but the
+                        inner markup is preserved as-authored.
+                    </p>
+                </div>
+
+                <div class="content-section">
+                    <div class="demo-area">
+                        <h3>Icon + static text</h3>
+                        <div class="link-demo">
+                            <a
+                                href="https://example.com/docs"
+                                data-scms-href="href-demo-icon-static"
+                            >
+                                <span aria-hidden="true">📘</span>
+                                Read the docs
+                            </a>
+                        </div>
+
+                        <h3>Icon + nested editable label</h3>
+                        <div class="link-demo">
+                            <a
+                                href="https://example.com/signup"
+                                data-scms-href="href-demo-icon-label"
+                            >
+                                <span aria-hidden="true">⭐</span>
+                                <span data-scms-text="href-demo-label">Sign up now</span>
+                            </a>
+                        </div>
+
+                        <h3>Rich HTML body inside a link</h3>
+                        <div class="link-demo">
+                            <a
+                                href="https://example.com/learn"
+                                data-scms-href="href-demo-html-body"
+                            >
+                                <div data-scms-html="href-demo-html-content">
+                                    <strong>Learn more</strong> about our
+                                    <em>enterprise</em> offerings →
+                                </div>
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- GROUPS PAGE -->

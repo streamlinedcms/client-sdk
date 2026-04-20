@@ -93,10 +93,46 @@ export class EditingManager {
         if (this.state.toolbar) {
             this.state.toolbar.activeElement = key;
             this.state.toolbar.activeElementType = elementType;
+            this.state.toolbar.hasOuterEditable = this.findOuterEditableKey() !== null;
         }
 
         // Update template context on toolbar
         this.helpers.updateToolbarTemplateContext();
+    }
+
+    /**
+     * Find the nearest editable ancestor of the currently-selected element.
+     * Returns its storage key, or null if there's no editable ancestor or
+     * nothing is currently selected.
+     */
+    findOuterEditableKey(): string | null {
+        if (!this.state.selectedKey) return null;
+        const infos = this.state.editableElements.get(this.state.selectedKey);
+        const primary = infos?.[0];
+        if (!primary) return null;
+        const elementToKey = this.helpers.getElementToKeyMap();
+        let current = primary.element.parentElement;
+        while (current) {
+            const key = elementToKey.get(current);
+            if (key && key !== this.state.selectedKey) return key;
+            current = current.parentElement;
+        }
+        return null;
+    }
+
+    /**
+     * Select the nearest editable ancestor of the currently-selected element.
+     * Used when a nested editable fills its parent's interior and the outer
+     * element can't be clicked directly.
+     */
+    selectOuterEditable(): void {
+        const outerKey = this.findOuterEditableKey();
+        if (!outerKey) return;
+        const infos = this.state.editableElements.get(outerKey);
+        const outerElement = infos?.[0]?.element;
+        if (!outerElement) return;
+        // Use startEditing to match the normal click behavior (desktop).
+        this.startEditing(outerKey, outerElement);
     }
 
     /**
@@ -119,6 +155,7 @@ export class EditingManager {
         if (!this.state.editingKey && this.state.toolbar) {
             this.state.toolbar.activeElement = null;
             this.state.toolbar.activeElementType = null;
+            this.state.toolbar.hasOuterEditable = false;
         }
     }
 
@@ -250,7 +287,7 @@ export class EditingManager {
             }
 
             // Make images and links focusable for keyboard navigation
-            if (elementType === "image" || elementType === "link") {
+            if (elementType === "image" || elementType === "link" || elementType === "href") {
                 info.element.setAttribute("tabindex", "-1");
             }
         }

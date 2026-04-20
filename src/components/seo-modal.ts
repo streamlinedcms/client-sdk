@@ -29,12 +29,14 @@ const SEO_FIELDS: FieldConfig[] = [
         priority: {
             image: "primary",
             link: "not-applicable",
+            href: "not-applicable",
             text: "not-applicable",
             html: "not-applicable",
         },
         tips: {
             image: "Describe the image for screen readers and when the image fails to load. Be concise but descriptive.",
             link: "Alt text is typically used for images, not links.",
+            href: "Alt text is typically used for images, not links.",
             text: "Alt text is typically used for images, not text elements.",
             html: "Alt text is typically used for images, not HTML elements.",
         },
@@ -47,12 +49,14 @@ const SEO_FIELDS: FieldConfig[] = [
         priority: {
             image: "secondary",
             link: "secondary",
+            href: "secondary",
             text: "secondary",
             html: "secondary",
         },
         tips: {
             image: "Shows as a tooltip on hover. Generally not needed if alt text is good.",
             link: "Shows as a tooltip on hover. Can provide additional context about the link destination.",
+            href: "Shows as a tooltip on hover. Can provide additional context about the link destination.",
             text: "Shows as a tooltip on hover. Rarely needed for text elements.",
             html: "Shows as a tooltip on hover. Rarely needed for HTML elements.",
         },
@@ -72,12 +76,14 @@ const SEO_FIELDS: FieldConfig[] = [
         priority: {
             image: "not-applicable",
             link: "primary",
+            href: "primary",
             text: "not-applicable",
             html: "not-applicable",
         },
         tips: {
             image: "Link relationship is typically used for anchor elements, not images.",
             link: "Controls how search engines treat this link and security for external links.",
+            href: "Controls how search engines treat this link and security for external links.",
             text: "Link relationship is typically used for anchor elements, not text.",
             html: "Link relationship is typically used for anchor elements, not HTML elements.",
         },

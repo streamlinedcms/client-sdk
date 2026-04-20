@@ -17,6 +17,7 @@ import {
     ChevronUp,
     ChevronDown,
     Ellipsis,
+    Expand,
     Layers,
     Plus,
     ScanEye,
@@ -85,6 +86,9 @@ export class Toolbar extends ScmsElement {
 
     @property({ type: Boolean, attribute: "content-viewer-active" })
     contentViewerActive = false;
+
+    @property({ type: Boolean, attribute: "has-outer-editable" })
+    hasOuterEditable = false;
 
     @property({ type: Number, attribute: "hidden-element-count" })
     hiddenElementCount = 0;
@@ -382,6 +386,15 @@ export class Toolbar extends ScmsElement {
         );
     }
 
+    private handleSelectOuter() {
+        this.dispatchEvent(
+            new CustomEvent("select-outer", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
     private handleShowHiddenElements(e: Event) {
         e.stopPropagation();
         this.dispatchEvent(
@@ -475,7 +488,11 @@ export class Toolbar extends ScmsElement {
     }
 
     private renderEditLinkButton() {
-        if (!this.activeElement || this.activeElementType !== "link") return nothing;
+        if (
+            !this.activeElement ||
+            (this.activeElementType !== "link" && this.activeElementType !== "href")
+        )
+            return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
@@ -488,7 +505,11 @@ export class Toolbar extends ScmsElement {
     }
 
     private renderGoToLinkButton() {
-        if (!this.activeElement || this.activeElementType !== "link") return nothing;
+        if (
+            !this.activeElement ||
+            (this.activeElementType !== "link" && this.activeElementType !== "href")
+        )
+            return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors inline-flex items-center gap-1"
@@ -647,6 +668,22 @@ export class Toolbar extends ScmsElement {
         `;
     }
 
+    private renderSelectOuterButton() {
+        if (this.warning || this.readOnly) return nothing;
+        if (!this.hasOuterEditable) return nothing;
+        return html`
+            <button
+                class="w-8 h-8 flex items-center justify-center text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors [&>svg]:w-5 [&>svg]:h-5"
+                data-action="select-outer"
+                @click=${this.handleSelectOuter}
+                title="Select outer element"
+                aria-label="Select outer element"
+            >
+                ${unsafeSVG(Expand)}
+            </button>
+        `;
+    }
+
     private renderContentViewerButton() {
         // Only show in editing mode (not viewer or when warning/readOnly)
         if (this.warning || this.readOnly) return nothing;
@@ -766,7 +803,8 @@ export class Toolbar extends ScmsElement {
 
                     <!-- Right: Undo + Content Viewer + Save + Sign Out + Admin + Help -->
                     <div class="flex items-center">
-                        ${this.renderUndoButton()} ${this.renderContentViewerButton()}
+                        ${this.renderUndoButton()} ${this.renderSelectOuterButton()}
+                        ${this.renderContentViewerButton()}
                         ${this.hasChanges
                             ? html`<span class="mx-3">${this.renderSaveButton()}</span>`
                             : nothing}
@@ -1167,7 +1205,8 @@ export class Toolbar extends ScmsElement {
                         class="flex items-center w-20 justify-end gap-1"
                         @click=${(e: Event) => e.stopPropagation()}
                     >
-                        ${this.renderContentViewerButton()} ${this.renderHelpButton()}
+                        ${this.renderSelectOuterButton()} ${this.renderContentViewerButton()}
+                        ${this.renderHelpButton()}
                     </div>
                 </button>
 
