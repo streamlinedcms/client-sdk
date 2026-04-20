@@ -1016,6 +1016,10 @@ class EditorController {
             this.contentViewerManager.toggle();
         });
 
+        toolbar.addEventListener("select-outer", () => {
+            this.editingManager.selectOuterEditable();
+        });
+
         toolbar.addEventListener("show-hidden-elements", () => {
             this.contentViewerManager.showHiddenPanel();
         });
