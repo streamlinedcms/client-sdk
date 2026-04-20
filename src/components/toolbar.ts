@@ -475,7 +475,11 @@ export class Toolbar extends ScmsElement {
     }
 
     private renderEditLinkButton() {
-        if (!this.activeElement || this.activeElementType !== "link") return nothing;
+        if (
+            !this.activeElement ||
+            (this.activeElementType !== "link" && this.activeElementType !== "href")
+        )
+            return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors"
@@ -488,7 +492,11 @@ export class Toolbar extends ScmsElement {
     }
 
     private renderGoToLinkButton() {
-        if (!this.activeElement || this.activeElementType !== "link") return nothing;
+        if (
+            !this.activeElement ||
+            (this.activeElementType !== "link" && this.activeElementType !== "href")
+        )
+            return nothing;
         return html`
             <button
                 class="px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 border border-blue-300 rounded-md hover:bg-blue-50 transition-colors inline-flex items-center gap-1"

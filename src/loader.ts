@@ -75,7 +75,7 @@
     /**
      * Editable element types
      */
-    type EditableType = "text" | "html" | "image" | "link";
+    type EditableType = "text" | "html" | "image" | "link" | "href";
 
     /**
      * Element info including optional group, template context, and type
@@ -166,7 +166,7 @@
         // For editable elements, strip all attributes except reserved ones
         // This handles src, href, alt, title, and any custom attributes set via modals
         const editableSelector =
-            "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+            "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link], [data-scms-href]";
         div.querySelectorAll(editableSelector).forEach((el) => {
             const attributesToRemove: string[] = [];
             for (let i = 0; i < el.attributes.length; i++) {
@@ -182,14 +182,21 @@
                 attributesToRemove.push(attr.name);
             }
             attributesToRemove.forEach((name) => el.removeAttribute(name));
-            el.innerHTML = "";
+            // href elements don't own inner content — preserve developer markup.
+            if (!el.hasAttribute("data-scms-href")) {
+                el.innerHTML = "";
+            }
         });
 
-        // Replace all text nodes with empty strings
+        // Replace all text nodes with empty strings, except those inside
+        // data-scms-href elements (where developer layout lives).
         const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) {
-            textNodes.push(walker.currentNode as Text);
+            const node = walker.currentNode as Text;
+            const nearestEditable = node.parentElement?.closest(editableSelector);
+            if (nearestEditable?.hasAttribute("data-scms-href")) continue;
+            textNodes.push(node);
         }
         textNodes.forEach((node) => (node.textContent = ""));
 
@@ -379,10 +386,15 @@
      * Get editable info from element by checking data-scms-{type} attributes
      */
     function getEditableInfo(element: HTMLElement): { id: string; type: EditableType } | null {
-        const types: EditableType[] = ["text", "html", "image", "link"];
+        const types: EditableType[] = ["text", "html", "image", "link", "href"];
         for (const type of types) {
             const id = element.getAttribute(`data-scms-${type}`);
-            if (id) return { id, type };
+            if (id) {
+                if (type === "href" && !(element instanceof HTMLAnchorElement)) {
+                    return null;
+                }
+                return { id, type };
+            }
         }
         return null;
     }
@@ -422,7 +434,7 @@
      */
     function scanEditableElements(): Map<string, EditableElementInfo[]> {
         const elements = new Map<string, EditableElementInfo[]>();
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link], [data-scms-href]";
         document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
             const info = getEditableInfo(element);
             if (info) {
@@ -596,6 +608,11 @@
                 element.target = linkData.target;
                 element.innerHTML = linkData.value;
                 return element;
+            } else if (data.type === "href" && element instanceof HTMLAnchorElement) {
+                const hrefData = data as { type: "href"; href: string; target: string };
+                element.href = hrefData.href;
+                element.target = hrefData.target;
+                return element;
             } else if (data.type) {
                 // Unknown type with type field - don't process
                 return element;
@@ -608,6 +625,12 @@
                     element.href = linkData.href;
                     element.target = linkData.target || "";
                     element.innerHTML = linkData.value || "";
+                }
+            } else if (type === "href" && element instanceof HTMLAnchorElement) {
+                const hrefData = data as { href?: string; target?: string };
+                if (hrefData.href !== undefined) {
+                    element.href = hrefData.href;
+                    element.target = hrefData.target || "";
                 }
             } else if (type === "image" && element instanceof HTMLImageElement) {
                 const imageData = data as { src?: string };

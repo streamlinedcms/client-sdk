@@ -645,12 +645,30 @@ class EditorController {
      * Get editable info from element by checking data-scms-{type} attributes
      */
     private getEditableInfo(element: HTMLElement): { id: string; type: EditableType } | null {
-        const types: EditableType[] = ["text", "html", "image", "link"];
+        const types: EditableType[] = ["text", "html", "image", "link", "href"];
+        const matches: { id: string; type: EditableType }[] = [];
         for (const type of types) {
             const id = element.getAttribute(`data-scms-${type}`);
-            if (id) return { id, type };
+            if (id) matches.push({ id, type });
         }
-        return null;
+        if (matches.length === 0) return null;
+        if (matches.length > 1) {
+            this.log.warn(
+                `Element has multiple data-scms-* attributes (${matches
+                    .map((m) => `data-scms-${m.type}`)
+                    .join(", ")}). Only the first ("data-scms-${matches[0].type}") will be used; nest editables to combine behaviors.`,
+                { element },
+            );
+        }
+        const first = matches[0];
+        if (first.type === "href" && !(element instanceof HTMLAnchorElement)) {
+            this.log.warn(
+                `data-scms-href can only be used on <a> elements. Element will be skipped.`,
+                { element },
+            );
+            return null;
+        }
+        return first;
     }
 
     /**
@@ -663,7 +681,8 @@ class EditorController {
             instanceElement.hasAttribute("data-scms-text") ||
             instanceElement.hasAttribute("data-scms-html") ||
             instanceElement.hasAttribute("data-scms-image") ||
-            instanceElement.hasAttribute("data-scms-link")
+            instanceElement.hasAttribute("data-scms-link") ||
+            instanceElement.hasAttribute("data-scms-href")
         );
     }
 
@@ -806,7 +825,11 @@ class EditorController {
                         this.state.lastTapTime = 0;
                     } else if (isMobile) {
                         // Mobile: images and links go straight to editing, others use two-step
-                        if (elementType === "image" || elementType === "link") {
+                        if (
+                            elementType === "image" ||
+                            elementType === "link" ||
+                            elementType === "href"
+                        ) {
                             this.editingManager.startEditing(key, element);
                         } else if (
                             this.state.selectedKey === key &&

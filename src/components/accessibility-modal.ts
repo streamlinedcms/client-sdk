@@ -30,12 +30,14 @@ const ACCESSIBILITY_FIELDS: FieldConfig[] = [
         priority: {
             image: "primary",
             link: "secondary",
+            href: "secondary",
             text: "secondary",
             html: "secondary",
         },
         tips: {
             image: "Provides an accessible name when alt text isn't sufficient or the image has additional meaning.",
             link: "Use when the link text alone doesn't clearly describe the destination. Overrides the visible text for screen readers.",
+            href: "Use when the link content alone doesn't clearly describe the destination. Overrides child content for screen readers.",
             text: "Usually not needed since the text content itself is read. Use for additional context.",
             html: "Provides an accessible name for the entire region. Use when content alone isn't descriptive enough.",
         },
@@ -48,12 +50,14 @@ const ACCESSIBILITY_FIELDS: FieldConfig[] = [
         priority: {
             image: "secondary",
             link: "secondary",
+            href: "secondary",
             text: "not-applicable",
             html: "secondary",
         },
         tips: {
             image: "Reference the ID of another element that provides a longer description of this image.",
             link: "Reference the ID of another element that provides additional context about this link.",
+            href: "Reference the ID of another element that provides additional context about this link.",
             text: "Rarely needed for text elements since they describe themselves.",
             html: "Reference the ID of another element that provides additional context for this content.",
         },
@@ -75,12 +79,14 @@ const ACCESSIBILITY_FIELDS: FieldConfig[] = [
         priority: {
             image: "secondary",
             link: "not-applicable",
+            href: "not-applicable",
             text: "not-applicable",
             html: "secondary",
         },
         tips: {
             image: "Override the default role. Use 'presentation' or 'none' for purely decorative images.",
             link: "Links already have the correct role. Changing it is rarely appropriate.",
+            href: "Links already have the correct role. Changing it is rarely appropriate.",
             text: "Text elements rarely need a role override.",
             html: "Override the semantic role if the content serves a different purpose than its markup suggests.",
         },
@@ -97,12 +103,14 @@ const ACCESSIBILITY_FIELDS: FieldConfig[] = [
         priority: {
             image: "not-applicable",
             link: "not-applicable",
+            href: "not-applicable",
             text: "not-applicable",
             html: "secondary",
         },
         tips: {
             image: "Images are not typically interactive. Use only if the image has a click handler.",
             link: "Links are already focusable. Changing tabindex is rarely needed.",
+            href: "Links are already focusable. Changing tabindex is rarely needed.",
             text: "Text elements are not typically interactive.",
             html: "Use to make non-interactive content focusable or to adjust tab order.",
         },

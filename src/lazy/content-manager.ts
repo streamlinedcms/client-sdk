@@ -15,6 +15,7 @@ import type {
     HtmlContentData,
     ImageContentData,
     LinkContentData,
+    HrefContentData,
 } from "../types.js";
 import { applyAttributesToElement } from "../types.js";
 
@@ -85,6 +86,12 @@ export function isVisuallyEmpty(element: HTMLElement): boolean {
  * matches when the element has no visible content.
  */
 export function updateEmptyState(element: HTMLElement): void {
+    // href elements manage their own inner markup; the SDK doesn't own the
+    // content inside, so a "Click to edit" placeholder would be misleading.
+    if (element.hasAttribute("data-scms-href")) {
+        element.classList.remove("streamlined-empty");
+        return;
+    }
     element.classList.toggle("streamlined-empty", isVisuallyEmpty(element));
 }
 
@@ -183,6 +190,14 @@ export class ContentManager {
                 ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
             };
             return JSON.stringify(data);
+        } else if (elementType === "href" && info.element instanceof HTMLAnchorElement) {
+            const data: HrefContentData = {
+                type: "href",
+                href: info.element.getAttribute("href") || "",
+                target: info.element.target,
+                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
+            };
+            return JSON.stringify(data);
         } else if (elementType === "text") {
             const data: TextContentData = {
                 type: "text",
@@ -242,6 +257,10 @@ export class ContentManager {
                 info.element.href = linkData.href;
                 info.element.target = linkData.target;
                 this.setElementHTML(info.element, linkData.value);
+            } else if (data.type === "href" && info.element instanceof HTMLAnchorElement) {
+                const hrefData = data as HrefContentData;
+                info.element.href = hrefData.href;
+                info.element.target = hrefData.target;
             } else if (!data.type) {
                 // No type field in JSON - use element's declared type
                 if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
@@ -250,6 +269,12 @@ export class ContentManager {
                         info.element.href = linkData.href;
                         info.element.target = linkData.target || "";
                         this.setElementHTML(info.element, linkData.value || "");
+                    }
+                } else if (elementType === "href" && info.element instanceof HTMLAnchorElement) {
+                    const hrefData = data as { href?: string; target?: string };
+                    if (hrefData.href !== undefined) {
+                        info.element.href = hrefData.href;
+                        info.element.target = hrefData.target || "";
                     }
                 } else if (elementType === "image" && info.element instanceof HTMLImageElement) {
                     const imageData = data as { src?: string };

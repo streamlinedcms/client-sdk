@@ -137,13 +137,13 @@ export interface BatchUpdateResponse {
 /**
  * Editable element types
  */
-export type EditableType = "text" | "html" | "image" | "link";
+export type EditableType = "text" | "html" | "image" | "link" | "href";
 
 /**
  * CSS selector for all editable elements
  */
 export const EDITABLE_SELECTOR =
-    "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link]";
+    "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link], [data-scms-href]";
 
 /**
  * Placeholder image for new template instances (SVG data URI)
@@ -206,7 +206,18 @@ export interface LinkContentData extends BaseContentData {
     value: string;
 }
 
-export type ContentData = TextContentData | HtmlContentData | ImageContentData | LinkContentData;
+export interface HrefContentData extends BaseContentData {
+    type: "href";
+    href: string;
+    target: string;
+}
+
+export type ContentData =
+    | TextContentData
+    | HtmlContentData
+    | ImageContentData
+    | LinkContentData
+    | HrefContentData;
 
 /**
  * Template instance info for repeating content blocks

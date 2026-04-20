@@ -98,14 +98,25 @@ export class TemplateManager {
                 attributesToRemove.push(attr.name);
             }
             attributesToRemove.forEach((name) => el.removeAttribute(name));
-            el.innerHTML = "";
+            // href elements don't own their inner content — the developer-authored
+            // markup (icons, spans, nested editables) must survive into clones.
+            if (!el.hasAttribute("data-scms-href")) {
+                el.innerHTML = "";
+            }
         });
 
-        // Replace all text nodes with empty strings
+        // Replace all text nodes with empty strings, except those inside
+        // data-scms-href elements — their descendant text is developer-authored
+        // layout that must survive into instance clones. Text inside a nested
+        // editable of another type (e.g. data-scms-text inside data-scms-href)
+        // is still blanked because the nearest editable ancestor owns it.
         const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) {
-            textNodes.push(walker.currentNode as Text);
+            const node = walker.currentNode as Text;
+            const nearestEditable = node.parentElement?.closest(EDITABLE_SELECTOR);
+            if (nearestEditable?.hasAttribute("data-scms-href")) continue;
+            textNodes.push(node);
         }
         textNodes.forEach((node) => (node.textContent = ""));
 

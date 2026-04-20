@@ -19,6 +19,7 @@ import type {
     HtmlContentData,
     ImageContentData,
     LinkContentData,
+    HrefContentData,
 } from "../types.js";
 import {
     ELEMENT_ATTRIBUTES,
@@ -282,6 +283,7 @@ export class ModalManager {
             return;
         }
 
+        const elementType = this.state.editableTypes.get(key) || "html";
         const primaryInfo = infos[0];
         const primaryAnchor = primaryInfo.element as HTMLAnchorElement;
         this.log.debug("Opening link editor", { key, elementId: primaryInfo.elementId });
@@ -290,7 +292,7 @@ export class ModalManager {
         const modal = document.createElement("scms-link-editor-modal") as LinkEditorModal;
         modal.elementId = key;
         // Read link value from stored content if available (avoids Tiptap normalization),
-        // fall back to DOM innerHTML
+        // fall back to DOM innerHTML. href type has no value to edit.
         let linkValue = primaryAnchor.innerHTML;
         const storedContent = this.state.currentContent.get(key);
         if (storedContent) {
@@ -318,14 +320,26 @@ export class ModalManager {
         modal.addEventListener("apply", ((e: CustomEvent<{ linkData: LinkData }>) => {
             // Build content and update via setContent
             const attributes = this.state.elementAttributes.get(key);
-            const data: LinkContentData = {
-                type: "link",
-                href: e.detail.linkData.href,
-                target: e.detail.linkData.target,
-                value: e.detail.linkData.value,
-                ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
-            };
-            this.contentManager.setContent(key, JSON.stringify(data));
+            let content: string;
+            if (elementType === "href") {
+                const data: HrefContentData = {
+                    type: "href",
+                    href: e.detail.linkData.href,
+                    target: e.detail.linkData.target,
+                    ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
+                };
+                content = JSON.stringify(data);
+            } else {
+                const data: LinkContentData = {
+                    type: "link",
+                    href: e.detail.linkData.href,
+                    target: e.detail.linkData.target,
+                    value: e.detail.linkData.value,
+                    ...(attributes && Object.keys(attributes).length > 0 ? { attributes } : {}),
+                };
+                content = JSON.stringify(data);
+            }
+            this.contentManager.setContent(key, content);
             this.closeModal("linkEditorModal");
             this.helpers.updateToolbarHasChanges();
             this.log.debug("Link updated", {

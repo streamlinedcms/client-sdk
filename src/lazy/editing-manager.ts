@@ -250,7 +250,7 @@ export class EditingManager {
             }
 
             // Make images and links focusable for keyboard navigation
-            if (elementType === "image" || elementType === "link") {
+            if (elementType === "image" || elementType === "link" || elementType === "href") {
                 info.element.setAttribute("tabindex", "-1");
             }
         }
