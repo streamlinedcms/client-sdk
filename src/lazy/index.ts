@@ -656,7 +656,9 @@ class EditorController {
             this.log.warn(
                 `Element has multiple data-scms-* attributes (${matches
                     .map((m) => `data-scms-${m.type}`)
-                    .join(", ")}). Only the first ("data-scms-${matches[0].type}") will be used; nest editables to combine behaviors.`,
+                    .join(
+                        ", ",
+                    )}). Only the first ("data-scms-${matches[0].type}") will be used; nest editables to combine behaviors.`,
                 { element },
             );
         }

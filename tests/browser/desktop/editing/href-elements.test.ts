@@ -145,9 +145,7 @@ test("href with both data-scms-href and data-scms-text skips href and registers 
 });
 
 test("data-scms-href on a non-anchor element is skipped", () => {
-    const bad = document.querySelector(
-        '[data-scms-href="test-href-nonanchor"]',
-    ) as HTMLElement;
+    const bad = document.querySelector('[data-scms-href="test-href-nonanchor"]') as HTMLElement;
     expect(bad).not.toBeNull();
     // Not registered, so no editable class.
     expect(bad.classList.contains("streamlined-editable")).toBe(false);

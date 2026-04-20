@@ -70,9 +70,7 @@ test("seeded instances preserve developer-authored inner HTML inside data-scms-h
 
 test("href and target apply from seeded content", () => {
     const cards = getCards();
-    const anchors = cards.map(
-        (c) => c.querySelector("[data-scms-href]") as HTMLAnchorElement,
-    );
+    const anchors = cards.map((c) => c.querySelector("[data-scms-href]") as HTMLAnchorElement);
 
     expect(anchors[0].getAttribute("href")).toBe("https://example.com/one");
     expect(anchors[0].target).toBe("");
@@ -82,9 +80,7 @@ test("href and target apply from seeded content", () => {
 });
 
 test("new instance from the add button keeps inner HTML", async () => {
-    const container = document.querySelector(
-        '[data-scms-template="href-cards"]',
-    ) as HTMLElement;
+    const container = document.querySelector('[data-scms-template="href-cards"]') as HTMLElement;
     const initialCount = container.querySelectorAll(".href-card").length;
 
     const addButton = container.querySelector(".scms-template-add") as HTMLElement;

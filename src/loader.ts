@@ -434,7 +434,8 @@
      */
     function scanEditableElements(): Map<string, EditableElementInfo[]> {
         const elements = new Map<string, EditableElementInfo[]>();
-        const selector = "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link], [data-scms-href]";
+        const selector =
+            "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link], [data-scms-href]";
         document.querySelectorAll<HTMLElement>(selector).forEach((element) => {
             const info = getEditableInfo(element);
             if (info) {
