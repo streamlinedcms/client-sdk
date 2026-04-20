@@ -21,7 +21,12 @@ export interface EditingManagerHelpers {
     updateToolbarTemplateContext: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
     scrollToElement: (element: HTMLElement, delay?: number) => void;
-    onStartEditing: (key: string, element: HTMLElement, elementType: string) => void;
+    onStartEditing: (
+        key: string,
+        element: HTMLElement,
+        elementType: string,
+        coords?: { x: number; y: number },
+    ) => void;
     onStopEditing: (key: string) => void;
 }
 
@@ -205,7 +210,11 @@ export class EditingManager {
     /**
      * Start editing an element (makes it contenteditable and focuses it).
      */
-    startEditing(key: string, clickedElement?: HTMLElement): void {
+    startEditing(
+        key: string,
+        clickedElement?: HTMLElement,
+        coords?: { x: number; y: number },
+    ): void {
         const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) {
             this.log.warn("Element not found", { key });
@@ -296,7 +305,7 @@ export class EditingManager {
         primaryInfo.element.focus();
 
         // Notify controller that editing started (for formatting toolbar, etc.)
-        this.helpers.onStartEditing(key, primaryInfo.element, elementType);
+        this.helpers.onStartEditing(key, primaryInfo.element, elementType, coords);
 
         // On mobile, scroll the element into view after keyboard opens
         if (window.innerWidth < 640) {

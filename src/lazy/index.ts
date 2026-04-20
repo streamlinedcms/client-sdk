@@ -228,8 +228,8 @@ class EditorController {
             updateToolbarTemplateContext: () => this.templateManager.updateToolbarTemplateContext(),
             getElementToKeyMap: () => this.elementToKey,
             scrollToElement: this.scrollToElement.bind(this),
-            onStartEditing: (key, element, elementType) =>
-                this.handleEditingStarted(key, element, elementType),
+            onStartEditing: (key, element, elementType, coords) =>
+                this.handleEditingStarted(key, element, elementType, coords),
             onStopEditing: (key) => this.handleEditingStopped(key),
         });
 
@@ -826,19 +826,20 @@ class EditorController {
                         this.state.lastTapKey = null;
                         this.state.lastTapTime = 0;
                     } else if (isMobile) {
+                        const coords = { x: e.clientX, y: e.clientY };
                         // Mobile: images and links go straight to editing, others use two-step
                         if (
                             elementType === "image" ||
                             elementType === "link" ||
                             elementType === "href"
                         ) {
-                            this.editingManager.startEditing(key, element);
+                            this.editingManager.startEditing(key, element, coords);
                         } else if (
                             this.state.selectedKey === key &&
                             this.state.editingKey !== key
                         ) {
                             // Two-step: second tap edits
-                            this.editingManager.startEditing(key, element);
+                            this.editingManager.startEditing(key, element, coords);
                         } else {
                             // Two-step: first tap selects
                             this.editingManager.selectElement(key, element);
@@ -847,7 +848,10 @@ class EditorController {
                         this.state.lastTapTime = now;
                     } else {
                         // Desktop: edit immediately
-                        this.editingManager.startEditing(key, element);
+                        this.editingManager.startEditing(key, element, {
+                            x: e.clientX,
+                            y: e.clientY,
+                        });
                         this.state.lastTapKey = key;
                         this.state.lastTapTime = now;
                     }
@@ -1104,7 +1108,12 @@ class EditorController {
      * Attaches or reuses a Tiptap editor for html/link element types.
      * Editors are preserved across blur/focus to maintain undo history.
      */
-    private handleEditingStarted(key: string, element: HTMLElement, elementType: string): void {
+    private handleEditingStarted(
+        key: string,
+        element: HTMLElement,
+        elementType: string,
+        coords?: { x: number; y: number },
+    ): void {
         if (elementType === "html" || elementType === "link") {
             const toolbar = this.ensureFormattingToolbar();
             const linkMode = elementType === "link";
@@ -1119,7 +1128,7 @@ class EditorController {
             };
 
             // Attach (reuses existing editor if available, creates new otherwise)
-            toolbar.attach(element, linkMode);
+            toolbar.attach(element, linkMode, coords);
 
             // Register editor in state so content manager can use Tiptap's API.
             if (toolbar.editor) {

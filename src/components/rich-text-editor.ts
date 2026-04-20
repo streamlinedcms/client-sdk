@@ -176,7 +176,7 @@ export class FormattingToolbar extends ScmsElement {
      * Reuses existing editor for the same element (preserves undo history).
      * Creates a new editor for new elements without destroying others.
      */
-    attach(element: HTMLElement, linkMode: boolean): void {
+    attach(element: HTMLElement, linkMode: boolean, coords?: { x: number; y: number }): void {
         this.linkMode = linkMode;
         this.isMobile = window.innerWidth < 640;
         this.targetElement = element;
@@ -193,7 +193,7 @@ export class FormattingToolbar extends ScmsElement {
             if (element.getAttribute("contenteditable") !== "true") {
                 element.setAttribute("contenteditable", "true");
             }
-            this.editor.commands.focus();
+            this.focusAtCoords(coords);
             this.updateActiveFormats();
             this.style.display = "block";
             return;
@@ -235,6 +235,11 @@ export class FormattingToolbar extends ScmsElement {
         this.initialHTML = this.editor.getHTML();
         this.editors.set(element, { editor: this.editor, initialHTML: this.initialHTML });
 
+        // A freshly-created editor has no selection yet. Without an explicit
+        // focus call, ProseMirror doesn't place a caret even though the host
+        // element has DOM focus, and the user has to click a second time.
+        this.focusAtCoords(coords);
+
         // Center horizontally on first show
         if (this.posX === -1) {
             requestAnimationFrame(() => {
@@ -249,6 +254,23 @@ export class FormattingToolbar extends ScmsElement {
 
         this.updateActiveFormats();
         this.style.display = "block";
+    }
+
+    /**
+     * Focus the editor and place the caret at the given viewport coordinates.
+     * Falls back to focus("end") when no coords are given or when the coords
+     * don't resolve to a document position (e.g., keyboard/programmatic paths).
+     */
+    private focusAtCoords(coords?: { x: number; y: number }): void {
+        if (!this.editor) return;
+        if (coords) {
+            const hit = this.editor.view.posAtCoords({ left: coords.x, top: coords.y });
+            if (hit) {
+                this.editor.chain().focus().setTextSelection(hit.pos).run();
+                return;
+            }
+        }
+        this.editor.commands.focus("end");
     }
 
     /**
