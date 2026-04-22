@@ -12,6 +12,7 @@ import type { Logger } from "loganite";
 import Sortable from "sortablejs";
 import type { EditorState, TemplateInfo, EditableElementInfo } from "./state.js";
 import type { ContentManager } from "./content-manager.js";
+import { updateEmptyState } from "./content-manager.js";
 import type { UndoManager } from "./undo-manager.js";
 import { EDITABLE_SELECTOR, IMAGE_PLACEHOLDER_DATA_URI, type EditableType } from "../types.js";
 
@@ -97,14 +98,25 @@ export class TemplateManager {
                 attributesToRemove.push(attr.name);
             }
             attributesToRemove.forEach((name) => el.removeAttribute(name));
-            el.innerHTML = "";
+            // href elements don't own their inner content — the developer-authored
+            // markup (icons, spans, nested editables) must survive into clones.
+            if (!el.hasAttribute("data-scms-href")) {
+                el.innerHTML = "";
+            }
         });
 
-        // Replace all text nodes with empty strings
+        // Replace all text nodes with empty strings, except those inside
+        // data-scms-href elements — their descendant text is developer-authored
+        // layout that must survive into instance clones. Text inside a nested
+        // editable of another type (e.g. data-scms-text inside data-scms-href)
+        // is still blanked because the nearest editable ancestor owns it.
         const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) {
-            textNodes.push(walker.currentNode as Text);
+            const node = walker.currentNode as Text;
+            const nearestEditable = node.parentElement?.closest(EDITABLE_SELECTOR);
+            if (nearestEditable?.hasAttribute("data-scms-href")) continue;
+            textNodes.push(node);
         }
         textNodes.forEach((node) => (node.textContent = ""));
 
@@ -1043,6 +1055,7 @@ export class TemplateManager {
             if (!key) return;
 
             element.classList.add("streamlined-editable");
+            updateEmptyState(element);
             this.helpers.setupElementClickHandler(element, key);
         });
 

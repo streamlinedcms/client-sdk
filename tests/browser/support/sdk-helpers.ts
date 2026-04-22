@@ -161,6 +161,28 @@ export async function clickToolbarButton(text: string): Promise<boolean> {
 }
 
 /**
+ * Edit the content of an element in a Tiptap-aware way.
+ * If the formatting toolbar has Tiptap attached to the element,
+ * uses Tiptap's API. Otherwise falls back to setting innerHTML directly.
+ */
+export function setElementContent(element: HTMLElement, newContent: string): void {
+    const toolbar = document.querySelector("scms-formatting-toolbar") as HTMLElement | null;
+    const target =
+        toolbar && (toolbar as unknown as { targetElement: HTMLElement | null }).targetElement;
+
+    if (target === element) {
+        // Tiptap is managing this element — use its API
+        const setContent = (toolbar as unknown as { setContent: (html: string) => void })
+            .setContent;
+        setContent.call(toolbar, newContent);
+    } else {
+        // No Tiptap — set innerHTML directly
+        element.innerHTML = newContent;
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+}
+
+/**
  * Setup function to be called in beforeAll
  */
 export function setupTestHelpers(): void {

@@ -10,6 +10,7 @@ import {
     initializeSDK,
     waitForCondition,
     clickToolbarButton,
+    setElementContent,
     setupTestHelpers,
     getController,
 } from "~/@browser-support/sdk-helpers.js";
@@ -55,8 +56,7 @@ async function editContent(element: HTMLElement, newContent: string): Promise<vo
     element.click();
     await waitForCondition(() => element.classList.contains("streamlined-editing"));
 
-    element.innerHTML = newContent;
-    element.dispatchEvent(new Event("input", { bubbles: true }));
+    setElementContent(element, newContent);
 
     await new Promise((r) => setTimeout(r, 100));
 }
@@ -105,8 +105,8 @@ test("saved content persists in element after save", async () => {
     await clickToolbarButton("Save");
     await waitForCondition(() => !getToolbar()!.hasChanges, 5000);
 
-    // Content should still be in the element
-    expect(element.innerHTML).toBe(newContent);
+    // Content should still be in the element (may be wrapped in tags by the editor)
+    expect(element.textContent).toContain(newContent);
 });
 
 test("hasChanges is false after successful save", async () => {
@@ -146,9 +146,9 @@ test("multiple elements can be edited and saved together", async () => {
     await clickToolbarButton("Save");
     await waitForCondition(() => !toolbar!.hasChanges, 5000);
 
-    // Both should be saved
-    expect(htmlElement.innerHTML).toBe("First element edited");
-    expect(paragraphElement.innerHTML).toBe("Second element edited");
+    // Both should be saved (content may be wrapped in tags by the editor)
+    expect(htmlElement.textContent).toContain("First element edited");
+    expect(paragraphElement.textContent).toContain("Second element edited");
 });
 
 test("Save button is only visible when there are changes", async () => {

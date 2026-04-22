@@ -35,7 +35,7 @@ export function injectEditStyles(): void {
             outline-color: #ef4444;
         }
 
-        .streamlined-editable:empty::before {
+        .streamlined-editable.streamlined-empty::before {
             content: "Click to edit";
             color: #9ca3af;
             font-style: italic;
@@ -58,6 +58,14 @@ export function injectEditStyles(): void {
 
         .streamlined-editing-sibling {
             outline: 2px solid #fca5a5;
+            outline-offset: -2px;
+        }
+
+        /* Non-image editables: semi-transparent solid outline for selected/editing so the caret stays visible */
+        .streamlined-editable.streamlined-selected:not([data-scms-image]),
+        .streamlined-editable.streamlined-editing:not([data-scms-image]),
+        .streamlined-editable.streamlined-editing-sibling:not([data-scms-image]) {
+            outline: 2px solid rgb(255 0 0 / 30%);
             outline-offset: -2px;
         }
 

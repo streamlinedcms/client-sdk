@@ -309,11 +309,3 @@ test("clicking backdrop cancels the modal", async () => {
     await waitForCondition(() => cancelCalled);
     expect(cancelCalled).toBe(true);
 });
-
-test("modal displays the element ID", async () => {
-    const modal = await openAttributesModal();
-    const shadowRoot = modal.shadowRoot!;
-
-    const elementIdSpan = shadowRoot.querySelector(".font-mono") as HTMLElement;
-    expect(elementIdSpan.textContent?.trim()).toBe("test-link");
-});

@@ -7,7 +7,6 @@ import {
     selectLinkStepDesktop,
     editLinkStepDesktop,
     linkEditorStepDesktop,
-    goToLinkTipDesktop,
     saveStepDesktop,
 } from "./desktop";
 import {
@@ -16,7 +15,6 @@ import {
     openElementSectionStepMobile,
     editLinkStepMobile,
     linkEditorStepMobile,
-    goToLinkTipMobile,
     saveStepMobile,
 } from "./mobile";
 
@@ -54,7 +52,6 @@ export const linkEditingTour: TourDefinition = {
                 openElementSectionStepMobile(ctx),
                 editLinkStepMobile(ctx),
                 linkEditorStepMobile(ctx),
-                goToLinkTipMobile(ctx),
                 saveStepMobile(),
             ];
         }
@@ -63,7 +60,6 @@ export const linkEditingTour: TourDefinition = {
             selectLinkStepDesktop(ctx),
             editLinkStepDesktop(ctx),
             linkEditorStepDesktop(ctx),
-            goToLinkTipDesktop(ctx),
             saveStepDesktop(),
         ];
     },

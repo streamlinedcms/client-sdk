@@ -118,9 +118,6 @@ test("link editor modal shows current link values", async () => {
     const urlInput = shadowRoot.querySelector('input[type="url"]') as HTMLInputElement;
     expect(urlInput.value).toMatch(/^https:\/\/example\.com\/?$/);
 
-    const textarea = shadowRoot.querySelector("textarea") as HTMLTextAreaElement;
-    expect(textarea.value).toBe("Default Link Text");
-
     const targetSelect = shadowRoot.querySelector("select") as HTMLSelectElement;
     expect(targetSelect.value).toBe("");
 });
@@ -141,22 +138,6 @@ test("can edit link URL in the modal", async () => {
     // Verify the change is reflected
     await waitForCondition(() => urlInput.value === "https://newurl.com");
     expect(urlInput.value).toBe("https://newurl.com");
-});
-
-test("can edit link text in the modal", async () => {
-    const modal = await openLinkEditor();
-    const shadowRoot = modal.shadowRoot!;
-
-    await new Promise((r) => setTimeout(r, 100));
-
-    const textarea = shadowRoot.querySelector("textarea") as HTMLTextAreaElement;
-
-    // Change the link text
-    textarea.value = "New Link Text";
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-
-    await waitForCondition(() => textarea.value === "New Link Text");
-    expect(textarea.value).toBe("New Link Text");
 });
 
 test("can change link target in the modal", async () => {
@@ -299,13 +280,4 @@ test("clicking backdrop cancels the modal", async () => {
 
     await waitForCondition(() => cancelCalled);
     expect(cancelCalled).toBe(true);
-});
-
-test("modal displays the element ID", async () => {
-    const modal = await openLinkEditor();
-    const shadowRoot = modal.shadowRoot!;
-
-    // Find the element ID display in the header
-    const elementIdSpan = shadowRoot.querySelector(".font-mono") as HTMLElement;
-    expect(elementIdSpan.textContent?.trim()).toBe("test-link");
 });

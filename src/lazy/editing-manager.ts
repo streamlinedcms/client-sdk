@@ -21,6 +21,13 @@ export interface EditingManagerHelpers {
     updateToolbarTemplateContext: () => void;
     getElementToKeyMap: () => WeakMap<HTMLElement, string>;
     scrollToElement: (element: HTMLElement, delay?: number) => void;
+    onStartEditing: (
+        key: string,
+        element: HTMLElement,
+        elementType: string,
+        coords?: { x: number; y: number },
+    ) => void;
+    onStopEditing: (key: string) => void;
 }
 
 export class EditingManager {
@@ -91,10 +98,46 @@ export class EditingManager {
         if (this.state.toolbar) {
             this.state.toolbar.activeElement = key;
             this.state.toolbar.activeElementType = elementType;
+            this.state.toolbar.hasOuterEditable = this.findOuterEditableKey() !== null;
         }
 
         // Update template context on toolbar
         this.helpers.updateToolbarTemplateContext();
+    }
+
+    /**
+     * Find the nearest editable ancestor of the currently-selected element.
+     * Returns its storage key, or null if there's no editable ancestor or
+     * nothing is currently selected.
+     */
+    findOuterEditableKey(): string | null {
+        if (!this.state.selectedKey) return null;
+        const infos = this.state.editableElements.get(this.state.selectedKey);
+        const primary = infos?.[0];
+        if (!primary) return null;
+        const elementToKey = this.helpers.getElementToKeyMap();
+        let current = primary.element.parentElement;
+        while (current) {
+            const key = elementToKey.get(current);
+            if (key && key !== this.state.selectedKey) return key;
+            current = current.parentElement;
+        }
+        return null;
+    }
+
+    /**
+     * Select the nearest editable ancestor of the currently-selected element.
+     * Used when a nested editable fills its parent's interior and the outer
+     * element can't be clicked directly.
+     */
+    selectOuterEditable(): void {
+        const outerKey = this.findOuterEditableKey();
+        if (!outerKey) return;
+        const infos = this.state.editableElements.get(outerKey);
+        const outerElement = infos?.[0]?.element;
+        if (!outerElement) return;
+        // Use startEditing to match the normal click behavior (desktop).
+        this.startEditing(outerKey, outerElement);
     }
 
     /**
@@ -117,6 +160,7 @@ export class EditingManager {
         if (!this.state.editingKey && this.state.toolbar) {
             this.state.toolbar.activeElement = null;
             this.state.toolbar.activeElementType = null;
+            this.state.toolbar.hasOuterEditable = false;
         }
     }
 
@@ -166,7 +210,11 @@ export class EditingManager {
     /**
      * Start editing an element (makes it contenteditable and focuses it).
      */
-    startEditing(key: string, clickedElement?: HTMLElement): void {
+    startEditing(
+        key: string,
+        clickedElement?: HTMLElement,
+        coords?: { x: number; y: number },
+    ): void {
         const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) {
             this.log.warn("Element not found", { key });
@@ -216,7 +264,7 @@ export class EditingManager {
                 info.element.classList.add("streamlined-editing-sibling");
             }
 
-            // Add input listener to all elements for change tracking and synchronization
+            // Add input listener for text and html elements for change tracking
             if (
                 (elementType === "text" || elementType === "html") &&
                 !info.element.dataset.scmsInputHandler
@@ -240,20 +288,24 @@ export class EditingManager {
                 info.element.dataset.scmsKeydownHandler = "true";
             }
 
-            // Make text and html elements contenteditable (not images or links)
-            // Only the primary element is focused, but all are editable for consistency
-            if (elementType === "text" || elementType === "html") {
+            // Make text elements contenteditable. For html elements, tiptap
+            // owns contenteditable — managing it here causes conflicts with
+            // tiptap's view, leading to states where the cursor disappears.
+            if (elementType === "text") {
                 info.element.setAttribute("contenteditable", "true");
             }
 
             // Make images and links focusable for keyboard navigation
-            if (elementType === "image" || elementType === "link") {
+            if (elementType === "image" || elementType === "link" || elementType === "href") {
                 info.element.setAttribute("tabindex", "-1");
             }
         }
 
         // Focus the primary element (all types need focus for keyboard navigation)
         primaryInfo.element.focus();
+
+        // Notify controller that editing started (for formatting toolbar, etc.)
+        this.helpers.onStartEditing(key, primaryInfo.element, elementType, coords);
 
         // On mobile, scroll the element into view after keyboard opens
         if (window.innerWidth < 640) {
@@ -302,12 +354,19 @@ export class EditingManager {
 
         this.log.trace("Stopping edit");
 
+        // Notify controller before cleanup (for formatting toolbar detach, etc.)
+        this.helpers.onStopEditing(this.state.editingKey);
+
+        const elementType = this.state.editableTypes.get(this.state.editingKey) || "html";
         const infos = this.state.editableElements.get(this.state.editingKey);
         if (infos) {
             for (const info of infos) {
                 info.element.classList.remove("streamlined-editing");
                 info.element.classList.remove("streamlined-editing-sibling");
-                info.element.setAttribute("contenteditable", "false");
+                // Only manage contenteditable for text elements; tiptap owns it for html.
+                if (elementType === "text") {
+                    info.element.setAttribute("contenteditable", "false");
+                }
             }
         }
 
