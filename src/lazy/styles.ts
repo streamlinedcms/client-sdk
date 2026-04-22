@@ -61,6 +61,14 @@ export function injectEditStyles(): void {
             outline-offset: -2px;
         }
 
+        /* Non-image editables: semi-transparent solid outline for selected/editing so the caret stays visible */
+        .streamlined-editable.streamlined-selected:not([data-scms-image]),
+        .streamlined-editable.streamlined-editing:not([data-scms-image]),
+        .streamlined-editable.streamlined-editing-sibling:not([data-scms-image]) {
+            outline: 2px solid rgb(255 0 0 / 30%);
+            outline-offset: -2px;
+        }
+
         /* Template instance controls */
         .scms-instance-delete {
             position: absolute;
