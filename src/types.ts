@@ -12,6 +12,7 @@ export type LogLevelInput = LogLevel | false | null;
 /**
  * Granular permissions for an app member
  * @see RFC-0013
+ * @see RFC-0016 (change-request permissions)
  */
 export interface AppPermissions {
     contentRead: boolean; // Always true (locked)
@@ -27,6 +28,9 @@ export interface AppPermissions {
     manageSettings: boolean;
     // Note: may be renamed to `denyAdmin` (see streamlinedcms/api#46)
     denyAppGui: boolean;
+    changeRequestValue: boolean;
+    changeRequestEstimate: boolean;
+    changeRequestMessage: boolean;
 }
 
 /**

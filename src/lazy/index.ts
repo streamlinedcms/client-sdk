@@ -86,6 +86,7 @@ import { ModalManager } from "./modal-manager.js";
 import { SaveManager } from "./save-manager.js";
 import { AuthManager } from "./auth-manager.js";
 import { AuthBridge } from "./auth-bridge.js";
+import { ChangeRequestManager } from "./change-request-manager.js";
 import { ContentViewerManager } from "./content-viewer-manager.js";
 import { injectEditStyles } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
@@ -139,6 +140,7 @@ class EditorController {
     private modalManager: ModalManager;
     private saveManager: SaveManager;
     private authManager: AuthManager;
+    private changeRequestManager: ChangeRequestManager;
     private tourManager: TourManager;
     private contentViewerManager: ContentViewerManager;
     private undoManager: UndoManager;
@@ -305,6 +307,7 @@ class EditorController {
                     if (this.state.toolbar) {
                         this.state.toolbar.readOnly =
                             this.state.permissions?.contentWrite === false;
+                        this.state.toolbar.canRequestChange = this.canRequestChange();
                     }
                 },
             },
@@ -348,6 +351,14 @@ class EditorController {
                 emitSignIn: () => this.emit("signin"),
                 emitSignOut: () => this.emit("signout"),
             },
+        );
+
+        // Initialize change-request manager
+        this.changeRequestManager = new ChangeRequestManager(
+            this.state,
+            this.log,
+            { apiUrl: config.apiUrl, appUrl: config.appUrl, appId: config.appId },
+            { apiFetch: this.apiFetch.bind(this) },
         );
 
         // Initialize tour manager
@@ -933,6 +944,7 @@ class EditorController {
 
         const isReadOnly = this.state.permissions?.contentWrite === false;
         const denyAppGui = this.state.permissions?.denyAppGui === true;
+        const canRequestChange = this.canRequestChange();
 
         // Update existing toolbar if present
         if (this.state.toolbar) {
@@ -940,6 +952,7 @@ class EditorController {
             this.state.toolbar.activeElement = this.state.editingKey;
             this.state.toolbar.readOnly = isReadOnly;
             this.state.toolbar.denyAppGui = denyAppGui;
+            this.state.toolbar.canRequestChange = canRequestChange;
             return;
         }
 
@@ -953,6 +966,7 @@ class EditorController {
         toolbar.mockAuth = this.config.mockAuth?.enabled ?? false;
         toolbar.readOnly = isReadOnly;
         toolbar.denyAppGui = denyAppGui;
+        toolbar.canRequestChange = canRequestChange;
 
         toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
             this.setMode(e.detail.mode);
@@ -1040,6 +1054,10 @@ class EditorController {
             this.saveManager.updateToolbarHasChanges();
         });
 
+        toolbar.addEventListener("request-change", () => {
+            this.changeRequestManager.createDraftFromPage();
+        });
+
         document.body.appendChild(toolbar);
         this.state.toolbar = toolbar;
 
@@ -1049,6 +1067,14 @@ class EditorController {
         // Add body padding to prevent content overlap
         this.updateBodyPadding();
         window.addEventListener("resize", this.updateBodyPadding);
+    }
+
+    private canRequestChange(): boolean {
+        const perms = this.state.permissions;
+        if (!perms) return false;
+        return (
+            perms.changeRequestValue || perms.changeRequestEstimate || perms.changeRequestMessage
+        );
     }
 
     private updateToolbarUndoState(): void {
