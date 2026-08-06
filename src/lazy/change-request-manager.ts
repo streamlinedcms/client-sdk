@@ -35,6 +35,8 @@ interface UploadUrlResponse {
     fileId: string;
     publicUrl: string;
     uploadUrl?: string;
+    /** Signed into uploadUrl — must be echoed verbatim on the PUT. */
+    uploadHeaders?: Record<string, string>;
     exists: boolean;
 }
 
@@ -113,7 +115,7 @@ export class ChangeRequestManager {
                 if (!upload.uploadUrl) {
                     throw new Error("upload-url response missing uploadUrl");
                 }
-                await this.uploadBlob(upload.uploadUrl, blob);
+                await this.uploadBlob(upload.uploadUrl, upload.uploadHeaders, blob);
             }
             await this.confirmScreenshot(draftId, hash, blob.size, width, height);
 
@@ -236,12 +238,17 @@ export class ChangeRequestManager {
         return (await response.json()) as UploadUrlResponse;
     }
 
-    private async uploadBlob(uploadUrl: string, blob: Blob): Promise<void> {
+    private async uploadBlob(
+        uploadUrl: string,
+        uploadHeaders: Record<string, string> | undefined,
+        blob: Blob,
+    ): Promise<void> {
         // Pre-signed URL — no Authorization header (and using bare fetch
-        // because apiFetch's 402/403 warning UI is irrelevant for R2).
+        // because apiFetch's 402/403 warning UI is irrelevant for R2). The
+        // server's uploadHeaders are signed into the URL and must be echoed.
         const response = await fetch(uploadUrl, {
             method: "PUT",
-            headers: { "Content-Type": SCREENSHOT_CONTENT_TYPE },
+            headers: uploadHeaders ?? { "Content-Type": SCREENSHOT_CONTENT_TYPE },
             body: blob,
         });
         if (!response.ok) {
