@@ -19,6 +19,7 @@ import {
     Ellipsis,
     Expand,
     Layers,
+    MessageSquarePlus,
     Plus,
     ScanEye,
     Trash2,
@@ -98,6 +99,21 @@ export class Toolbar extends ScmsElement {
 
     @property({ type: Boolean, attribute: "can-redo" })
     canRedo = false;
+
+    @property({ type: Boolean, attribute: "can-request-change" })
+    canRequestChange = false;
+
+    @property({ type: Boolean, attribute: "requesting-change" })
+    requestingChange = false;
+
+    @property({ type: Boolean, attribute: "popup-blocked" })
+    popupBlocked = false;
+
+    @property({ type: String, attribute: "last-request-id" })
+    lastRequestId: string | null = null;
+
+    @property({ type: String, attribute: "change-request-error" })
+    changeRequestError: string | null = null;
 
     @property({ type: Boolean, reflect: true })
     expanded = false;
@@ -441,6 +457,15 @@ export class Toolbar extends ScmsElement {
         );
     }
 
+    private handleRequestChange() {
+        this.dispatchEvent(
+            new CustomEvent("request-change", {
+                bubbles: true,
+                composed: true,
+            }),
+        );
+    }
+
     private renderModeToggle() {
         // Hide toggle when there's a warning (domain not whitelisted, payment required)
         // or when user is in read-only mode (no contentWrite permission)
@@ -644,6 +669,42 @@ export class Toolbar extends ScmsElement {
         `;
     }
 
+    private renderRequestChangeButton() {
+        if (!this.canRequestChange) return nothing;
+
+        const fallbackHref =
+            this.popupBlocked && this.lastRequestId && this.appUrl && this.appId
+                ? `${this.appUrl}/apps/${encodeURIComponent(this.appId)}/requests/${encodeURIComponent(this.lastRequestId)}`
+                : null;
+
+        return html`
+            <span class="ml-2 inline-flex items-center gap-2">
+                <button
+                    class="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-wait [&>span>svg]:w-3.5 [&>span>svg]:h-3.5"
+                    data-action="request-change"
+                    ?disabled=${this.requestingChange}
+                    @click=${this.handleRequestChange}
+                    title="Capture this page and send a change request"
+                >
+                    <span class="inline-flex">${unsafeSVG(MessageSquarePlus)}</span>
+                    ${this.requestingChange ? "Capturing…" : "Request a change"}
+                </button>
+                ${fallbackHref
+                    ? html`<a
+                          href=${fallbackHref}
+                          target="_blank"
+                          class="text-xs font-medium text-blue-600 hover:text-blue-800 underline"
+                      >
+                          Click here to open the editor
+                      </a>`
+                    : nothing}
+                ${this.changeRequestError
+                    ? html`<span class="text-xs text-red-600">${this.changeRequestError}</span>`
+                    : nothing}
+            </span>
+        `;
+    }
+
     private renderAdminLink() {
         if (this.mockAuth) return nothing;
         if (this.denyAppGui) return nothing;
@@ -808,6 +869,7 @@ export class Toolbar extends ScmsElement {
                         ${this.hasChanges
                             ? html`<span class="mx-3">${this.renderSaveButton()}</span>`
                             : nothing}
+                        ${this.renderRequestChangeButton()}
                         ${this.mockAuth
                             ? nothing
                             : html`<div
@@ -1113,6 +1175,46 @@ export class Toolbar extends ScmsElement {
         `;
     }
 
+    private renderMobileRequestChangeSection() {
+        if (!this.canRequestChange) return nothing;
+
+        const fallbackHref =
+            this.popupBlocked && this.lastRequestId && this.appUrl && this.appId
+                ? `${this.appUrl}/apps/${encodeURIComponent(this.appId)}/requests/${encodeURIComponent(this.lastRequestId)}`
+                : null;
+
+        return html`
+            <div
+                class="mobile-section mb-4 pb-4 border-b border-gray-200"
+                data-section="request-change"
+            >
+                <button
+                    class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-wait [&>span>svg]:w-4 [&>span>svg]:h-4"
+                    data-action="request-change"
+                    ?disabled=${this.requestingChange}
+                    @click=${this.handleRequestChange}
+                >
+                    <span class="inline-flex">${unsafeSVG(MessageSquarePlus)}</span>
+                    ${this.requestingChange ? "Capturing…" : "Request a change"}
+                </button>
+                ${fallbackHref
+                    ? html`<a
+                          href=${fallbackHref}
+                          target="_blank"
+                          class="block mt-2 text-sm text-center font-medium text-blue-600 hover:text-blue-800 underline"
+                      >
+                          Click here to open the editor
+                      </a>`
+                    : nothing}
+                ${this.changeRequestError
+                    ? html`<p class="mt-2 text-sm text-center text-red-600">
+                          ${this.changeRequestError}
+                      </p>`
+                    : nothing}
+            </div>
+        `;
+    }
+
     private renderMobileSettingsSection() {
         // When mockAuth is enabled, only show the mode toggle and help centered
         if (this.mockAuth) {
@@ -1233,6 +1335,9 @@ export class Toolbar extends ScmsElement {
 
                         <!-- Actions section (only when element selected) -->
                         ${this.activeElement ? this.renderMobileActionsSection() : nothing}
+
+                        <!-- Request a change (visible whenever permission allows) -->
+                        ${this.renderMobileRequestChangeSection()}
 
                         <!-- Settings section -->
                         ${this.renderMobileSettingsSection()}
