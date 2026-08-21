@@ -1543,9 +1543,7 @@ class EditorController {
         }
 
         const extra =
-            providerEnv || extraEnvironment
-                ? { ...providerEnv, ...extraEnvironment }
-                : undefined;
+            providerEnv || extraEnvironment ? { ...providerEnv, ...extraEnvironment } : undefined;
 
         // Fire and forget — the manager owns its own progress/error UI.
         this.changeRequestManager.createDraftFromPage(extra);

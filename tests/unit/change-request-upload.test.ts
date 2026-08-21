@@ -28,10 +28,7 @@ describe("ChangeRequestManager uploadBlob", () => {
         vi.unstubAllGlobals();
     });
 
-    const uploadBlob = (
-        headers: Record<string, string> | undefined,
-        blob: Blob,
-    ): Promise<void> =>
+    const uploadBlob = (headers: Record<string, string> | undefined, blob: Blob): Promise<void> =>
         // Private method — invoked directly because the public flow requires
         // a real snapdom/canvas capture unavailable in jsdom.
         manager["uploadBlob"]("http://r2.test/signed-put", headers, blob);
@@ -64,9 +61,7 @@ describe("ChangeRequestManager uploadBlob", () => {
     });
 
     test("throws on a non-ok PUT response", async () => {
-        fetchMock.mockResolvedValue(
-            new Response(null, { status: 403, statusText: "Forbidden" }),
-        );
+        fetchMock.mockResolvedValue(new Response(null, { status: 403, statusText: "Forbidden" }));
 
         await expect(uploadBlob(undefined, new Blob(["png-bytes"]))).rejects.toThrow(
             "Screenshot upload failed: 403 Forbidden",

@@ -79,9 +79,7 @@ describe("ChangeRequestManager environment", () => {
         test("omits the environment entirely when even the base exceeds 8 KB", () => {
             const result = fit({ big: "x".repeat(9000) }, undefined);
             expect(result).toBeUndefined();
-            expect(log.warn).toHaveBeenCalledWith(
-                expect.stringContaining("omitting environment"),
-            );
+            expect(log.warn).toHaveBeenCalledWith(expect.stringContaining("omitting environment"));
         });
     });
 

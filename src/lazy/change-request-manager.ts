@@ -148,10 +148,7 @@ export class ChangeRequestManager {
             const blob = await this.captureScreenshot();
             const { hash, width, height } = await this.describeBlob(blob);
 
-            const environment = this.fitEnvironment(
-                this.gatherEnvironment(),
-                extraEnvironment,
-            );
+            const environment = this.fitEnvironment(this.gatherEnvironment(), extraEnvironment);
 
             const draftId = await this.createDraft(pageUrl, environment);
             const upload = await this.requestUploadUrl(draftId, hash, blob.size);
@@ -298,14 +295,10 @@ export class ChangeRequestManager {
         const full = extra ? { ...base, ...extra } : base;
         if (JSON.stringify(full).length <= MAX_ENVIRONMENT_LENGTH) return full;
 
-        this.log.warn(
-            "Change-request environment exceeds 8 KB; dropping caller-supplied fields",
-        );
+        this.log.warn("Change-request environment exceeds 8 KB; dropping caller-supplied fields");
         if (JSON.stringify(base).length <= MAX_ENVIRONMENT_LENGTH) return base;
 
-        this.log.warn(
-            "Change-request environment still exceeds 8 KB; omitting environment",
-        );
+        this.log.warn("Change-request environment still exceeds 8 KB; omitting environment");
         return undefined;
     }
 
@@ -334,10 +327,7 @@ export class ChangeRequestManager {
         return new Error(`${fallback}: ${response.status} ${response.statusText}`);
     }
 
-    private async createDraft(
-        pageUrl: string,
-        environment?: ExtraEnvironment,
-    ): Promise<string> {
+    private async createDraft(pageUrl: string, environment?: ExtraEnvironment): Promise<string> {
         const url = `${this.config.apiUrl}/apps/${encodeURIComponent(this.config.appId)}/change-requests`;
         const response = await this.helpers.apiFetch(url, {
             method: "POST",
@@ -391,9 +381,7 @@ export class ChangeRequestManager {
             body: blob,
         });
         if (!response.ok) {
-            throw new Error(
-                `Screenshot upload failed: ${response.status} ${response.statusText}`,
-            );
+            throw new Error(`Screenshot upload failed: ${response.status} ${response.statusText}`);
         }
     }
 
