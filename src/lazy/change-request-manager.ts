@@ -45,6 +45,39 @@ const SCREENSHOT_EXTENSION = "png";
 const SCREENSHOT_FILENAME = "page.png";
 
 /**
+ * Serialized-size cap on the environment blob. Mirrors the API's check
+ * (api#91: `JSON.stringify(environment).length > 8192` → 400), measured the
+ * same way — string length, not UTF-8 bytes — so the client-side guard never
+ * disagrees with the server.
+ */
+const MAX_ENVIRONMENT_LENGTH = 8192;
+
+/** Extra environment fields a caller (provider or programmatic trigger) supplies. */
+export type ExtraEnvironment = Record<string, unknown>;
+
+/**
+ * Thrown when an API call is denied with 402 (plan limit) or 403 (domain not
+ * whitelisted). The shared apiFetch wrapper has already surfaced the API's
+ * reason in the toolbar warning banner, so the flow aborts without setting a
+ * second, conflicting change-request error.
+ */
+export class ChangeRequestAccessError extends Error {
+    constructor(readonly status: number) {
+        super(`Change request denied (${status})`);
+        this.name = "ChangeRequestAccessError";
+    }
+}
+
+/** Read `fn()` and swallow any throw — used to make each environment probe optional. */
+function safe<T>(fn: () => T): T | undefined {
+    try {
+        return fn();
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * snapdom plugin: inline every <img> in the cloned tree as a data URI so the
  * SVG rasterization step has no cross-origin sources to taint on. Mutates only
  * the clone — live DOM is untouched. Silently leaves images alone if the fetch
@@ -89,7 +122,13 @@ export class ChangeRequestManager {
         private helpers: ChangeRequestManagerHelpers,
     ) {}
 
-    async createDraftFromPage(): Promise<void> {
+    /**
+     * @param extraEnvironment - Caller-supplied fields (from the environment
+     *   provider and/or a programmatic `requestChange` argument) merged on top
+     *   of the passive snapshot. See {@link fitEnvironment} for how overflow is
+     *   handled.
+     */
+    async createDraftFromPage(extraEnvironment?: ExtraEnvironment): Promise<void> {
         const toolbar = this.state.toolbar;
         if (!toolbar) return;
         if (!this.state.apiKey) {
@@ -109,7 +148,12 @@ export class ChangeRequestManager {
             const blob = await this.captureScreenshot();
             const { hash, width, height } = await this.describeBlob(blob);
 
-            const draftId = await this.createDraft(pageUrl);
+            const environment = this.fitEnvironment(
+                this.gatherEnvironment(),
+                extraEnvironment,
+            );
+
+            const draftId = await this.createDraft(pageUrl, environment);
             const upload = await this.requestUploadUrl(draftId, hash, blob.size);
             if (!upload.exists) {
                 if (!upload.uploadUrl) {
@@ -121,9 +165,15 @@ export class ChangeRequestManager {
 
             this.openDraftEditor(draftId);
         } catch (err) {
-            this.log.error("Failed to create change-request draft", err);
-            toolbar.changeRequestError =
-                err instanceof Error ? err.message : "Could not create request";
+            if (err instanceof ChangeRequestAccessError) {
+                // apiFetch already surfaced the reason in the warning banner;
+                // setting changeRequestError too would show a conflicting message.
+                this.log.warn("Change request denied by API", { status: err.status });
+            } else {
+                this.log.error("Failed to create change-request draft", err);
+                toolbar.changeRequestError =
+                    err instanceof Error ? err.message : "Could not create request";
+            }
         } finally {
             toolbar.requestingChange = false;
         }
@@ -194,17 +244,108 @@ export class ChangeRequestManager {
         return { hash, width, height };
     }
 
-    private async createDraft(pageUrl: string): Promise<string> {
+    /**
+     * Passive, synchronous browser snapshot sent with the draft so a change
+     * request carries the troubleshooting context (browser, viewport, timezone,
+     * …) a developer would otherwise ask for by hand. Every probe is optional:
+     * a field absent in an old or embedded browser is simply omitted, never
+     * fatal. Empty values are dropped to keep the blob lean (api#91 caps it at
+     * 8 KB). The API stores it verbatim, so the SDK owns the shape.
+     */
+    private gatherEnvironment(): ExtraEnvironment {
+        const env: ExtraEnvironment = {
+            userAgent: safe(() => navigator.userAgent),
+            uaClientHints: safe(() =>
+                (
+                    navigator as Navigator & {
+                        userAgentData?: { toJSON?: () => unknown };
+                    }
+                ).userAgentData?.toJSON?.(),
+            ),
+            viewport: safe(() => ({
+                width: window.innerWidth,
+                height: window.innerHeight,
+            })),
+            screen: safe(() => ({ width: screen.width, height: screen.height })),
+            devicePixelRatio: safe(() => window.devicePixelRatio),
+            language: safe(() => navigator.language),
+            timezone: safe(() => Intl.DateTimeFormat().resolvedOptions().timeZone),
+            referrer: safe(() => document.referrer),
+            sdkVersion: __SDK_VERSION__,
+            prefersColorScheme: safe(() =>
+                window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light",
+            ),
+        };
+        // Drop probes that returned nothing (undefined or empty string).
+        for (const key of Object.keys(env)) {
+            const value = env[key];
+            if (value === undefined || value === "") delete env[key];
+        }
+        return env;
+    }
+
+    /**
+     * Merge the caller-supplied `extra` over the passive `base`, then fit the
+     * result under the API's 8 KB cap by dropping the least-important layer
+     * first: prefer the full blob, else the passive base alone (extra dropped),
+     * else no environment at all. The draft itself must always be creatable, so
+     * the environment is what gives way — never the request.
+     */
+    private fitEnvironment(
+        base: ExtraEnvironment,
+        extra: ExtraEnvironment | undefined,
+    ): ExtraEnvironment | undefined {
+        const full = extra ? { ...base, ...extra } : base;
+        if (JSON.stringify(full).length <= MAX_ENVIRONMENT_LENGTH) return full;
+
+        this.log.warn(
+            "Change-request environment exceeds 8 KB; dropping caller-supplied fields",
+        );
+        if (JSON.stringify(base).length <= MAX_ENVIRONMENT_LENGTH) return base;
+
+        this.log.warn(
+            "Change-request environment still exceeds 8 KB; omitting environment",
+        );
+        return undefined;
+    }
+
+    /**
+     * Build the Error to throw for a failed API Response.
+     *
+     * 402/403 are access denials the shared apiFetch wrapper already reports in
+     * the toolbar warning banner, so they become a {@link ChangeRequestAccessError}
+     * the flow swallows — no second message. Anything else keeps the API's
+     * human-readable `error` sentence (`{ error, code, … }`, @whi/http-errors
+     * `toResponse`) so a 400/500 shows something useful, falling back to the
+     * status line when the body isn't our JSON shape (an R2 or proxy error).
+     */
+    private async errorFor(response: Response, fallback: string): Promise<Error> {
+        if (response.status === 402 || response.status === 403) {
+            return new ChangeRequestAccessError(response.status);
+        }
+        try {
+            const body = (await response.json()) as { error?: unknown };
+            if (typeof body.error === "string" && body.error) {
+                return new Error(body.error);
+            }
+        } catch {
+            // Non-JSON body — fall through to the status line.
+        }
+        return new Error(`${fallback}: ${response.status} ${response.statusText}`);
+    }
+
+    private async createDraft(
+        pageUrl: string,
+        environment?: ExtraEnvironment,
+    ): Promise<string> {
         const url = `${this.config.apiUrl}/apps/${encodeURIComponent(this.config.appId)}/change-requests`;
         const response = await this.helpers.apiFetch(url, {
             method: "POST",
             headers: this.jsonHeaders(),
-            body: JSON.stringify({ pageUrl }),
+            body: JSON.stringify(environment ? { pageUrl, environment } : { pageUrl }),
         });
         if (!response.ok) {
-            throw new Error(
-                `Failed to create draft: ${response.status} ${response.statusText}`,
-            );
+            throw await this.errorFor(response, "Failed to create draft");
         }
         const draft = (await response.json()) as CreateDraftResponse;
         if (!draft.id) {
@@ -231,9 +372,7 @@ export class ChangeRequestManager {
             }),
         });
         if (!response.ok) {
-            throw new Error(
-                `Failed to get upload URL: ${response.status} ${response.statusText}`,
-            );
+            throw await this.errorFor(response, "Failed to get upload URL");
         }
         return (await response.json()) as UploadUrlResponse;
     }
@@ -280,9 +419,7 @@ export class ChangeRequestManager {
             }),
         });
         if (!response.ok) {
-            throw new Error(
-                `Failed to confirm screenshot: ${response.status} ${response.statusText}`,
-            );
+            throw await this.errorFor(response, "Failed to confirm screenshot");
         }
     }
 
