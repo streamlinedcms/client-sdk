@@ -12,6 +12,7 @@ import type { EditorMode } from "../key-storage.js";
 import type { AppPermissions, EditableType, ElementAttributes } from "../types.js";
 import type { Toolbar } from "../components/toolbar.js";
 import type { FormattingToolbar } from "../components/rich-text-editor.js";
+import type { ChangeRequestOverlay } from "../components/change-request-overlay.js";
 import type { HtmlEditorModal } from "../components/html-editor-modal.js";
 
 import type { LinkEditorModal } from "../components/link-editor-modal.js";
@@ -95,6 +96,7 @@ export interface EditorState {
     // UI components
     toolbar: Toolbar | null;
     formattingToolbar: FormattingToolbar | null;
+    changeRequestOverlay: ChangeRequestOverlay | null;
     htmlEditorModal: HtmlEditorModal | null;
     linkEditorModal: LinkEditorModal | null;
     seoModal: SeoModal | null;
@@ -150,6 +152,7 @@ export function createEditorState(): EditorState {
         // UI components
         toolbar: null,
         formattingToolbar: null,
+        changeRequestOverlay: null,
         htmlEditorModal: null,
         linkEditorModal: null,
         seoModal: null,

@@ -20,7 +20,7 @@ describe("ChangeRequestManager uploadBlob", () => {
             {} as EditorState,
             { warn: vi.fn(), error: vi.fn(), info: vi.fn() } as unknown as Logger,
             { apiUrl: "http://api.test", appUrl: "http://app.test", appId: "app-1" },
-            { apiFetch: vi.fn() },
+            { apiFetch: vi.fn(), deselect: vi.fn() },
         );
     });
 
@@ -28,10 +28,18 @@ describe("ChangeRequestManager uploadBlob", () => {
         vi.unstubAllGlobals();
     });
 
-    const uploadBlob = (headers: Record<string, string> | undefined, blob: Blob): Promise<void> =>
+    const uploadBlob = (
+        headers: Record<string, string> | undefined,
+        blob: Blob,
+        contentType = "image/png",
+    ): Promise<void> =>
         // Private method — invoked directly because the public flow requires
-        // a real snapdom/canvas capture unavailable in jsdom.
-        manager["uploadBlob"]("http://r2.test/signed-put", headers, blob);
+        // a real snapdom/canvas capture unavailable in jsdom. Only `blob` and
+        // `contentType` are read off the PreparedImage here.
+        manager["uploadBlob"]("http://r2.test/signed-put", headers, {
+            blob,
+            contentType,
+        } as unknown as never);
 
     test("echoes server uploadHeaders verbatim on the PUT", async () => {
         const blob = new Blob(["png-bytes"], { type: "image/png" });

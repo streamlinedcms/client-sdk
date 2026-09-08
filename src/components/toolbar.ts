@@ -106,15 +106,6 @@ export class Toolbar extends ScmsElement {
     @property({ type: Boolean, attribute: "requesting-change" })
     requestingChange = false;
 
-    @property({ type: Boolean, attribute: "popup-blocked" })
-    popupBlocked = false;
-
-    @property({ type: String, attribute: "last-request-id" })
-    lastRequestId: string | null = null;
-
-    @property({ type: String, attribute: "change-request-error" })
-    changeRequestError: string | null = null;
-
     @property({ type: Boolean, reflect: true })
     expanded = false;
 
@@ -672,11 +663,9 @@ export class Toolbar extends ScmsElement {
     private renderRequestChangeButton() {
         if (!this.canRequestChange) return nothing;
 
-        const fallbackHref =
-            this.popupBlocked && this.lastRequestId && this.appUrl && this.appId
-                ? `${this.appUrl}/apps/${encodeURIComponent(this.appId)}/requests/${encodeURIComponent(this.lastRequestId)}`
-                : null;
-
+        // Once clicked, the flow is driven by the change-request overlay
+        // (preview, progress, errors, fallback link) — the toolbar only
+        // triggers it and reflects the brief capture-in-progress state.
         return html`
             <span class="ml-2 inline-flex items-center gap-2">
                 <button
@@ -689,18 +678,6 @@ export class Toolbar extends ScmsElement {
                     <span class="inline-flex">${unsafeSVG(MessageSquarePlus)}</span>
                     ${this.requestingChange ? "Capturing…" : "Request a change"}
                 </button>
-                ${fallbackHref
-                    ? html`<a
-                          href=${fallbackHref}
-                          target="_blank"
-                          class="text-xs font-medium text-blue-600 hover:text-blue-800 underline"
-                      >
-                          Click here to open the editor
-                      </a>`
-                    : nothing}
-                ${this.changeRequestError
-                    ? html`<span class="text-xs text-red-600">${this.changeRequestError}</span>`
-                    : nothing}
             </span>
         `;
     }
@@ -1178,11 +1155,8 @@ export class Toolbar extends ScmsElement {
     private renderMobileRequestChangeSection() {
         if (!this.canRequestChange) return nothing;
 
-        const fallbackHref =
-            this.popupBlocked && this.lastRequestId && this.appUrl && this.appId
-                ? `${this.appUrl}/apps/${encodeURIComponent(this.appId)}/requests/${encodeURIComponent(this.lastRequestId)}`
-                : null;
-
+        // Preview, progress, errors and the fallback link all live in the
+        // change-request overlay now; this is just the trigger.
         return html`
             <div
                 class="mobile-section mb-4 pb-4 border-b border-gray-200"
@@ -1197,20 +1171,6 @@ export class Toolbar extends ScmsElement {
                     <span class="inline-flex">${unsafeSVG(MessageSquarePlus)}</span>
                     ${this.requestingChange ? "Capturing…" : "Request a change"}
                 </button>
-                ${fallbackHref
-                    ? html`<a
-                          href=${fallbackHref}
-                          target="_blank"
-                          class="block mt-2 text-sm text-center font-medium text-blue-600 hover:text-blue-800 underline"
-                      >
-                          Click here to open the editor
-                      </a>`
-                    : nothing}
-                ${this.changeRequestError
-                    ? html`<p class="mt-2 text-sm text-center text-red-600">
-                          ${this.changeRequestError}
-                      </p>`
-                    : nothing}
             </div>
         `;
     }
