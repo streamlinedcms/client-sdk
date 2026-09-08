@@ -435,6 +435,14 @@ export class ChangeRequestManager {
 
         const capture = await snapdom(document.body, {
             embedFonts: true,
+            // Capture only what the user currently sees. `clip: "viewport"`
+            // renders position:fixed/sticky elements at their *pinned* positions
+            // — a scrolled sticky header, a fixed nav — exactly as they appear.
+            // The previous approach rendered the whole document and cropped to
+            // the scroll offset, which dropped those: they render at their
+            // document-flow position (e.g. the sticky header at document top),
+            // outside the crop window once scrolled.
+            clip: "viewport",
             // Read fresh every capture. snapdom's default "soft" cache keeps a
             // per-element computed-style cache across calls, which replays stale
             // styles on a page that changes between requests — e.g. a selection
@@ -457,39 +465,12 @@ export class ChangeRequestManager {
             plugins: [inlineImagesPlugin],
         });
 
-        // snapdom renders the full body. Crop to the viewport at the current
-        // scroll position so the screenshot matches what the user is looking at.
-        const fullCanvas = await capture.toCanvas();
-        const dpr = window.devicePixelRatio || 1;
-        const viewportWidth = Math.round(window.innerWidth * dpr);
-        const viewportHeight = Math.round(window.innerHeight * dpr);
-        const sourceX = Math.round(window.scrollX * dpr);
-        const sourceY = Math.round(window.scrollY * dpr);
-
-        const viewCanvas = document.createElement("canvas");
-        viewCanvas.width = viewportWidth;
-        viewCanvas.height = viewportHeight;
-        const ctx = viewCanvas.getContext("2d");
-        if (!ctx) {
-            throw new Error("Failed to acquire 2D canvas context");
-        }
-        ctx.drawImage(
-            fullCanvas,
-            sourceX,
-            sourceY,
-            viewportWidth,
-            viewportHeight,
-            0,
-            0,
-            viewportWidth,
-            viewportHeight,
-        );
-
+        const canvas = await capture.toCanvas();
         const blob = await new Promise<Blob | null>((resolve) => {
-            viewCanvas.toBlob(resolve, "image/png");
+            canvas.toBlob(resolve, "image/png");
         });
         if (!blob) {
-            throw new Error("Failed to encode cropped viewport canvas");
+            throw new Error("Failed to encode viewport screenshot");
         }
         return blob;
     }
