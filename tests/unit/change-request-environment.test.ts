@@ -24,7 +24,7 @@ describe("ChangeRequestManager environment", () => {
             {} as EditorState,
             log,
             { apiUrl: "http://api.test", appUrl: "http://app.test", appId: "app-1" },
-            { apiFetch },
+            { apiFetch, deselect: vi.fn() },
         );
     });
 

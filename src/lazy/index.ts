@@ -361,7 +361,15 @@ class EditorController {
             this.state,
             this.log,
             { apiUrl: config.apiUrl, appUrl: config.appUrl, appId: config.appId },
-            { apiFetch: this.apiFetch.bind(this) },
+            {
+                apiFetch: this.apiFetch.bind(this),
+                deselect: () => {
+                    // Same clear-everything sequence as clicking outside an element.
+                    this.editingManager.stopEditing();
+                    this.editingManager.deselectElement();
+                    this.editingManager.deselectInstance();
+                },
+            },
         );
 
         // Initialize tour manager
@@ -1121,6 +1129,9 @@ class EditorController {
     };
 
     private removeToolbar(): void {
+        // Tear down any in-progress change-request overlay so it can't outlive
+        // the toolbar that spawned it (e.g. on sign-out / mode exit).
+        this.changeRequestManager.dismiss();
         if (this.state.toolbar) {
             this.state.toolbar.remove();
             this.state.toolbar = null;
