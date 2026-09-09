@@ -124,8 +124,19 @@ export class ChangeRequestOverlay extends ScmsElement {
         `,
     ];
 
+    connectedCallback() {
+        super.connectedCallback();
+        // Paste-to-replace: the preview has nothing focusable, so a listener
+        // scoped to the overlay would never receive ⌘V (paste lands on whatever
+        // is focused, usually document.body). We listen at the document level
+        // instead and scope by behaviour — only while previewing, and never when
+        // the user is pasting into a text field on the host page.
+        document.addEventListener("paste", this.handlePaste);
+    }
+
     disconnectedCallback() {
         super.disconnectedCallback();
+        document.removeEventListener("paste", this.handlePaste);
         document.body.style.overflow = "";
     }
 
@@ -162,6 +173,43 @@ export class ChangeRequestOverlay extends ScmsElement {
         }
         this.emit("cr-replace", { file });
     };
+
+    private handlePaste = (e: ClipboardEvent) => {
+        // Only intercept while the user is deciding on the screenshot, and never
+        // steal a paste aimed at an editable element (a form field on the host
+        // page). Non-image pastes fall through untouched.
+        if (this.phase !== "preview") return;
+        if (this.isEditableTarget(e)) return;
+
+        const file = this.imageFromClipboard(e.clipboardData);
+        if (!file) return;
+
+        e.preventDefault();
+        this.emit("cr-replace", { file });
+    };
+
+    /** First image file on the clipboard, or null if none is present. */
+    private imageFromClipboard(data: DataTransfer | null): File | null {
+        const items = data?.items;
+        if (!items) return null;
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.kind === "file" && item.type.startsWith("image/")) {
+                const file = item.getAsFile();
+                if (file) return file;
+            }
+        }
+        return null;
+    }
+
+    /** True when focus is in a text field / contenteditable we shouldn't hijack. */
+    private isEditableTarget(e: ClipboardEvent): boolean {
+        const el = (e.composedPath()[0] as Element | undefined) ?? document.activeElement;
+        if (!(el instanceof HTMLElement)) return false;
+        if (el.isContentEditable) return true;
+        const tag = el.tagName;
+        return tag === "TEXTAREA" || tag === "INPUT";
+    }
 
     private handleKeydown = (e: KeyboardEvent) => {
         // Only close on Escape while the user is still deciding.
@@ -253,6 +301,9 @@ export class ChangeRequestOverlay extends ScmsElement {
                           so some details may differ. You can use it as-is, or replace it with one
                           you capture yourself.
                       </p>`}
+                <p class="text-xs text-gray-500">
+                    You can also paste an image from your clipboard to replace the screenshot.
+                </p>
             </div>
             <div
                 class="px-4 py-3 border-t border-gray-200 flex items-center justify-between bg-gray-50 gap-2"
