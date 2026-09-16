@@ -76,6 +76,15 @@ async function headerInTopOfShot(): Promise<boolean> {
     return magenta > 100;
 }
 
+/** Capture via the real SDK path and return the shot's pixel dimensions. */
+async function shotDimensions(): Promise<{ width: number; height: number }> {
+    const blob = await makeManager()["captureScreenshot"]();
+    const bitmap = await createImageBitmap(blob);
+    const dims = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return dims;
+}
+
 async function scrollTo(y: number): Promise<void> {
     window.scrollTo(0, y);
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
@@ -97,4 +106,25 @@ test("fixed header is captured at the top when scrolled", async () => {
     buildPage("fixed");
     await scrollTo(1000);
     expect(await headerInTopOfShot()).toBe(true);
+});
+
+// The header-colour checks above pass even for a full-page capture, because a
+// sticky/fixed header sits at document top either way. This asserts the shot is
+// actually clipped to the viewport — the guard for the "captures the whole page"
+// regression (issue #100), which happens if snapdom silently ignores
+// `clip: "viewport"` (e.g. an older cached snapdom chunk) and renders the whole
+// body over a page much taller than the viewport.
+test("capture is clipped to the viewport, not the whole page", async () => {
+    buildPage("sticky"); // 80px header over 3000px of content
+    await scrollTo(1000);
+
+    const dpr = window.devicePixelRatio || 1;
+    const { width, height } = await shotDimensions();
+
+    // Viewport-sized (within a few px for scrollbar/DPR rounding), not full page.
+    expect(height).toBeLessThanOrEqual(Math.round(window.innerHeight * dpr) + 4);
+    expect(width).toBeLessThanOrEqual(Math.round(window.innerWidth * dpr) + 4);
+    // And unambiguously smaller than the ~3080px document — a whole-page shot
+    // would be several times the viewport height.
+    expect(height).toBeLessThan(Math.round(document.body.scrollHeight * dpr) / 2);
 });

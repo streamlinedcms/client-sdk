@@ -108,7 +108,12 @@ export default [
             format: "es",
             sourcemap: true,
             entryFileNames: "streamlined-cms.esm.js",
-            chunkFileNames: "streamlined-cms.[name].js",
+            // Content-hash the code-split chunks (snapdom, tours, etc.) so a
+            // changed chunk gets a new URL. The entry filenames stay stable
+            // (they're the public embed URLs); the entry references each chunk
+            // by its exact hash, so a cached entry can never pair with a
+            // stale-but-same-named chunk from an older deploy. See issue #100.
+            chunkFileNames: "streamlined-cms.[name]-[hash].js",
         },
         plugins: [
             replacePlugin,
@@ -129,7 +134,8 @@ export default [
             format: "es",
             sourcemap: true,
             entryFileNames: "streamlined-cms.esm.min.js",
-            chunkFileNames: "streamlined-cms.[name].min.js",
+            // Content-hashed chunks — see the note on the unminified build above.
+            chunkFileNames: "streamlined-cms.[name]-[hash].min.js",
         },
         plugins: [
             replacePlugin,
