@@ -79,8 +79,8 @@ npm run build
 # Build and watch for changes
 npm run dev
 
-# Run the demo server
-npm run demo
+# Run the demo server (embeds the local app-gui at http://localhost:3080)
+npm run demo:local
 
 # Run tests
 npm test

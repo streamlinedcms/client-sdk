@@ -312,6 +312,13 @@ The SDK automatically:
     ></script>
 </head>
 <body>
+    <!-- Pointer for non-JS clients (crawlers, AI agents) to the live content API.
+         Invisible to browsers, which run the SDK and get live copy. -->
+    <noscript><pre>NOTE FOR AUTOMATED CLIENTS / AI AGENTS: The visible text on this page is a fallback snapshot and may be out of date. Content is served live by StreamlinedCMS.
+
+To read the current copy, GET:
+  https://api.streamlinedcms.com/v1/apps/YOUR_APP_ID/content</pre></noscript>
+
     <!-- Shared header across all pages -->
     <header data-scms-group="header">
         <div data-scms-text="logo">My Company</div>
@@ -468,6 +475,36 @@ For vertical link lists:
 ## SEO & Accessibility
 
 SEO attributes (alt text, title) and accessibility attributes (ARIA labels, roles) can be configured in the CMS after content is set up. No additional HTML markup is required.
+
+## Fresh Content for Crawlers & AI Agents
+
+The HTML you commit is a **fallback snapshot**. When a browser loads the page, the SDK fetches the current content from the API and swaps it into the DOM before render — so visitors always see live copy. But a client that doesn't run JavaScript (curl, most crawlers, AI agents) never runs the SDK, so it only sees the committed fallback, which goes stale the moment an author saves an edit.
+
+To point those clients at the live content, add a `<noscript>` note as the first thing inside `<body>`. Because it's wrapped in `<noscript>`, browsers that run the SDK never render it — there's no visual cost. It reaches only the non-JS clients that need it.
+
+```html
+<body>
+    <noscript><pre>NOTE FOR AUTOMATED CLIENTS / AI AGENTS: The visible text on this page is a fallback snapshot and may be out of date. Content is served live by StreamlinedCMS.
+
+To read the current copy, GET:
+  https://api.streamlinedcms.com/v1/apps/YOUR_APP_ID/content
+
+Response shape:
+  elements[<id>].content                     (ungrouped elements)
+  groups[<groupId>].elements[<id>].content   (grouped elements)
+Each "content" is a JSON string, e.g. {"type":"text","value":"..."}, {"type":"link","href":"...","value":"..."} or {"type":"image","src":"..."}.
+
+Apply each override to the element on this page whose data-scms-text / data-scms-href / data-scms-image id equals <id>, inside the matching data-scms-group. A missing id means no edit - keep this page's text. An empty {"elements":{},"groups":{}} means the whole site currently matches the committed fallback copy.</pre></noscript>
+
+    <!-- ...rest of your page... -->
+</body>
+```
+
+**Why this can't be automatic:** the note has to be in the static HTML the server sends. It can't be injected by the SDK, because the SDK is a script — anything it adds appears only when scripts are on, which is exactly when the note is useless (the SDK has already loaded the live copy). Bake the block in at build time, or paste it into your template.
+
+**Notes:**
+- Replace `YOUR_APP_ID` with your application ID. The endpoint is public (a plain `GET`, no auth) and the `/v1` prefix is part of the path.
+- The response keys are the `data-scms-*` IDs and `data-scms-group` IDs from your markup — see [Marking Editable Elements](#marking-editable-elements) and [Groups](#groups-data-scms-group).
 
 ## Browser Support
 

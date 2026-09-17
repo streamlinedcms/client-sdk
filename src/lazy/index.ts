@@ -86,6 +86,7 @@ import { ModalManager } from "./modal-manager.js";
 import { SaveManager } from "./save-manager.js";
 import { AuthManager } from "./auth-manager.js";
 import { AuthBridge } from "./auth-bridge.js";
+import { ChangeRequestManager, type ExtraEnvironment } from "./change-request-manager.js";
 import { ContentViewerManager } from "./content-viewer-manager.js";
 import { injectEditStyles } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
@@ -139,6 +140,10 @@ class EditorController {
     private modalManager: ModalManager;
     private saveManager: SaveManager;
     private authManager: AuthManager;
+    private changeRequestManager: ChangeRequestManager;
+    // Optional host-app hook: returns extra environment fields attached to every
+    // change request (see setEnvironmentProvider).
+    private environmentProvider: (() => ExtraEnvironment) | null = null;
     private tourManager: TourManager;
     private contentViewerManager: ContentViewerManager;
     private undoManager: UndoManager;
@@ -305,6 +310,7 @@ class EditorController {
                     if (this.state.toolbar) {
                         this.state.toolbar.readOnly =
                             this.state.permissions?.contentWrite === false;
+                        this.state.toolbar.canRequestChange = this.canRequestChange();
                     }
                 },
             },
@@ -350,6 +356,22 @@ class EditorController {
             },
         );
 
+        // Initialize change-request manager
+        this.changeRequestManager = new ChangeRequestManager(
+            this.state,
+            this.log,
+            { apiUrl: config.apiUrl, appUrl: config.appUrl, appId: config.appId },
+            {
+                apiFetch: this.apiFetch.bind(this),
+                deselect: () => {
+                    // Same clear-everything sequence as clicking outside an element.
+                    this.editingManager.stopEditing();
+                    this.editingManager.deselectElement();
+                    this.editingManager.deselectInstance();
+                },
+            },
+        );
+
         // Initialize tour manager
         this.tourManager = new TourManager();
 
@@ -375,20 +397,16 @@ class EditorController {
     private async apiFetch(url: string, options?: RequestInit): Promise<Response> {
         const response = await fetch(url, options);
 
-        // Show warning on 402 (payment required - upgrade needed for custom domain)
-        if (response.status === 402 && !this.state.domainWarningShown) {
+        // Show warning on access denial: 402 (plan limit — custom-domain gate or
+        // change-request allowance) or 403 (domain not whitelisted). Prefer the
+        // API's own message so the banner names the actual cause instead of
+        // assuming it's always the live-domain gate.
+        if (
+            (response.status === 402 || response.status === 403) &&
+            !this.state.domainWarningShown
+        ) {
             if (this.state.toolbar) {
-                const domain = window.location.hostname;
-                this.state.toolbar.warning = `A paid plan is required to edit on live domains like "${domain}". See Admin → Billing.`;
-            }
-            this.state.domainWarningShown = true;
-        }
-
-        // Show warning on 403 (domain not whitelisted)
-        if (response.status === 403 && !this.state.domainWarningShown) {
-            if (this.state.toolbar) {
-                const domain = window.location.hostname;
-                this.state.toolbar.warning = `Domain "${domain}" is not whitelisted. Add it in Admin → Settings.`;
+                this.state.toolbar.warning = await this.deniedWarning(response);
             }
             this.state.domainWarningShown = true;
         }
@@ -402,6 +420,28 @@ class EditorController {
         }
 
         return response;
+    }
+
+    /**
+     * Warning-banner text for a 402/403. The API returns a human-readable
+     * `error` sentence for both the live-domain gate and change-request plan
+     * limits; surface it verbatim. Falls back to a status-specific default when
+     * the body isn't our JSON shape. Reads a clone so the caller can still read
+     * the original body.
+     */
+    private async deniedWarning(response: Response): Promise<string> {
+        try {
+            const body = (await response.clone().json()) as { error?: unknown };
+            if (typeof body.error === "string" && body.error) {
+                return body.error;
+            }
+        } catch {
+            // Non-JSON body — fall through to the status-specific default.
+        }
+        const domain = window.location.hostname;
+        return response.status === 403
+            ? `Domain "${domain}" is not whitelisted. Add it in Admin → Settings.`
+            : `A paid plan is required to edit on live domains like "${domain}". See Admin → Billing.`;
     }
 
     /**
@@ -933,6 +973,7 @@ class EditorController {
 
         const isReadOnly = this.state.permissions?.contentWrite === false;
         const denyAppGui = this.state.permissions?.denyAppGui === true;
+        const canRequestChange = this.canRequestChange();
 
         // Update existing toolbar if present
         if (this.state.toolbar) {
@@ -940,6 +981,7 @@ class EditorController {
             this.state.toolbar.activeElement = this.state.editingKey;
             this.state.toolbar.readOnly = isReadOnly;
             this.state.toolbar.denyAppGui = denyAppGui;
+            this.state.toolbar.canRequestChange = canRequestChange;
             return;
         }
 
@@ -953,6 +995,7 @@ class EditorController {
         toolbar.mockAuth = this.config.mockAuth?.enabled ?? false;
         toolbar.readOnly = isReadOnly;
         toolbar.denyAppGui = denyAppGui;
+        toolbar.canRequestChange = canRequestChange;
 
         toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
             this.setMode(e.detail.mode);
@@ -1040,6 +1083,12 @@ class EditorController {
             this.saveManager.updateToolbarHasChanges();
         });
 
+        toolbar.addEventListener("request-change", () => {
+            // Route the built-in button through the same path as a programmatic
+            // trigger so the environment provider contributes here too.
+            this.requestChange();
+        });
+
         document.body.appendChild(toolbar);
         this.state.toolbar = toolbar;
 
@@ -1049,6 +1098,14 @@ class EditorController {
         // Add body padding to prevent content overlap
         this.updateBodyPadding();
         window.addEventListener("resize", this.updateBodyPadding);
+    }
+
+    private canRequestChange(): boolean {
+        const perms = this.state.permissions;
+        if (!perms) return false;
+        return (
+            perms.changeRequestValue || perms.changeRequestEstimate || perms.changeRequestMessage
+        );
     }
 
     private updateToolbarUndoState(): void {
@@ -1072,6 +1129,9 @@ class EditorController {
     };
 
     private removeToolbar(): void {
+        // Tear down any in-progress change-request overlay so it can't outlive
+        // the toolbar that spawned it (e.g. on sign-out / mode exit).
+        this.changeRequestManager.dismiss();
         if (this.state.toolbar) {
             this.state.toolbar.remove();
             this.state.toolbar = null;
@@ -1446,6 +1506,58 @@ class EditorController {
      */
     public stopTour(): void {
         this.tourManager.stopTour();
+    }
+
+    /**
+     * Register a provider that returns extra fields to attach to the
+     * `environment` blob of every change request — including ones started from
+     * the built-in toolbar button. Use it to tag requests with host-app context
+     * (build sha, feature flags, current route, …). The provider is called
+     * synchronously at capture time; if it throws, the extra fields are skipped
+     * and the request proceeds with the passive snapshot only.
+     *
+     * Pass `null` to remove a previously registered provider.
+     *
+     * @example
+     * StreamlinedCMS.setEnvironmentProvider(() => ({ buildSha: window.__BUILD__ }));
+     */
+    public setEnvironmentProvider(provider: (() => ExtraEnvironment) | null): void {
+        this.environmentProvider = provider;
+    }
+
+    /**
+     * Programmatically start a change request (capture the page and open the
+     * draft editor), as if the toolbar button were clicked. Lets a host app
+     * offer its own "Report a problem" trigger.
+     *
+     * `extraEnvironment` is merged into the `environment` blob on top of both
+     * the passive snapshot and any registered environment provider, so per-call
+     * fields win over provider fields. No-ops (with a warning) if the current
+     * user lacks change-request permission.
+     *
+     * @example
+     * StreamlinedCMS.requestChange({ orderId: 123 });
+     */
+    public requestChange(extraEnvironment?: ExtraEnvironment): void {
+        if (!this.canRequestChange()) {
+            this.log.warn("Cannot request change: not permitted for this user");
+            return;
+        }
+
+        let providerEnv: ExtraEnvironment | undefined;
+        if (this.environmentProvider) {
+            try {
+                providerEnv = this.environmentProvider();
+            } catch (err) {
+                this.log.warn("Environment provider threw; skipping its fields", err);
+            }
+        }
+
+        const extra =
+            providerEnv || extraEnvironment ? { ...providerEnv, ...extraEnvironment } : undefined;
+
+        // Fire and forget — the manager owns its own progress/error UI.
+        this.changeRequestManager.createDraftFromPage(extra);
     }
 
     /**

@@ -264,7 +264,7 @@ Before submitting a PR:
 
 1. **Run tests**: `npm test` (all tests must pass)
 2. **Format code**: `npm run format`
-3. **Test in browser**: `npm run demo` and manually verify your changes
+3. **Test in browser**: `npm run demo:local` and manually verify your changes
 4. **Write meaningful commits**: Describe what changed and why
 5. **Keep PRs focused**: One feature or fix per PR when possible
 
