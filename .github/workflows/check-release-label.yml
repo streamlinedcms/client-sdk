@@ -61,7 +61,7 @@ jobs:
 
             - name: Checkout for version validation
               if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true'
-              uses: actions/checkout@v4
+              uses: actions/checkout@v7
 
             - name: Validate release branch version
               if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true'

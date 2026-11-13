@@ -182,6 +182,10 @@ npm run format
 npm run format:check
 ```
 
+## Node Version
+
+`.nvmrc` pins the Node version every workflow uses; use the same one locally. It is 24 rather than the active LTS (26) because under Node 26 the built-in `localStorage` hides jsdom's, which breaks the unit tests. `package.json` sets the minimum under `engines`, and `.npmrc` makes `npm ci` fail on a Node version a dependency doesn't support, instead of only warning.
+
 ## Building
 
 ```bash
