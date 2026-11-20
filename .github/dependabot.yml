@@ -1,0 +1,45 @@
+version: 2
+
+# Weekly updates for npm packages and for the GitHub Actions the workflows use,
+# opened against develop so they deploy to staging and ship with the next
+# normal release. Minor and patch bumps arrive as one grouped PR per ecosystem;
+# each major bump gets its own PR so a breaking upgrade doesn't block the rest.
+#
+# Urgent security fixes come from a Dependabot rule in the repo settings, which
+# opens PRs only for critical alerts in runtime dependencies (code that ships in
+# the SDK script). Those PRs always target master. The second npm entry below
+# exists only to give them the release:patch label that PRs to master need;
+# its open-pull-requests-limit of 0 stops it opening scheduled updates.
+#
+# Dependabot reads this file from the default branch (master), so changes take
+# effect after the next release.
+updates:
+    - package-ecosystem: npm
+      directory: /
+      target-branch: develop
+      schedule:
+          interval: weekly
+      groups:
+          # vitest and its plugins must share a version, so they move together,
+          # majors included. Listed first because an update joins the first
+          # group it matches.
+          vitest:
+              patterns: ["vitest", "@vitest/*"]
+          minor-and-patch:
+              update-types: [minor, patch]
+
+    - package-ecosystem: npm
+      directory: /
+      schedule:
+          interval: weekly
+      open-pull-requests-limit: 0
+      labels: ["release:patch"]
+
+    - package-ecosystem: github-actions
+      directory: /
+      target-branch: develop
+      schedule:
+          interval: weekly
+      groups:
+          minor-and-patch:
+              update-types: [minor, patch]
