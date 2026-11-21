@@ -9,6 +9,7 @@ jobs:
         runs-on: ubuntu-latest
         outputs:
             should_deploy: ${{ steps.lookup.outputs.should_deploy }}
+            release_none: ${{ steps.lookup.outputs.release_none }}
             bump_type: ${{ steps.lookup.outputs.bump_type }}
             head_ref: ${{ steps.lookup.outputs.head_ref }}
             pr_number: ${{ steps.lookup.outputs.pr_number }}
@@ -58,23 +59,24 @@ jobs:
                   # one release label; this guards a label changed after CI ran.
                   RELEASE_LABELS=$(echo "$LABELS" | grep -cE '^release:(major|minor|patch|none)$' || true)
                   if [ "$RELEASE_LABELS" -gt 1 ]; then
-                      echo "::error::PR #$PR_NUMBER has more than one release label"
+                      echo "::error::PR #$PR_NUMBER has more than one release label; remove the extra one and re-run this workflow"
                       exit 1
                   fi
 
-                  # release:none merges without releasing: no version bump, no CDN
-                  # publish, and no sync back to develop (the change came from there)
+                  # release:none merges without releasing: no version bump or CDN
+                  # publish, but master is still synced back to develop
                   if echo "$LABELS" | grep -qx 'release:none'; then
                       echo "PR #$PR_NUMBER has release:none, skipping release"
                       echo "should_deploy=false" >> $GITHUB_OUTPUT
+                      echo "release_none=true" >> $GITHUB_OUTPUT
                       exit 0
                   fi
 
-                  if echo "$LABELS" | grep -q 'release:major'; then
+                  if echo "$LABELS" | grep -qx 'release:major'; then
                       BUMP_TYPE="major"
-                  elif echo "$LABELS" | grep -q 'release:minor'; then
+                  elif echo "$LABELS" | grep -qx 'release:minor'; then
                       BUMP_TYPE="minor"
-                  elif echo "$LABELS" | grep -q 'release:patch'; then
+                  elif echo "$LABELS" | grep -qx 'release:patch'; then
                       BUMP_TYPE="patch"
                   else
                       echo "::error::No release label found on PR #$PR_NUMBER"
@@ -176,10 +178,14 @@ jobs:
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-    # Skipped along with deploy when there is no release (automated commits
-    # and release:none PRs), since a skipped need skips this job too.
+    # Runs after a release and after a release:none merge. Even with no release,
+    # the merge commit has to reach develop: master only accepts PRs whose branch
+    # contains its latest commit, so otherwise the next develop PR is blocked.
+    # Skipped for the automated version bump commit, which the release's own
+    # sync already covers.
     sync-develop:
         needs: [get-pr-info, deploy]
+        if: ${{ !failure() && !cancelled() && (needs.deploy.result == 'success' || needs.get-pr-info.outputs.release_none == 'true') }}
         runs-on: ubuntu-latest
         environment: production
 
@@ -211,7 +217,7 @@ jobs:
                   fi
 
             - name: Delete release branch
-              if: startsWith(needs.get-pr-info.outputs.head_ref, 'release/')
+              if: startsWith(needs.get-pr-info.outputs.head_ref, 'release/') && needs.deploy.result == 'success'
               env:
                   GH_TOKEN: ${{ secrets.RELEASE_PAT }}
               run: |

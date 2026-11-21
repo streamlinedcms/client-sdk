@@ -5,7 +5,7 @@ on:
     # would start two runs at once, and GitHub can judge the PR by whichever
     # one it records last, even if that one was cancelled. check-release-label
     # reads the labels when it runs instead, so after changing a release label,
-    # re-run that job.
+    # re-run the "check-release-label / check" job.
     pull_request:
         branches: [master, develop]
 
