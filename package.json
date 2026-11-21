@@ -89,7 +89,7 @@
     "@tiptap/pm": "^3.22.1",
     "@tiptap/starter-kit": "^3.22.1",
     "@vue/reactivity": "^3.5.26",
-    "@zumer/snapdom": "^2.24.16",
+    "@zumer/snapdom": "^3.8.1",
     "driver.js": "^1.4.0",
     "lit": "^3.3.1",
     "loganite": "^0.1.4",
