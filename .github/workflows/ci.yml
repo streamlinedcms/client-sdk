@@ -57,7 +57,10 @@ jobs:
                   retention-days: 1
 
     test:
-        needs: build
+        # Wait for the quick checks too, so a format, release label or
+        # includes-master failure fails the PR without waiting on the slower
+        # tests. build also provides the dist/ artifact the tests use.
+        needs: [lint, build, check-release-label, includes-master]
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v7
@@ -89,4 +92,25 @@ jobs:
             pr_number: ${{ github.event.pull_request.number }}
             base_ref: ${{ github.base_ref }}
             head_ref: ${{ github.head_ref }}
-            head_sha: ${{ github.event.pull_request.head.sha }}
+
+    # PRs to master must include everything already on master, so a hotfix that
+    # landed after the branch was made can't be dropped; see
+    # scripts/check-includes-master.mjs
+    includes-master:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v7
+              with:
+                  fetch-depth: 0 # need master and the PR's head commit
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: .nvmrc
+
+            - name: Check the PR includes master
+              run: node scripts/check-includes-master.mjs
+              env:
+                  BASE_REF: ${{ github.base_ref }}
+                  HEAD_REF: ${{ github.head_ref }}
+                  HEAD_SHA: ${{ github.event.pull_request.head.sha }}

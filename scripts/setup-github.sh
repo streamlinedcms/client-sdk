@@ -38,7 +38,7 @@ Requirements:
 
 Rulesets:
   master:
-    - Require PR before merging (1 approval, dismiss stale reviews)
+    - Require PR before merging (no approval required)
     - Require status checks to pass (not required to be up to date)
     - Block force pushes, restrict deletions
     - Admins can bypass
@@ -46,13 +46,12 @@ Rulesets:
   develop:
     - Require PR before merging (no approval required)
     - Require status checks to pass (not required to be up to date)
-    - Allow force pushes, restrict deletions
+    - Block force pushes, restrict deletions
     - Admins can bypass
 
   release:
-    - Only maintainers can create release/* branches
-    - Restrict deletions
-    - Maintainers can bypass
+    - Only admins can create or delete release/* branches
+    - Admins can bypass
 
 Environments:
   staging     - Auto-deploy target for develop branch
@@ -229,10 +228,11 @@ master_payload=$(cat <<'EOF'
         {
             "type": "pull_request",
             "parameters": {
-                "required_approving_review_count": 1,
+                "required_approving_review_count": 0,
                 "dismiss_stale_reviews_on_push": true,
                 "required_reviewers": [],
                 "require_code_owner_review": false,
+                "require_extra_approval_for_unattributed_changes": true,
                 "require_last_push_approval": false,
                 "required_review_thread_resolution": false,
                 "allowed_merge_methods": ["merge"]
@@ -246,7 +246,8 @@ master_payload=$(cat <<'EOF'
                     { "context": "lint" },
                     { "context": "build" },
                     { "context": "test" },
-                    { "context": "check-release-label / check" }
+                    { "context": "check-release-label / check" },
+                    { "context": "includes-master" }
                 ]
             }
         }
@@ -274,6 +275,7 @@ develop_payload=$(cat <<'EOF'
     },
     "rules": [
         { "type": "deletion" },
+        { "type": "non_fast_forward" },
         {
             "type": "pull_request",
             "parameters": {
@@ -281,6 +283,7 @@ develop_payload=$(cat <<'EOF'
                 "dismiss_stale_reviews_on_push": false,
                 "required_reviewers": [],
                 "require_code_owner_review": false,
+                "require_extra_approval_for_unattributed_changes": true,
                 "require_last_push_approval": false,
                 "required_review_thread_resolution": false,
                 "allowed_merge_methods": ["merge"]

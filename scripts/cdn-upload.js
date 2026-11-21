@@ -32,16 +32,17 @@ const versionOverride = versionArg ? versionArg.split("=")[1] : null;
 // --ci implies --yes (used in CI pipelines)
 const skipPrompts = flags.has("--yes") || flags.has("--ci");
 const skipBuild = flags.has("--skip-build");
-// --skip-existing leaves an already-uploaded version alone instead of failing,
-// so a release whose later steps failed can be re-run
-const skipExisting = flags.has("--skip-existing");
+// --overwrite replaces an already-uploaded version instead of failing, so a
+// release whose upload or later steps failed can be re-run with every file
+// re-uploaded. Only for versions nothing points to yet (not yet released).
+const overwrite = flags.has("--overwrite");
 
 if (!["staging", "production"].includes(environment)) {
     console.error("Usage: node scripts/cdn-upload.js <staging|production> [options]");
     console.error("  --yes            Skip confirmation prompts");
     console.error("  --ci             Same as --yes (for CI pipelines)");
     console.error("  --skip-build     Skip npm run build (use pre-built dist/)");
-    console.error("  --skip-existing  Exit successfully if the version is already uploaded");
+    console.error("  --overwrite      Replace the version if it's already uploaded");
     console.error("  --version=X.Y.Z  Override version (e.g., 0.1.22-dev.20260110143052)");
     process.exit(1);
 }
@@ -97,11 +98,7 @@ for (const file of files) {
 }
 
 if (versionExists) {
-    if (skipExisting) {
-        console.log(`\nVersion ${version} is already uploaded; leaving it as is.`);
-        process.exit(0);
-    }
-    if (skipPrompts) {
+    if (skipPrompts && !overwrite) {
         console.error(`\n❌ Version ${version} already exists. Bump the version before deploying.`);
         process.exit(1);
     }

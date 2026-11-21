@@ -1,13 +1,18 @@
 name: Deploy Production
 
 # Releases the version in package.json when it lands on master: builds, uploads
-# to the CDN, updates the aliases, then tags the commit v<version>. The version
-# is set in the PR (the release label check makes sure it matches the label),
-# so nothing is ever committed to master here.
+# to the CDN, updates the stable aliases, then tags the commit v<version>. The
+# version is set in the PR (the release label check makes sure it matches the
+# label), so nothing is ever committed to master here. Prereleases are
+# published from release branches by deploy-release.yml, never from master.
 #
-# Idempotent via the tag: if v<version> already exists (a release:none merge,
-# or a re-run after success) there is nothing to release. The tag is created
-# last, so a failed publish can simply be re-run.
+# If v<version> already exists there is nothing to release (a release:none
+# merge, or a re-run after success), unless the SDK changed since that tag,
+# which fails the run. The tag is created last, so a failed release can simply
+# be re-run; the upload replaces any files a failed attempt left behind.
+#
+# A run stops without releasing if master has moved on to a newer version, so
+# re-running an old failed release can't move the aliases backwards.
 on:
     push:
         branches: [master]
@@ -29,24 +34,24 @@ jobs:
               with:
                   fetch-depth: 0 # need tags to tell whether this version is released
 
-            - name: Determine version and whether it is already released
-              id: check
-              run: |
-                  VERSION=$(node -p "require('./package.json').version")
-                  echo "version=$VERSION" >> $GITHUB_OUTPUT
-                  if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
-                      echo "v$VERSION is already released; nothing to do."
-                      echo "skip=true" >> $GITHUB_OUTPUT
-                  else
-                      echo "Releasing v$VERSION"
-                  fi
-
             - name: Setup Node.js
-              if: steps.check.outputs.skip != 'true'
               uses: actions/setup-node@v7
               with:
                   node-version-file: .nvmrc
                   cache: "npm"
+
+            - name: Determine version and whether it is already released
+              id: check
+              run: |
+                  VERSION=$(node -p "require('./package.json').version")
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+                      echo "v$VERSION is already released."
+                      node scripts/check-released-unchanged.mjs "$VERSION"
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                  else
+                      echo "Releasing v$VERSION"
+                  fi
 
             - name: Install dependencies
               if: steps.check.outputs.skip != 'true'
@@ -64,24 +69,53 @@ jobs:
               if: steps.check.outputs.skip != 'true'
               run: npm run build
 
-            - name: Upload to CDN
+            # Stop if master has moved on to another version since this push,
+            # e.g. when re-running an old failed release: publishing it would
+            # move the aliases backwards. Checked again before publishing.
+            - name: Check master is still at this version
+              id: current
               if: steps.check.outputs.skip != 'true'
-              run: node scripts/cdn-upload.js production --ci --skip-build --skip-existing
+              run: |
+                  git fetch -q origin master
+                  LATEST=$(git show origin/master:package.json | node -p "JSON.parse(require('fs').readFileSync(0)).version")
+                  if [ "$LATEST" != "$VERSION" ]; then
+                      echo "::warning::master has moved on to $LATEST, so v$VERSION won't be released."
+                      echo "superseded=true" >> "$GITHUB_OUTPUT"
+                  fi
+              env:
+                  VERSION: ${{ steps.check.outputs.version }}
+
+            - name: Upload to CDN
+              if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true'
+              run: node scripts/cdn-upload.js production --ci --skip-build --overwrite
               env:
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-            # Prerelease versions (1.4.0-beta.0) update only the prerelease
-            # aliases; see docs/versioning-strategy.md
+            - name: Check master is still at this version before publishing
+              id: still-current
+              if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true'
+              run: |
+                  git fetch -q origin master
+                  LATEST=$(git show origin/master:package.json | node -p "JSON.parse(require('fs').readFileSync(0)).version")
+                  if [ "$LATEST" != "$VERSION" ]; then
+                      echo "::warning::master has moved on to $LATEST, so v$VERSION won't be released."
+                      echo "superseded=true" >> "$GITHUB_OUTPUT"
+                  fi
+              env:
+                  VERSION: ${{ steps.check.outputs.version }}
+
             - name: Publish version
-              if: steps.check.outputs.skip != 'true'
+              if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true' && steps.still-current.outputs.superseded != 'true'
               run: node scripts/cdn-publish.js production --ci
               env:
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
             - name: Tag the release
-              if: steps.check.outputs.skip != 'true'
+              if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true' && steps.still-current.outputs.superseded != 'true'
               run: |
-                  git tag "v${{ steps.check.outputs.version }}"
-                  git push origin "v${{ steps.check.outputs.version }}"
+                  git tag "v$VERSION"
+                  git push origin "v$VERSION"
+              env:
+                  VERSION: ${{ steps.check.outputs.version }}

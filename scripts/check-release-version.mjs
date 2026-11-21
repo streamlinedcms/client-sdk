@@ -2,30 +2,25 @@
 
 /**
  * Check that a PR to master carries a release label matching the version in
- * package.json, so merging it publishes exactly what the label says.
+ * package.json, so merging it publishes exactly what the label says. master
+ * only ever holds stable releases; prereleases are published from release
+ * branches (see .github/workflows/deploy-release.yml).
  *
  * Release labels:
  *   release:patch / release:minor / release:major
- *     The jump to the version this release series is heading for, measured
- *     from the last stable release. 1.3.0 -> 1.4.0-beta.0, 1.4.0-beta.1 and
- *     1.4.0 are all release:minor. The version must also be newer than
- *     master's and not yet tagged.
+ *     The version must be the last stable release bumped by the label, newer
+ *     than master's, and not yet tagged.
  *   release:none
  *     Merge without releasing: the version must be unchanged from master and
  *     already tagged.
  *
- * Branch rules:
- *   - release/X.Y.Z-<type> must carry X.Y.Z-<type>.N; release/X.Y.Z must carry
- *     X.Y.Z. Other branches can't carry a prerelease version.
- *   - From develop, master must have no changes develop is missing (a hotfix
- *     or release branch merged to master), so they aren't left out of develop.
+ * Versions must be stable (X.Y.Z), and a release/X.Y.Z branch must carry X.Y.Z.
  *
- * Requires tags and the base branch to be fetched (checkout fetch-depth: 0).
+ * Requires tags and master to be fetched (checkout fetch-depth: 0).
  *
  * Environment:
  *   BASE_REF    Base branch of the PR. Anything but master passes without checks.
  *   HEAD_REF    Source branch of the PR.
- *   HEAD_SHA    Commit at the tip of the PR's source branch.
  *   PR_NUMBER, GH_REPO, GH_TOKEN
  *               Used to look up the PR's labels when this runs, rather than
  *               taking them from the event that started the run, since CI
@@ -36,65 +31,56 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 
-const { BASE_REF, HEAD_REF = "", HEAD_SHA = "HEAD" } = process.env;
+const { BASE_REF, HEAD_REF = "" } = process.env;
 const RERUN = "then re-run this job";
-
-function git(...args) {
-    return execFileSync("git", args, { encoding: "utf8" }).trim();
-}
+const LABEL = /^release:(major|minor|patch|none)$/;
 
 function fail(message) {
     console.error(`::error::${message}`);
     process.exit(1);
 }
 
-// Semver parsing and comparison, enough for X.Y.Z and X.Y.Z-<prerelease>
-function parse(version) {
-    const match = /^(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/.exec(version);
-    if (!match) return null;
-    const [, major, minor, patch, pre] = match;
-    return {
-        core: [Number(major), Number(minor), Number(patch)],
-        pre: pre ? pre.split(".") : [],
-    };
+function run(command, args, hint) {
+    try {
+        return execFileSync(command, args, {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+        }).trim();
+    } catch (error) {
+        fail(
+            `${command} ${args.join(" ")} failed: ${error.stderr?.trim() || error.message}. ${hint}`,
+        );
+    }
 }
 
-function compareIdentifiers(a, b) {
-    const aNum = /^\d+$/.test(a);
-    const bNum = /^\d+$/.test(b);
-    if (aNum && bNum) return Number(a) - Number(b);
-    if (aNum) return -1;
-    if (bNum) return 1;
-    return a < b ? -1 : a > b ? 1 : 0;
+// Stable versions only: X.Y.Z, no leading zeros
+function parse(version) {
+    const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
+    return match ? match.slice(1).map(Number) : null;
 }
 
 function compare(a, b) {
-    const va = parse(a);
-    const vb = parse(b);
-    for (let i = 0; i < 3; i++) {
-        if (va.core[i] !== vb.core[i]) return va.core[i] - vb.core[i];
-    }
-    // A prerelease sorts before its stable version
-    if (!va.pre.length || !vb.pre.length) return vb.pre.length - va.pre.length;
-    for (let i = 0; i < Math.min(va.pre.length, vb.pre.length); i++) {
-        const diff = compareIdentifiers(va.pre[i], vb.pre[i]);
-        if (diff) return diff;
-    }
-    return va.pre.length - vb.pre.length;
+    const [va, vb] = [parse(a), parse(b)];
+    return va[0] - vb[0] || va[1] - vb[1] || va[2] - vb[2];
 }
 
 function bump(version, type) {
-    const [major, minor, patch] = parse(version).core;
+    const [major, minor, patch] = parse(version);
     if (type === "major") return `${major + 1}.0.0`;
     if (type === "minor") return `${major}.${minor + 1}.0`;
     return `${major}.${minor}.${patch + 1}`;
 }
 
-function releaseLabel() {
+function releaseLabels() {
     if (!process.env.PR_NUMBER) {
-        return process.env.RELEASE_LABEL ? [process.env.RELEASE_LABEL] : [];
+        const label = process.env.RELEASE_LABEL;
+        if (!label) return [];
+        if (!LABEL.test(`release:${label}`)) {
+            fail(`RELEASE_LABEL must be patch, minor, major or none, not '${label}'.`);
+        }
+        return [label];
     }
-    const labels = execFileSync(
+    const labels = run(
         "gh",
         [
             "api",
@@ -102,11 +88,11 @@ function releaseLabel() {
             "--jq",
             ".[].name",
         ],
-        { encoding: "utf8" },
+        "Couldn't read the PR's labels.",
     );
     return labels
         .split("\n")
-        .map((label) => /^release:(major|minor|patch|none)$/.exec(label)?.[1])
+        .map((label) => LABEL.exec(label)?.[1])
         .filter(Boolean);
 }
 
@@ -115,7 +101,7 @@ if (BASE_REF !== "master") {
     process.exit(0);
 }
 
-const types = releaseLabel();
+const types = releaseLabels();
 if (types.length === 0) {
     fail(
         `PRs to master need a release:patch, release:minor, release:major or release:none label; add one and ${RERUN}.`,
@@ -128,24 +114,29 @@ if (types.length > 1) {
 }
 const type = types[0];
 
+const FETCH_HINT = "Fetch master and tags first (git fetch origin master --tags).";
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
-const masterVersion = JSON.parse(git("show", "origin/master:package.json")).version;
-const tags = git("tag", "--list", "v*").split("\n").filter(Boolean);
+const masterVersion = JSON.parse(
+    run("git", ["show", "origin/master:package.json"], FETCH_HINT),
+).version;
+const tags = run("git", ["tag", "--list", "v*"], FETCH_HINT).split("\n").filter(Boolean);
 const isTagged = tags.includes(`v${version}`);
 
 if (!parse(version)) {
-    fail(`package.json version ${version} isn't a valid version.`);
+    fail(
+        `package.json version ${version} isn't a stable X.Y.Z version. master only holds stable ` +
+            `releases; prereleases are published from release/X.Y.Z branches.`,
+    );
 }
 
-if (HEAD_REF === "develop") {
-    // Compare file contents, not commits: the merge commit a release leaves on
-    // master changes nothing, but a hotfix or release branch fix does
-    const base = git("merge-base", "origin/master", HEAD_SHA);
-    const missing = git("diff", "--name-only", base, "origin/master");
-    if (missing) {
+const releaseBranch = /^release\/(.*)$/.exec(HEAD_REF);
+if (releaseBranch) {
+    if (!parse(releaseBranch[1])) {
+        fail(`Release branches must be named release/X.Y.Z (e.g. release/1.5.0), not ${HEAD_REF}.`);
+    }
+    if (version !== releaseBranch[1]) {
         fail(
-            `master has changes that develop doesn't (probably a hotfix or release branch). ` +
-                `Open a PR from master to develop, merge it, then update this PR. Files: ${missing.split("\n").join(", ")}`,
+            `Branch ${HEAD_REF} must carry version ${releaseBranch[1]}, but package.json has ${version}.`,
         );
     }
 }
@@ -159,53 +150,30 @@ if (type === "none") {
     }
     if (!isTagged) {
         fail(
-            `release:none, but version ${version} has no v${version} tag, so merging would release it.`,
+            `release:none, but version ${version} has no v${version} tag, so merging would release it. ` +
+                `If master was just released, wait for its release to finish tagging, ${RERUN}.`,
         );
     }
     console.log(`release:none: version ${version} is unchanged and already released. OK.`);
     process.exit(0);
 }
 
-const stableTags = tags
+const lastStable = tags
     .map((tag) => tag.slice(1))
-    .filter((v) => parse(v) && !parse(v).pre.length)
-    .sort(compare);
-const lastStable = stableTags.at(-1);
+    .filter(parse)
+    .sort(compare)
+    .at(-1);
 if (!lastStable) {
-    fail("No stable release tag (vX.Y.Z) found to measure the version bump from.");
+    fail(`No stable release tag (vX.Y.Z) found to measure the version bump from. ${FETCH_HINT}`);
 }
 
-const target = bump(lastStable, type);
-const prerelease = parse(version).pre;
-const core = parse(version).core.join(".");
-
-if (core !== target) {
+const expected = bump(lastStable, type);
+if (version !== expected) {
     fail(
-        `release:${type} from the last stable release ${lastStable} means version ${target}` +
-            `${prerelease.length ? `-${prerelease.join(".")}` : ""}, but package.json has ${version}. ` +
-            `Change the version, or change the label and ${RERUN}.`,
+        `release:${type} from the last stable release ${lastStable} means version ${expected}, ` +
+            `but package.json has ${version}. Change the version, or change the label and ${RERUN}.`,
     );
 }
-
-const branch = /^release\/(\d+\.\d+\.\d+)(?:-([a-z]+))?$/.exec(HEAD_REF);
-if (branch) {
-    const [, branchCore, branchType] = branch;
-    const expected = branchType ? `${branchCore}-${branchType}.N` : branchCore;
-    const matches = branchType
-        ? core === branchCore &&
-          prerelease.length === 2 &&
-          prerelease[0] === branchType &&
-          /^\d+$/.test(prerelease[1])
-        : core === branchCore && !prerelease.length;
-    if (!matches) {
-        fail(`Branch ${HEAD_REF} must carry version ${expected}, but package.json has ${version}.`);
-    }
-} else if (prerelease.length) {
-    fail(
-        `Prerelease versions (${version}) can only be released from a release/X.Y.Z-<type> branch.`,
-    );
-}
-
 if (compare(version, masterVersion) <= 0) {
     fail(`Version ${version} isn't newer than master's ${masterVersion}.`);
 }

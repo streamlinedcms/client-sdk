@@ -202,36 +202,42 @@ See [docs/versioning-strategy.md](docs/versioning-strategy.md) for the SDK versi
 
 ## Release Process
 
-A release is a PR to `master` that sets a new version in `package.json`. When
-it merges, `.github/workflows/deploy-prod.yml` builds that version, uploads it
-to the production CDN, updates the aliases, and tags the commit `v<version>`.
-Nothing is committed to `master` by CI. If the version is already tagged, the
-merge releases nothing.
+`master` only ever holds stable releases. A release is a PR to `master` that
+sets a new version in `package.json`. When it merges,
+`.github/workflows/deploy-prod.yml` builds that version, uploads it to the
+production CDN, updates the stable aliases (`latest`, `1`, `1.5`), and tags the
+commit `v<version>`. Nothing is committed to `master` by CI, and if the version
+is already tagged the merge releases nothing.
+
+If a release fails partway, re-run the failed Deploy Production run: it
+re-uploads every file and only tags once the release is complete. A run stops
+without releasing if `master` has moved on to a newer version, and fails if
+the version is already tagged but the SDK changed since that tag (two PRs set
+the same version); merge a PR with a new version to release those changes.
 
 ### Setting the Version
 
 Set the version with `npm version <x.y.z> --no-git-tag-version` and commit it
-in a PR to `develop` (or on the release or hotfix branch). Don't create the tag
+in a PR to `develop`, or on the release or hotfix branch. Don't create the tag
 yourself: the release workflow creates it, and skips any version that already
 has one.
 
-### PR Labels
+### PR Checks
 
 PRs to `master` need exactly one release label, and the
 `check-release-label / check` job fails unless the version matches it:
 
-| Label | Meaning | Example (last stable release `1.3.0`) |
+| Label | Meaning | Example (last stable release `1.4.0`) |
 |-------|---------|---------|
-| `release:patch` | Patch release | `1.3.1` |
-| `release:minor` | Minor release | `1.4.0`, or `1.4.0-beta.0` on its way there |
-| `release:major` | Major release | `2.0.0`, or `2.0.0-rc.1` on its way there |
-| `release:none` | Merge without releasing | stays `1.3.0` |
+| `release:patch` | Patch release | `1.4.1` |
+| `release:minor` | Minor release | `1.5.0` |
+| `release:major` | Major release | `2.0.0` |
+| `release:none` | Merge without releasing | stays `1.4.0` |
 
-The label describes the jump to the version the release series is heading
-for, measured from the last stable release. So `1.4.0-beta.0`, `1.4.0-beta.1`
-and the final `1.4.0` are all `release:minor`. The version must also be newer
-than `master`'s and not yet tagged, and the error says which version the
-label expects.
+The version must be a stable `X.Y.Z`, newer than `master`'s and not yet
+tagged, and the error says which version the label expects. Adding or removing
+a label doesn't start a new CI run; if you change it after the checks have
+run, re-run the `check-release-label / check` job.
 
 To merge into `master` without releasing, for example to get dev dependency
 updates or tooling changes onto `master` (Dependabot reads its config and
@@ -239,58 +245,89 @@ reports alerts from there), use `release:none`. The version must be unchanged
 from `master` and already released, so only use it for changes that don't
 affect the built SDK.
 
-Adding or removing a label doesn't start a new CI run; if you change it after
-the checks have run, re-run the `check-release-label / check` job.
+The `includes-master` job fails a PR to `master` whose branch is missing
+changes already on `master`, such as a hotfix that landed after the branch was
+made. Merge `master` into the branch to fix it (for `develop`, see
+[Getting Changes Back to develop](#getting-changes-back-to-develop)).
 
-### Release Branches
+### Release Branches and Prereleases
 
-For major releases or prereleases, use a release branch created from
-`develop`:
+To test a release before it goes live, use a release branch named
+`release/X.Y.Z`, created from `develop` (only admins can create or delete
+release branches). Set `package.json` to `X.Y.Z` on it once, then open its PR
+to `master` as a draft.
 
-| Branch | Version in `package.json` | Purpose |
-|--------|---------|---------|
-| `release/1.0.0-beta` | `1.0.0-beta.0`, `1.0.0-beta.1`, … | Beta testing before stable release |
-| `release/1.0.0-rc` | `1.0.0-rc.0`, `1.0.0-rc.1`, … | Release candidate, final validation |
-| `release/1.0.0` | `1.0.0` | Stable release preparation |
+Every push to the branch runs the tests and publishes a prerelease build to
+the production CDN, named after its commit:
 
-Every push to a release branch deploys a test build to the production CDN
-under a one-off version (`1.0.0-beta.<timestamp>.<sha>`), without updating any
-aliases. Merging a `-beta` or `-rc` branch to `master` releases a real
-prerelease that updates only the prerelease aliases (`beta`, `1.0.0-beta`);
-merging `release/1.0.0` releases the stable version. Prerelease versions can
-only be released from a release branch.
+| PR state | Build | Alias it moves |
+|----------|-------|----------------|
+| Draft (or no PR yet) | `1.5.0-beta.<timestamp>.<sha>` | `1.5.0-beta` |
+| Ready for review | `1.5.0-rc.<timestamp>.<sha>` | `1.5.0-rc` |
 
-Release branches aren't deleted automatically, so the same branch can carry
-the next beta. Delete it (maintainers only) once the series is done.
+Testers can follow the alias (`/client-sdk/v1.5.0-beta/…`) or load an exact
+build by its version. Aliases are cached for up to an hour, so use the exact
+build to see a push straight away. Prereleases never move the stable aliases.
+
+- **Beta:** keep the PR a draft while testing still finds problems or the
+  scope may change.
+- **Release candidate:** mark the PR ready for review once you believe the
+  current code is what ships; only bug fixes go in after that. Marking it ready
+  republishes the current commit as an rc without a push, and moving it back
+  to draft makes later builds betas again.
+- **Release:** merge the PR (with its release label). A draft can't be merged,
+  so every release branch ends as an rc.
+
+Fixes made on the release branch reach `develop` after the release; see below.
+Don't merge a release branch into `develop` while it's being tested.
+
+Release branches aren't deleted automatically. Delete the branch once its
+release is out.
 
 ### Hotfixes
 
 An urgent fix that can't wait for the changes on `develop` goes straight to
-`master` from a branch off `master`, with `release:patch`. That includes the
-PRs Dependabot opens for critical alerts in runtime dependencies (see
-`.github/dependabot.yml`): push a commit to the PR's branch that bumps the
-patch version, and the check passes.
+`master` from a branch off `master`: make the fix, bump the patch version, and
+open a PR with `release:patch`. Because `master` only holds stable releases,
+this works at any time, even while a release branch is in testing.
 
-Nothing merges `master` back into `develop` automatically. Instead, the check
-on the next `develop` to `master` PR fails if `master` has changes that
-`develop` doesn't, from a hotfix or a release branch, and asks you to open and
-merge a PR from `master` to `develop` first. Because you open that PR, CI runs
-on it like any other.
+That includes the PRs Dependabot opens for critical alerts in runtime
+dependencies (see `.github/dependabot.yml`): push a commit to the PR's branch
+that bumps the patch version, and the check passes. If anyone asks Dependabot
+to rebase the PR afterwards, the bump commit is lost and has to be pushed
+again.
 
-Automating that sync would need a credential that can push to `develop` or
-open PRs that run CI, such as a GitHub App's token (a personal access token
-was rejected as a long-lived personal credential). There is nothing wrong with
-a GitHub App beyond being one more thing to maintain, so it's worth
-reconsidering if hotfixes become frequent. See #132 for the rest of the
-reasoning.
+After a hotfix, merge `master` into any open release branch so its next
+prerelease, and the release itself, include the fix (`includes-master` won't
+let the release branch merge without it).
+
+### Getting Changes Back to develop
+
+Nothing merges `master` back into `develop` automatically. After a hotfix or a
+release branch merges, the next `develop` PR to `master` fails
+`includes-master` until `develop` has those changes:
+
+1. Create a branch from `master` (e.g. `sync/master-to-develop`). Don't open
+   the PR from `master` itself: resolving a conflict in GitHub's editor would
+   commit the resolution to `master`.
+2. Merge `develop` into it if there are conflicts, and resolve them there. On
+   the version line in `package.json` and `package-lock.json`, keep
+   `develop`'s version if `develop` already has its next version set.
+3. Open a PR from it to `develop` and merge it.
+
+Automating this would need a credential that can push to `develop` or open PRs
+that run CI, such as a GitHub App's token (a personal access token was
+rejected as a long-lived personal credential). There is nothing wrong with a
+GitHub App beyond being one more thing to maintain, so it's worth reconsidering
+if hotfixes become frequent. See #132 for the rest of the reasoning.
 
 ### Deployment Flow
 
 1. **Feature work** → PR to `develop` → auto-deploys to staging CDN
-2. **Version** → set the release version on `develop` (or a release branch)
-3. **Testing** (optional) → commits to a release branch deploy to the production CDN (no aliases)
-4. **Release** → PR to `master` with the matching release label → publish, alias updates, tag
-5. **Post-release** → after a hotfix or release branch, merge `master` into `develop` through a PR
+2. **Version** → set the release version on `develop`, or create `release/X.Y.Z`
+3. **Testing** (optional) → pushes to the release branch publish betas, then rcs once its PR is ready
+4. **Release** → merge the PR to `master` with the matching release label → publish, alias updates, tag
+5. **Post-release** → after a hotfix or release branch, bring `master`'s changes into `develop` through a PR
 
 ### Repository Setup
 
@@ -300,9 +337,13 @@ The release workflow requires specific GitHub configuration. Run `./scripts/setu
 ```bash
 ./scripts/setup-github.sh rulesets apply
 ```
-- `master-protection` - require PR, approvals, status checks (the PR's branch doesn't need to be up to date with `master`)
+- `master-protection` - require PR and status checks, including `includes-master` (no approval needed; the PR's branch doesn't need to be up to date with `master`)
 - `develop-protection` - require PR, status checks (no approval needed)
-- `release-protection` - only maintainers can create/delete `release/*` branches
+- `release-protection` - only admins can create/delete `release/*` branches
+
+Anyone with write access can push to an existing release branch, and every
+push publishes a prerelease with the production Cloudflare token. Before adding
+collaborators with write access, require PRs for release branches too.
 
 **Environments:**
 ```bash
@@ -313,8 +354,9 @@ The release workflow requires specific GitHub configuration. Run `./scripts/setu
 
 **Tokens:**
 
-The release workflow pushes the release tag with its own `GITHUB_TOKEN`, so no
-personal access token is needed.
+The release workflows use their own `GITHUB_TOKEN` to push release tags and to
+republish a release branch when its PR changes stage, so no personal access
+token is needed.
 
 See the [deployment guide](https://github.com/streamlinedcms/planning/blob/master/guides/cloudflare-github-deployment.md#cicd-security) for security details.
 

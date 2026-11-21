@@ -1,9 +1,30 @@
 name: Deploy Release
 
+# Publishes every push to a release/X.Y.Z branch as a prerelease of X.Y.Z, once
+# the tests pass. The branch's PR to master sets the stage: while the PR is a
+# draft (or there is no PR yet) builds are betas and move the X.Y.Z-beta alias;
+# once it's ready for review they're release candidates and move X.Y.Z-rc.
+# Each build is named after its commit (X.Y.Z-beta.<timestamp>.<sha>), so it
+# can also be loaded by its exact version. Stable X.Y.Z is released by merging
+# the PR (deploy-prod.yml).
+#
+# release-stage.yml runs this on the branch when the PR is marked ready for
+# review or moved back to draft, so the current commit is republished under the
+# new stage without a push.
 on:
     push:
         branches:
-            - "release/*"
+            - "release/**"
+    workflow_dispatch:
+
+# A newer push (or stage change) supersedes a run still in progress
+concurrency:
+    group: deploy-release-${{ github.ref_name }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+    pull-requests: read # to find the branch's PR to master and its stage
 
 jobs:
     deploy:
@@ -19,39 +40,53 @@ jobs:
                   node-version-file: .nvmrc
                   cache: "npm"
 
-            - name: Install dependencies
-              run: npm ci
-
-            - name: Generate release version
+            - name: Determine release version and stage
               id: version
+              env:
+                  BRANCH: ${{ github.ref_name }}
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+                  OWNER: ${{ github.repository_owner }}
               run: |
-                  # Extract version from branch name (release/1.0.0-beta → 1.0.0-beta)
-                  BRANCH_VERSION=${GITHUB_REF_NAME#release/}
-
-                  # Check if version has a prerelease suffix
-                  if [[ "$BRANCH_VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(-(.+))?$ ]]; then
-                    BASE_VERSION="${BASH_REMATCH[1]}"
-                    SUFFIX="${BASH_REMATCH[3]}"
-
-                    # If no suffix, default to rc
-                    if [ -z "$SUFFIX" ]; then
-                      SUFFIX="rc"
-                    fi
-                  else
-                    echo "::error::Invalid branch name format: $BRANCH_VERSION"
-                    exit 1
+                  if [[ ! "$BRANCH" =~ ^release/(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+                      echo "::error::Release branches must be named release/X.Y.Z (e.g. release/1.5.0), not $BRANCH"
+                      exit 1
                   fi
+                  BASE_VERSION="${BRANCH#release/}"
+
+                  PACKAGE_VERSION=$(node -p "require('./package.json').version")
+                  if [ "$PACKAGE_VERSION" != "$BASE_VERSION" ]; then
+                      echo "::error::$BRANCH must carry version $BASE_VERSION in package.json, but it has $PACKAGE_VERSION"
+                      exit 1
+                  fi
+
+                  # Draft PR, or no PR yet: beta. Ready for review: rc.
+                  DRAFT=$(gh api "repos/$GH_REPO/pulls?head=$OWNER:$BRANCH&base=master&state=open" --jq 'if length == 0 then "true" else (.[0].draft | tostring) end')
+                  if [ "$DRAFT" = "false" ]; then STAGE=rc; else STAGE=beta; fi
 
                   TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
                   SHORT_SHA=$(git rev-parse --short HEAD)
-                  RELEASE_VERSION="${BASE_VERSION}-${SUFFIX}.${TIMESTAMP}.${SHORT_SHA}"
+                  VERSION="$BASE_VERSION-$STAGE.$TIMESTAMP.$SHORT_SHA"
 
-                  echo "version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-                  echo "Generated version: $RELEASE_VERSION"
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  echo "alias=$BASE_VERSION-$STAGE" >> "$GITHUB_OUTPUT"
+                  echo "Publishing $VERSION as $BASE_VERSION-$STAGE"
+
+            - name: Install dependencies
+              run: npm ci
+
+            # Everyone following the alias gets this build, so it must pass the
+            # tests. Some tests load the built dist/, so test a build with
+            # placeholder URLs (as CI does) rather than the production one.
+            - name: Build and test with placeholder URLs
+              run: |
+                  printf 'SDK_API_URL=https://api.example.com/v1\nSDK_APP_URL=https://app.example.com\n' > .env
+                  npm run build
+                  npm test
 
             - name: Create .env for build
               run: |
-                  echo "SDK_API_URL=${{ vars.SDK_API_URL }}" >> .env
+                  echo "SDK_API_URL=${{ vars.SDK_API_URL }}" > .env
                   echo "SDK_APP_URL=${{ vars.SDK_APP_URL }}" >> .env
                   echo "R2_BUCKET_PRODUCTION=${{ vars.R2_BUCKET_PRODUCTION }}" >> .env
                   echo "KV_NAMESPACE_PRODUCTION=${{ vars.KV_NAMESPACE_PRODUCTION }}" >> .env
@@ -62,13 +97,26 @@ jobs:
                   SDK_VERSION: ${{ steps.version.outputs.version }}
 
             - name: Upload to CDN
-              run: node scripts/cdn-upload.js production --ci --skip-build --version=${{ steps.version.outputs.version }}
+              run: node scripts/cdn-upload.js production --ci --skip-build --version="$VERSION"
               env:
+                  VERSION: ${{ steps.version.outputs.version }}
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-            - name: Publish version (no aliases)
-              run: node scripts/cdn-publish.js production --ci --version=${{ steps.version.outputs.version }} --no-alias
+            # Don't move the alias if the branch has moved on since this run
+            # started; the newer commit's run publishes instead
+            - name: Publish version
               env:
+                  BRANCH: ${{ github.ref_name }}
+                  VERSION: ${{ steps.version.outputs.version }}
+                  ALIAS: ${{ steps.version.outputs.alias }}
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+              run: |
+                  HEAD=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
+                  if [ "$HEAD" != "$GITHUB_SHA" ]; then
+                      echo "::warning::$BRANCH has moved on to ${HEAD:0:7}; leaving $ALIAS for its run."
+                      node scripts/cdn-publish.js production --ci --version="$VERSION" --no-alias
+                      exit 0
+                  fi
+                  node scripts/cdn-publish.js production --ci --version="$VERSION" --alias="$ALIAS"

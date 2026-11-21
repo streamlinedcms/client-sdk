@@ -18,10 +18,6 @@ on:
                 description: "Source branch of the PR"
                 required: true
                 type: string
-            head_sha:
-                description: "Commit at the tip of the PR's source branch"
-                required: true
-                type: string
 
 jobs:
     check:
@@ -51,4 +47,3 @@ jobs:
                   PR_NUMBER: ${{ inputs.pr_number }}
                   BASE_REF: ${{ inputs.base_ref }}
                   HEAD_REF: ${{ inputs.head_ref }}
-                  HEAD_SHA: ${{ inputs.head_sha }}

@@ -10,7 +10,8 @@ version: 2
 # the SDK script). Those PRs always target master. The second npm entry below
 # exists only to give them the release:patch label that PRs to master need;
 # its open-pull-requests-limit of 0 stops it opening scheduled updates. Push a
-# commit bumping the patch version to such a PR before merging it.
+# commit bumping the patch version to such a PR before merging it (and again if
+# Dependabot is asked to rebase it, which drops that commit).
 #
 # Dependabot reads this file from the default branch (master), so changes take
 # effect once they reach master.
