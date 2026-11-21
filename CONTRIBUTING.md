@@ -205,15 +205,18 @@ See [docs/versioning-strategy.md](docs/versioning-strategy.md) for the SDK versi
 `master` only ever holds stable releases. A release is a PR to `master` that
 sets a new version in `package.json`. When it merges,
 `.github/workflows/deploy-prod.yml` builds that version, uploads it to the
-production CDN, updates the stable aliases (`latest`, `1`, `1.5`), and tags the
+production CDN, updates the stable aliases (`latest`, `v1`, `v1.5`), and tags the
 commit `v<version>`. Nothing is committed to `master` by CI, and if the version
 is already tagged the merge releases nothing.
 
 If a release fails partway, re-run the failed Deploy Production run: it
-re-uploads every file and only tags once the release is complete. A run stops
-without releasing if `master` has moved on to a newer version, and fails if
-the version is already tagged but the SDK changed since that tag (two PRs set
-the same version); merge a PR with a new version to release those changes.
+re-uploads every file and only tags once the release is complete. If a re-run
+can't fix it (the release itself is broken), merge a PR with the fix that keeps
+the same version and label; the check allows that while `master`'s version is
+unreleased. A run stops without releasing if `master` has moved on to a newer
+version, and fails if the version is already tagged but the SDK changed since
+that tag (two PRs set the same version); merge a PR with a new version to
+release those changes.
 
 ### Setting the Version
 
@@ -242,20 +245,28 @@ run, re-run the `check-release-label / check` job.
 To merge into `master` without releasing, for example to get dev dependency
 updates or tooling changes onto `master` (Dependabot reads its config and
 reports alerts from there), use `release:none`. The version must be unchanged
-from `master` and already released, so only use it for changes that don't
-affect the built SDK.
+from `master` and already released, and the check fails if the PR changes the
+built SDK: its source, build config, or runtime dependencies. Dependabot's
+weekly grouped PR often updates runtime dependencies too, so once that's on
+`develop`, the next PR to `master` needs a real release.
 
 The `includes-master` job fails a PR to `master` whose branch is missing
 changes already on `master`, such as a hotfix that landed after the branch was
 made. Merge `master` into the branch to fix it (for `develop`, see
-[Getting Changes Back to develop](#getting-changes-back-to-develop)).
+[Getting Changes Back to develop](#getting-changes-back-to-develop); for a
+Dependabot PR, ask Dependabot to rebase it instead).
 
 ### Release Branches and Prereleases
 
 To test a release before it goes live, use a release branch named
 `release/X.Y.Z`, created from `develop` (only admins can create or delete
-release branches). Set `package.json` to `X.Y.Z` on it once, then open its PR
-to `master` as a draft.
+release branches):
+
+1. Create the branch locally, commit `npm version X.Y.Z --no-git-tag-version`
+   on it, then push. (Pushing the branch before the version commit gives one
+   failed run, since it still carries `develop`'s version.)
+2. Open its PR to `master` as a draft, with its release label (the label check
+   shows a failure until it has one).
 
 Every push to the branch runs the tests and publishes a prerelease build to
 the production CDN, named after its commit:
@@ -266,23 +277,39 @@ the production CDN, named after its commit:
 | Ready for review | `1.5.0-rc.<timestamp>.<sha>` | `1.5.0-rc` |
 
 Testers can follow the alias (`/client-sdk/v1.5.0-beta/…`) or load an exact
-build by its version. Aliases are cached for up to an hour, so use the exact
+build by its version. Aliases are cached for an hour and browsers may keep
+using a stale copy for up to a day while they refresh it, so use the exact
 build to see a push straight away. Prereleases never move the stable aliases.
 
 - **Beta:** keep the PR a draft while testing still finds problems or the
   scope may change.
 - **Release candidate:** mark the PR ready for review once you believe the
   current code is what ships; only bug fixes go in after that. Marking it ready
-  republishes the current commit as an rc without a push, and moving it back
-  to draft makes later builds betas again.
+  (or opening or reopening the PR as ready) republishes the current commit as
+  an rc without a push, and moving it back to draft makes later builds betas
+  again.
 - **Release:** merge the PR (with its release label). A draft can't be merged,
-  so every release branch ends as an rc.
+  so every release branch ends as an rc. Once the version is released, the
+  branch publishes nothing more; delete it.
 
 Fixes made on the release branch reach `develop` after the release; see below.
 Don't merge a release branch into `develop` while it's being tested.
 
-Release branches aren't deleted automatically. Delete the branch once its
-release is out.
+If a prerelease publish fails, re-run it: each run publishes under a new name,
+and it leaves the alias alone if the branch has moved on. If the tests failed,
+push a fix instead.
+
+To abandon a release, close its PR and have an admin delete the branch. Its
+`X.Y.Z-beta`/`X.Y.Z-rc` aliases keep pointing at its last build until another
+release of the same version moves them.
+
+**While a release branch is open:**
+- Send urgent fixes through a [hotfix](#hotfixes), not a `develop` release.
+  After a `develop` release, `includes-master` makes the release branch take
+  everything `develop` had, possibly in the middle of its rc.
+- With two release branches open (say `1.5.0` and `2.0.0`), release the lower
+  version first. Once a higher version is released, the lower branch can't
+  merge: abandon it, or rename it and re-version it above the new release.
 
 ### Hotfixes
 
@@ -299,7 +326,9 @@ again.
 
 After a hotfix, merge `master` into any open release branch so its next
 prerelease, and the release itself, include the fix (`includes-master` won't
-let the release branch merge without it).
+let the release branch merge without it). The version line in `package.json`
+and `package-lock.json` will conflict: keep the release branch's `X.Y.Z`. Until
+that merge, the PR has a conflict, and GitHub runs no PR workflows for it.
 
 ### Getting Changes Back to develop
 
@@ -340,6 +369,7 @@ The release workflow requires specific GitHub configuration. Run `./scripts/setu
 - `master-protection` - require PR and status checks, including `includes-master` (no approval needed; the PR's branch doesn't need to be up to date with `master`)
 - `develop-protection` - require PR, status checks (no approval needed)
 - `release-protection` - only admins can create/delete `release/*` branches
+- `tags-protection` - release tags (`v*`) can't be deleted or moved; anyone can create them, so the release workflow can tag releases
 
 Anyone with write access can push to an existing release branch, and every
 push publishes a prerelease with the production Cloudflare token. Before adding

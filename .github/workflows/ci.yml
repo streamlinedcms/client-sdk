@@ -60,6 +60,9 @@ jobs:
         # Wait for the quick checks too, so a format, release label or
         # includes-master failure fails the PR without waiting on the slower
         # tests. build also provides the dist/ artifact the tests use.
+        # Every job listed here must also be a required check on master
+        # (scripts/setup-github.sh): if one fails, test is skipped, and GitHub
+        # counts a skipped required check as passing.
         needs: [lint, build, check-release-label, includes-master]
         runs-on: ubuntu-latest
         steps:

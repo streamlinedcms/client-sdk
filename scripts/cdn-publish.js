@@ -12,8 +12,9 @@
  * release branch build), and --no-alias updates none.
  *
  * In production, a version with a prerelease suffix (anything after a "-")
- * must use --alias or --no-alias, so a prerelease build can never move the
- * stable aliases. Staging's -dev builds still update its stable aliases.
+ * must use --no-alias or an --alias that is itself a prerelease alias
+ * (containing a "-"), so a prerelease build can never move the stable aliases.
+ * Staging's -dev builds still update its stable aliases.
  *
  * Usage: node scripts/cdn-publish.js <staging|production> [options]
  */
@@ -72,8 +73,19 @@ const version = versionOverride || packageJson.version;
 const isPrerelease = version.includes("-");
 const [major, minor] = version.split("-")[0].split(".");
 
+if (aliasArg && !aliasOverride) {
+    console.error("Error: --alias needs a name, e.g. --alias=1.5.0-beta");
+    process.exit(1);
+}
 if (noAlias && aliasOverride) {
     console.error("Error: use either --alias or --no-alias, not both");
+    process.exit(1);
+}
+if (environment === "production" && isPrerelease && aliasOverride && !aliasOverride.includes("-")) {
+    console.error(
+        `Error: ${version} is a prerelease; in production its alias must be a prerelease alias ` +
+            `(e.g. ${version.split("-")[0]}-beta), not "${aliasOverride}"`,
+    );
     process.exit(1);
 }
 if (environment === "production" && isPrerelease && !noAlias && !aliasOverride) {

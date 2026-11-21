@@ -66,6 +66,12 @@ if (HEAD_REF === "develop") {
             `Files: ${files}`,
     );
 }
+if (HEAD_REF.startsWith("dependabot/")) {
+    fail(
+        `master has changed since Dependabot opened this PR. Comment '@dependabot rebase' on the PR, ` +
+            `then push the version bump commit again (the rebase drops it). Files: ${files}`,
+    );
+}
 fail(
     `master has changed since this branch was made, and the branch doesn't have those changes. ` +
         `Merge master into ${HEAD_REF || "the branch"}, then push. Files: ${files}`,

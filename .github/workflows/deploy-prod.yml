@@ -30,9 +30,12 @@ jobs:
         environment: production
 
         steps:
+            # Don't leave the write token in the checkout for npm ci and the
+            # build to find; only the tag step gets it
             - uses: actions/checkout@v7
               with:
                   fetch-depth: 0 # need tags to tell whether this version is released
+                  persist-credentials: false
 
             - name: Setup Node.js
               uses: actions/setup-node@v7
@@ -116,6 +119,7 @@ jobs:
               if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true' && steps.still-current.outputs.superseded != 'true'
               run: |
                   git tag "v$VERSION"
-                  git push origin "v$VERSION"
+                  git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" "v$VERSION"
               env:
                   VERSION: ${{ steps.check.outputs.version }}
+                  GH_TOKEN: ${{ github.token }}

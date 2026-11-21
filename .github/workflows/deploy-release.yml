@@ -3,14 +3,16 @@ name: Deploy Release
 # Publishes every push to a release/X.Y.Z branch as a prerelease of X.Y.Z, once
 # the tests pass. The branch's PR to master sets the stage: while the PR is a
 # draft (or there is no PR yet) builds are betas and move the X.Y.Z-beta alias;
-# once it's ready for review they're release candidates and move X.Y.Z-rc.
-# Each build is named after its commit (X.Y.Z-beta.<timestamp>.<sha>), so it
-# can also be loaded by its exact version. Stable X.Y.Z is released by merging
-# the PR (deploy-prod.yml).
+# once it's ready for review (or merged) they're release candidates and move
+# X.Y.Z-rc. Each build is named after its commit (X.Y.Z-beta.<timestamp>.<sha>),
+# so it can also be loaded by its exact version. Stable X.Y.Z is released by
+# merging the PR (deploy-prod.yml); after that, the branch publishes nothing.
 #
-# release-stage.yml runs this on the branch when the PR is marked ready for
-# review or moved back to draft, so the current commit is republished under the
-# new stage without a push.
+# release-stage.yml runs this on the branch when the PR changes stage, so the
+# current commit is republished under the new stage without a push.
+#
+# The tests run in a job without the production environment, so test code and
+# its dependencies never run alongside the Cloudflare token.
 on:
     push:
         branches:
@@ -27,9 +29,13 @@ permissions:
     pull-requests: read # to find the branch's PR to master and its stage
 
 jobs:
-    deploy:
+    test:
+        if: startsWith(github.ref, 'refs/heads/release/')
         runs-on: ubuntu-latest
-        environment: production
+        outputs:
+            skip: ${{ steps.version.outputs.skip }}
+            version: ${{ steps.version.outputs.version }}
+            alias: ${{ steps.version.outputs.alias }}
 
         steps:
             - uses: actions/checkout@v7
@@ -54,15 +60,24 @@ jobs:
                   fi
                   BASE_VERSION="${BRANCH#release/}"
 
+                  if [ -n "$(git ls-remote --tags origin "refs/tags/v$BASE_VERSION")" ]; then
+                      echo "::notice::$BASE_VERSION is already released; $BRANCH publishes nothing more. Delete the branch."
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
+                      exit 0
+                  fi
+
                   PACKAGE_VERSION=$(node -p "require('./package.json').version")
                   if [ "$PACKAGE_VERSION" != "$BASE_VERSION" ]; then
                       echo "::error::$BRANCH must carry version $BASE_VERSION in package.json, but it has $PACKAGE_VERSION"
                       exit 1
                   fi
 
-                  # Draft PR, or no PR yet: beta. Ready for review: rc.
-                  DRAFT=$(gh api "repos/$GH_REPO/pulls?head=$OWNER:$BRANCH&base=master&state=open" --jq 'if length == 0 then "true" else (.[0].draft | tostring) end')
-                  if [ "$DRAFT" = "false" ]; then STAGE=rc; else STAGE=beta; fi
+                  # The newest open or merged PR from this branch to master sets
+                  # the stage: draft (or none) is beta; ready or merged is rc
+                  STAGE=$(gh api "repos/$GH_REPO/pulls?head=$OWNER:$BRANCH&base=master&state=all" --jq '
+                      map(select(.state == "open" or .merged_at != null))
+                      | sort_by(.created_at) | last
+                      | if . == null or (.state == "open" and .draft) then "beta" else "rc" end')
 
                   TIMESTAMP=$(date -u +%Y%m%d%H%M%S)
                   SHORT_SHA=$(git rev-parse --short HEAD)
@@ -73,20 +88,40 @@ jobs:
                   echo "Publishing $VERSION as $BASE_VERSION-$STAGE"
 
             - name: Install dependencies
+              if: steps.version.outputs.skip != 'true'
               run: npm ci
 
             # Everyone following the alias gets this build, so it must pass the
             # tests. Some tests load the built dist/, so test a build with
-            # placeholder URLs (as CI does) rather than the production one.
+            # placeholder URLs, as CI does.
             - name: Build and test with placeholder URLs
+              if: steps.version.outputs.skip != 'true'
               run: |
                   printf 'SDK_API_URL=https://api.example.com/v1\nSDK_APP_URL=https://app.example.com\n' > .env
                   npm run build
                   npm test
 
+    deploy:
+        needs: test
+        if: needs.test.outputs.skip != 'true'
+        runs-on: ubuntu-latest
+        environment: production
+
+        steps:
+            - uses: actions/checkout@v7
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: .nvmrc
+                  cache: "npm"
+
+            - name: Install dependencies
+              run: npm ci
+
             - name: Create .env for build
               run: |
-                  echo "SDK_API_URL=${{ vars.SDK_API_URL }}" > .env
+                  echo "SDK_API_URL=${{ vars.SDK_API_URL }}" >> .env
                   echo "SDK_APP_URL=${{ vars.SDK_APP_URL }}" >> .env
                   echo "R2_BUCKET_PRODUCTION=${{ vars.R2_BUCKET_PRODUCTION }}" >> .env
                   echo "KV_NAMESPACE_PRODUCTION=${{ vars.KV_NAMESPACE_PRODUCTION }}" >> .env
@@ -94,28 +129,28 @@ jobs:
             - name: Build
               run: npm run build
               env:
-                  SDK_VERSION: ${{ steps.version.outputs.version }}
+                  SDK_VERSION: ${{ needs.test.outputs.version }}
 
             - name: Upload to CDN
               run: node scripts/cdn-upload.js production --ci --skip-build --version="$VERSION"
               env:
-                  VERSION: ${{ steps.version.outputs.version }}
+                  VERSION: ${{ needs.test.outputs.version }}
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-            # Don't move the alias if the branch has moved on since this run
-            # started; the newer commit's run publishes instead
+            # Don't move the alias if the branch has moved on (or been deleted)
+            # since this run started; the newer commit's run publishes instead
             - name: Publish version
               env:
                   BRANCH: ${{ github.ref_name }}
-                  VERSION: ${{ steps.version.outputs.version }}
-                  ALIAS: ${{ steps.version.outputs.alias }}
+                  VERSION: ${{ needs.test.outputs.version }}
+                  ALIAS: ${{ needs.test.outputs.alias }}
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
               run: |
                   HEAD=$(git ls-remote origin "refs/heads/$BRANCH" | cut -f1)
                   if [ "$HEAD" != "$GITHUB_SHA" ]; then
-                      echo "::warning::$BRANCH has moved on to ${HEAD:0:7}; leaving $ALIAS for its run."
+                      echo "::warning::$BRANCH has moved on or been deleted; leaving $ALIAS for the newer run."
                       node scripts/cdn-publish.js production --ci --version="$VERSION" --no-alias
                       exit 0
                   fi

@@ -30,6 +30,7 @@
 
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { sdkChangesSince } from "./sdk-changes.mjs";
 
 const { BASE_REF, HEAD_REF = "" } = process.env;
 const RERUN = "then re-run this job";
@@ -154,7 +155,16 @@ if (type === "none") {
                 `If master was just released, wait for its release to finish tagging, ${RERUN}.`,
         );
     }
-    console.log(`release:none: version ${version} is unchanged and already released. OK.`);
+    const changes = sdkChangesSince(`v${version}`);
+    if (changes) {
+        fail(
+            `release:none, but this PR changes the built SDK since v${version} (${changes}), so merging ` +
+                `would leave unreleased SDK changes on master. Use a release label and bump the version instead.`,
+        );
+    }
+    console.log(
+        `release:none: version ${version} is unchanged, already released, and the SDK hasn't changed. OK.`,
+    );
     process.exit(0);
 }
 
@@ -169,10 +179,23 @@ if (!lastStable) {
 
 const expected = bump(lastStable, type);
 if (version !== expected) {
+    const masterHint = !tags.includes(`v${masterVersion}`)
+        ? ` master's version ${masterVersion} was never released: re-run its failed Deploy Production run, ` +
+          `or keep ${masterVersion} in this PR so merging it releases it.`
+        : "";
     fail(
         `release:${type} from the last stable release ${lastStable} means version ${expected}, ` +
-            `but package.json has ${version}. Change the version, or change the label and ${RERUN}.`,
+            `but package.json has ${version}. Change the version, or change the label and ${RERUN}.${masterHint}`,
     );
+}
+// master's version is normally released, but if its release failed and a
+// re-run can't fix it, a PR that keeps that version (with fixes) releases it
+const masterUnreleased = !tags.includes(`v${masterVersion}`);
+if (version === masterVersion && masterUnreleased) {
+    console.log(
+        `release:${type}: master's version ${version} isn't released yet; merging this PR releases it. OK.`,
+    );
+    process.exit(0);
 }
 if (compare(version, masterVersion) <= 0) {
     fail(`Version ${version} isn't newer than master's ${masterVersion}.`);
