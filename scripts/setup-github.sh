@@ -39,7 +39,7 @@ Requirements:
 Rulesets:
   master:
     - Require PR before merging (1 approval, dismiss stale reviews)
-    - Require status checks to pass (must be up to date)
+    - Require status checks to pass (not required to be up to date)
     - Block force pushes, restrict deletions
     - Admins can bypass
 
@@ -241,7 +241,7 @@ master_payload=$(cat <<'EOF'
         {
             "type": "required_status_checks",
             "parameters": {
-                "strict_required_status_checks_policy": true,
+                "strict_required_status_checks_policy": false,
                 "required_status_checks": [
                     { "context": "lint" },
                     { "context": "build" },

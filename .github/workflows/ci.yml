@@ -87,5 +87,6 @@ jobs:
             pull-requests: read
         with:
             pr_number: ${{ github.event.pull_request.number }}
-            require: ${{ github.base_ref == 'master' }}
+            base_ref: ${{ github.base_ref }}
             head_ref: ${{ github.head_ref }}
+            head_sha: ${{ github.event.pull_request.head.sha }}

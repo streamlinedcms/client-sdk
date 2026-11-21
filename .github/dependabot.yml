@@ -9,10 +9,11 @@ version: 2
 # opens PRs only for critical alerts in runtime dependencies (code that ships in
 # the SDK script). Those PRs always target master. The second npm entry below
 # exists only to give them the release:patch label that PRs to master need;
-# its open-pull-requests-limit of 0 stops it opening scheduled updates.
+# its open-pull-requests-limit of 0 stops it opening scheduled updates. Push a
+# commit bumping the patch version to such a PR before merging it.
 #
 # Dependabot reads this file from the default branch (master), so changes take
-# effect after the next release.
+# effect once they reach master.
 updates:
     - package-ecosystem: npm
       directory: /
