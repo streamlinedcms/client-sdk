@@ -1,105 +1,46 @@
 name: Deploy Production
 
+# Releases the version in package.json when it lands on master: builds, uploads
+# to the CDN, updates the stable aliases, then tags the commit v<version>. The
+# version is set in the PR (the release label check makes sure it matches the
+# label), so nothing is ever committed to master here. Prereleases are
+# published from release branches by deploy-release.yml, never from master.
+#
+# If v<version> already exists there is nothing to release (a release:none
+# merge, or a re-run after success), unless the SDK changed since that tag,
+# which fails the run. It also fails if master already carried this unreleased
+# version before this push and the SDK changed since (two PRs set the same
+# version and the first one's release failed). The tag is created last, so a
+# failed release can simply be re-run; the upload replaces any files a failed
+# attempt left behind.
+#
+# A run stops without releasing if master has moved on to a newer version, so
+# re-running an old failed release can't move the aliases backwards.
 on:
     push:
         branches: [master]
 
+concurrency:
+    group: deploy-production
+    cancel-in-progress: false
+
+permissions:
+    contents: write # push the release tag
+
 jobs:
-    get-pr-info:
-        runs-on: ubuntu-latest
-        outputs:
-            should_deploy: ${{ steps.lookup.outputs.should_deploy }}
-            release_none: ${{ steps.lookup.outputs.release_none }}
-            bump_type: ${{ steps.lookup.outputs.bump_type }}
-            head_ref: ${{ steps.lookup.outputs.head_ref }}
-            pr_number: ${{ steps.lookup.outputs.pr_number }}
-
-        steps:
-            - name: Lookup merged PR
-              id: lookup
-              env:
-                  GH_TOKEN: ${{ github.token }}
-              run: |
-                  # Check if this is an automated commit (e.g., version bump)
-                  AUTHOR=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}" --jq '.author.login')
-                  if [ "$AUTHOR" = "github-actions[bot]" ]; then
-                      echo "Automated commit by $AUTHOR, skipping deploy"
-                      echo "should_deploy=false" >> $GITHUB_OUTPUT
-                      exit 0
-                  fi
-
-                  # Look up PR associated with this merge commit
-                  # (retry a few times — the API may not be immediately consistent after merge)
-                  echo "Looking up PR for merge commit: ${{ github.sha }}"
-
-                  PR_DATA=""
-                  for i in 1 2 3; do
-                      PR_DATA=$(gh api "/repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" --jq '.[0]' 2>/dev/null || echo "")
-                      if [ -n "$PR_DATA" ] && [ "$PR_DATA" != "null" ]; then
-                          break
-                      fi
-                      echo "Attempt $i: PR not found yet, retrying in 10s..."
-                      sleep 10
-                  done
-
-                  if [ -z "$PR_DATA" ] || [ "$PR_DATA" = "null" ]; then
-                      echo "::error::No PR found for commit ${{ github.sha }}"
-                      exit 1
-                  fi
-
-                  PR_NUMBER=$(echo "$PR_DATA" | jq -r '.number')
-                  HEAD_REF=$(echo "$PR_DATA" | jq -r '.head.ref')
-                  echo "Found PR #$PR_NUMBER from branch $HEAD_REF"
-
-                  # Get labels from PR
-                  LABELS=$(echo "$PR_DATA" | jq -r '.labels[].name')
-                  echo "Labels: $LABELS"
-
-                  # Determine bump type from labels. CI already requires exactly
-                  # one release label; this guards a label changed after CI ran.
-                  RELEASE_LABELS=$(echo "$LABELS" | grep -cE '^release:(major|minor|patch|none)$' || true)
-                  if [ "$RELEASE_LABELS" -gt 1 ]; then
-                      echo "::error::PR #$PR_NUMBER has more than one release label; remove the extra one and re-run this workflow"
-                      exit 1
-                  fi
-
-                  # release:none merges without releasing: no version bump or CDN
-                  # publish, but master is still synced back to develop
-                  if echo "$LABELS" | grep -qx 'release:none'; then
-                      echo "PR #$PR_NUMBER has release:none, skipping release"
-                      echo "should_deploy=false" >> $GITHUB_OUTPUT
-                      echo "release_none=true" >> $GITHUB_OUTPUT
-                      exit 0
-                  fi
-
-                  if echo "$LABELS" | grep -qx 'release:major'; then
-                      BUMP_TYPE="major"
-                  elif echo "$LABELS" | grep -qx 'release:minor'; then
-                      BUMP_TYPE="minor"
-                  elif echo "$LABELS" | grep -qx 'release:patch'; then
-                      BUMP_TYPE="patch"
-                  else
-                      echo "::error::No release label found on PR #$PR_NUMBER"
-                      exit 1
-                  fi
-
-                  echo "Bump type: $BUMP_TYPE"
-                  echo "should_deploy=true" >> $GITHUB_OUTPUT
-                  echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
-                  echo "head_ref=$HEAD_REF" >> $GITHUB_OUTPUT
-                  echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
-
     deploy:
-        needs: get-pr-info
-        if: needs.get-pr-info.outputs.should_deploy == 'true'
         runs-on: ubuntu-latest
         environment: production
 
         steps:
+            # Don't leave the write token in the checkout for npm ci and the
+            # build to find; only the tag step gets it. Later fetches of master
+            # work without credentials because the repo is public; if it ever
+            # goes private, pass the token to them too.
             - uses: actions/checkout@v7
               with:
-                  fetch-depth: 0
-                  token: ${{ secrets.RELEASE_PAT }}
+                  fetch-depth: 0 # need tags to tell whether this version is released
+                  persist-credentials: false
 
             - name: Setup Node.js
               uses: actions/setup-node@v7
@@ -107,56 +48,28 @@ jobs:
                   node-version-file: .nvmrc
                   cache: "npm"
 
-            - name: Install dependencies
-              run: npm ci
-
-            - name: Bump version
-              id: version
+            - name: Determine version and whether it is already released
+              id: check
+              env:
+                  BEFORE: ${{ github.event.before }} # master's tip before this push
               run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
-
-                  BUMP_TYPE="${{ needs.get-pr-info.outputs.bump_type }}"
-                  HEAD_REF="${{ needs.get-pr-info.outputs.head_ref }}"
-                  CURRENT_VERSION=$(node -p "require('./package.json').version")
-
-                  echo "Source branch: $HEAD_REF"
-                  echo "Current version: $CURRENT_VERSION"
-                  echo "Bump type: $BUMP_TYPE"
-
-                  # Check if this is a release branch with prerelease suffix
-                  if [[ "$HEAD_REF" =~ ^release/([0-9]+\.[0-9]+\.[0-9]+)(-([a-z]+))?$ ]]; then
-                      TARGET_BASE="${BASH_REMATCH[1]}"
-                      PRERELEASE_SUFFIX="${BASH_REMATCH[3]}"
-
-                      if [ -n "$PRERELEASE_SUFFIX" ]; then
-                          echo "Prerelease branch detected: $PRERELEASE_SUFFIX"
-
-                          # Check if already in this prerelease series
-                          if [[ "$CURRENT_VERSION" == "$TARGET_BASE-$PRERELEASE_SUFFIX"* ]]; then
-                              echo "Incrementing existing $PRERELEASE_SUFFIX series"
-                              npm version prerelease -m "chore: release v%s"
-                          else
-                              echo "Starting new $PRERELEASE_SUFFIX series"
-                              npm version "pre$BUMP_TYPE" --preid="$PRERELEASE_SUFFIX" -m "chore: release v%s"
-                          fi
-                      else
-                          echo "Stable release branch"
-                          npm version "$BUMP_TYPE" -m "chore: release v%s"
-                      fi
+                  VERSION=$(node -p "require('./package.json').version")
+                  echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+                  if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+                      echo "v$VERSION is already released."
+                      node scripts/check-released-unchanged.mjs "$VERSION"
+                      echo "skip=true" >> "$GITHUB_OUTPUT"
                   else
-                      echo "Regular branch (not release/*)"
-                      npm version "$BUMP_TYPE" -m "chore: release v%s"
+                      node scripts/check-unreleased-unchanged.mjs "$VERSION"
+                      echo "Releasing v$VERSION"
                   fi
 
-                  NEW_VERSION=$(node -p "require('./package.json').version")
-                  echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
-                  echo "New version: $NEW_VERSION"
-
-            - name: Push version commit and tag
-              run: git push --follow-tags
+            - name: Install dependencies
+              if: steps.check.outputs.skip != 'true'
+              run: npm ci
 
             - name: Create .env for build
+              if: steps.check.outputs.skip != 'true'
               run: |
                   echo "SDK_API_URL=${{ vars.SDK_API_URL }}" >> .env
                   echo "SDK_APP_URL=${{ vars.SDK_APP_URL }}" >> .env
@@ -164,63 +77,59 @@ jobs:
                   echo "KV_NAMESPACE_PRODUCTION=${{ vars.KV_NAMESPACE_PRODUCTION }}" >> .env
 
             - name: Build
+              if: steps.check.outputs.skip != 'true'
               run: npm run build
 
+            # Stop if master has moved on to another version since this push,
+            # e.g. when re-running an old failed release: publishing it would
+            # move the aliases backwards. Checked again before publishing.
+            - name: Check master is still at this version
+              id: current
+              if: steps.check.outputs.skip != 'true'
+              run: |
+                  git fetch -q origin master
+                  LATEST=$(git show origin/master:package.json | node -p "JSON.parse(require('fs').readFileSync(0)).version")
+                  if [ "$LATEST" != "$VERSION" ]; then
+                      echo "::warning::master has moved on to $LATEST, so v$VERSION won't be released."
+                      echo "superseded=true" >> "$GITHUB_OUTPUT"
+                  fi
+              env:
+                  VERSION: ${{ steps.check.outputs.version }}
+
             - name: Upload to CDN
-              run: node scripts/cdn-upload.js production --ci --skip-build
+              if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true'
+              run: node scripts/cdn-upload.js production --ci --skip-build --overwrite
               env:
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
+            - name: Check master is still at this version before publishing
+              id: still-current
+              if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true'
+              run: |
+                  git fetch -q origin master
+                  LATEST=$(git show origin/master:package.json | node -p "JSON.parse(require('fs').readFileSync(0)).version")
+                  if [ "$LATEST" != "$VERSION" ]; then
+                      echo "::warning::master has moved on to $LATEST, so v$VERSION won't be released."
+                      echo "superseded=true" >> "$GITHUB_OUTPUT"
+                  fi
+              env:
+                  VERSION: ${{ steps.check.outputs.version }}
+
             - name: Publish version
+              if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true' && steps.still-current.outputs.superseded != 'true'
               run: node scripts/cdn-publish.js production --ci
               env:
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
                   CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
 
-    # Runs after a release and after a release:none merge. Even with no release,
-    # the merge commit has to reach develop: master only accepts PRs whose branch
-    # contains its latest commit, so otherwise the next develop PR is blocked.
-    # Skipped for the automated version bump commit, which the release's own
-    # sync already covers.
-    sync-develop:
-        needs: [get-pr-info, deploy]
-        if: ${{ !failure() && !cancelled() && (needs.deploy.result == 'success' || needs.get-pr-info.outputs.release_none == 'true') }}
-        runs-on: ubuntu-latest
-        environment: production
-
-        steps:
-            - uses: actions/checkout@v7
-              with:
-                  fetch-depth: 0
-                  token: ${{ secrets.RELEASE_PAT }}
-
-            - name: Sync master to develop
-              env:
-                  GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+            - name: Tag the release
+              if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true' && steps.still-current.outputs.superseded != 'true'
               run: |
-                  git config user.name "github-actions[bot]"
-                  git config user.email "github-actions[bot]@users.noreply.github.com"
-
-                  git fetch origin master develop
-                  git checkout develop
-
-                  if git merge origin/master --no-edit; then
-                      echo "Merge successful, pushing to develop"
-                      git push
-                  else
-                      echo "Merge conflict detected, creating PR for manual resolution"
-                      git merge --abort
-                      gh pr create --base develop --head master \
-                          --title "Sync master to develop" \
-                          --body "Auto-generated PR to sync release changes back to develop. Manual conflict resolution required."
-                  fi
-
-            - name: Delete release branch
-              if: startsWith(needs.get-pr-info.outputs.head_ref, 'release/') && needs.deploy.result == 'success'
+                  git -c user.name="github-actions[bot]" \
+                      -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                      tag -a "v$VERSION" -m "v$VERSION"
+                  git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" "v$VERSION"
               env:
-                  GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-              run: |
-                  HEAD_REF="${{ needs.get-pr-info.outputs.head_ref }}"
-                  echo "Deleting branch: $HEAD_REF"
-                  git push origin --delete "$HEAD_REF"
+                  VERSION: ${{ steps.check.outputs.version }}
+                  GH_TOKEN: ${{ github.token }}
