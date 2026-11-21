@@ -286,39 +286,44 @@ export class AccessibilityModal extends ScmsElement {
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">
                     ${field.label}
-                    ${priority === "primary"
-                        ? html`<span class="text-red-500 ml-1">*</span>`
-                        : nothing}
+                    ${
+                        priority === "primary"
+                            ? html`<span class="text-red-500 ml-1">*</span>`
+                            : nothing
+                    }
                 </label>
-                ${field.type === "select"
-                    ? html`
-                          <select
-                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white"
-                              .value=${value}
-                              @change=${(e: Event) =>
-                                  this.handleInput(
-                                      field.name,
-                                      (e.target as HTMLSelectElement).value,
+                ${
+                    field.type === "select"
+                        ? html`
+                              <select
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 bg-white"
+                                  .value=${value}
+                                  @change=${(e: Event) =>
+                                      this.handleInput(
+                                          field.name,
+                                          (e.target as HTMLSelectElement).value,
+                                      )}
+                              >
+                                  ${field.options?.map(
+                                      (opt) =>
+                                          html`<option value=${opt.value}>${opt.label}</option>`,
                                   )}
-                          >
-                              ${field.options?.map(
-                                  (opt) => html`<option value=${opt.value}>${opt.label}</option>`,
-                              )}
-                          </select>
-                      `
-                    : html`
-                          <input
-                              type="text"
-                              class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                              .value=${value}
-                              @input=${(e: Event) =>
-                                  this.handleInput(
-                                      field.name,
-                                      (e.target as HTMLInputElement).value,
-                                  )}
-                              placeholder=${field.placeholder || ""}
-                          />
-                      `}
+                              </select>
+                          `
+                        : html`
+                              <input
+                                  type="text"
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                                  .value=${value}
+                                  @input=${(e: Event) =>
+                                      this.handleInput(
+                                          field.name,
+                                          (e.target as HTMLInputElement).value,
+                                      )}
+                                  placeholder=${field.placeholder || ""}
+                              />
+                          `
+                }
                 <p class="field-tip">${tip}</p>
             </div>
         `;
@@ -369,45 +374,50 @@ export class AccessibilityModal extends ScmsElement {
                     ${secondaryFields.map((field) => this.renderField(field))}
 
                     <!-- Not applicable fields (collapsed) -->
-                    ${notApplicableFields.length > 0
-                        ? html`
-                              <div class="pt-2 border-t border-gray-200">
-                                  <button
-                                      type="button"
-                                      class="not-applicable-toggle"
-                                      @click=${() =>
-                                          (this.showNotApplicable = !this.showNotApplicable)}
-                                  >
-                                      <svg
-                                          class="w-4 h-4 transition-transform ${this
-                                              .showNotApplicable
-                                              ? "rotate-90"
-                                              : ""}"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
+                    ${
+                        notApplicableFields.length > 0
+                            ? html`
+                                  <div class="pt-2 border-t border-gray-200">
+                                      <button
+                                          type="button"
+                                          class="not-applicable-toggle"
+                                          @click=${() =>
+                                              (this.showNotApplicable = !this.showNotApplicable)}
                                       >
-                                          <path
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M9 5l7 7-7 7"
-                                          />
-                                      </svg>
-                                      Not typically used for this element type
-                                  </button>
-                                  ${this.showNotApplicable
-                                      ? html`
-                                            <div class="not-applicable-section mt-3 space-y-4">
-                                                ${notApplicableFields.map((field) =>
-                                                    this.renderField(field),
-                                                )}
-                                            </div>
-                                        `
-                                      : nothing}
-                              </div>
-                          `
-                        : nothing}
+                                          <svg
+                                              class="w-4 h-4 transition-transform ${
+                                                  this.showNotApplicable ? "rotate-90" : ""
+                                              }"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                          >
+                                              <path
+                                                  stroke-linecap="round"
+                                                  stroke-linejoin="round"
+                                                  stroke-width="2"
+                                                  d="M9 5l7 7-7 7"
+                                              />
+                                          </svg>
+                                          Not typically used for this element type
+                                      </button>
+                                      ${
+                                          this.showNotApplicable
+                                              ? html`
+                                                    <div
+                                                        class="not-applicable-section mt-3 space-y-4"
+                                                    >
+                                                        ${notApplicableFields.map((field) =>
+                                                            this.renderField(field),
+                                                        )}
+                                                    </div>
+                                                `
+                                              : nothing
+                                      }
+                                  </div>
+                              `
+                            : nothing
+                    }
                 </div>
 
                 <!-- Footer -->

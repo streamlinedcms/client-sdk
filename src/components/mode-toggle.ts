@@ -52,17 +52,17 @@ export class ModeToggle extends ScmsElement {
                     style=${styleMap(sliderStyles)}
                 ></div>
                 <button
-                    class="${baseButtonClasses} ${isViewer
-                        ? "text-gray-900"
-                        : "text-gray-500 hover:text-gray-700"}"
+                    class="${baseButtonClasses} ${
+                        isViewer ? "text-gray-900" : "text-gray-500 hover:text-gray-700"
+                    }"
                     @click=${() => this.handleModeChange("viewer")}
                 >
                     Preview
                 </button>
                 <button
-                    class="${baseButtonClasses} ${!isViewer
-                        ? "text-gray-900"
-                        : "text-gray-500 hover:text-gray-700"}"
+                    class="${baseButtonClasses} ${
+                        !isViewer ? "text-gray-900" : "text-gray-500 hover:text-gray-700"
+                    }"
                     @click=${() => this.handleModeChange("author")}
                 >
                     Editing

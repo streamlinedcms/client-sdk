@@ -486,70 +486,77 @@ export class AttributesModal extends ScmsElement {
                                 Add
                             </button>
                         </div>
-                        ${this.addError
-                            ? html`<p class="mt-2 text-sm text-red-600">${this.addError}</p>`
-                            : nothing}
+                        ${
+                            this.addError
+                                ? html`<p class="mt-2 text-sm text-red-600">${this.addError}</p>`
+                                : nothing
+                        }
                     </div>
 
                     <!-- Custom attributes list -->
-                    ${customEntries.length > 0
-                        ? html`
-                              <div class="mb-4">
-                                  <div class="text-sm font-medium text-gray-700 mb-2">
-                                      Custom Attributes
-                                  </div>
-                                  <div class="space-y-2">
-                                      ${customEntries.map(
-                                          (entry) => html`
-                                              <div class="attribute-row">
-                                                  <span class="attr-key">${entry.name}</span>
-                                                  <input
-                                                      type="text"
-                                                      class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
-                                                      .value=${entry.value}
-                                                      @input=${(e: Event) =>
-                                                          this.handleValueChange(
-                                                              entry.name,
-                                                              (e.target as HTMLInputElement).value,
-                                                          )}
-                                                  />
-                                                  <button
-                                                      class="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                                                      @click=${() => this.handleRemove(entry.name)}
-                                                      aria-label="Remove attribute"
-                                                  >
-                                                      <svg
-                                                          class="w-5 h-5"
-                                                          fill="none"
-                                                          viewBox="0 0 24 24"
-                                                          stroke="currentColor"
+                    ${
+                        customEntries.length > 0
+                            ? html`
+                                  <div class="mb-4">
+                                      <div class="text-sm font-medium text-gray-700 mb-2">
+                                          Custom Attributes
+                                      </div>
+                                      <div class="space-y-2">
+                                          ${customEntries.map(
+                                              (entry) => html`
+                                                  <div class="attribute-row">
+                                                      <span class="attr-key">${entry.name}</span>
+                                                      <input
+                                                          type="text"
+                                                          class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400"
+                                                          .value=${entry.value}
+                                                          @input=${(e: Event) =>
+                                                              this.handleValueChange(
+                                                                  entry.name,
+                                                                  (e.target as HTMLInputElement)
+                                                                      .value,
+                                                              )}
+                                                      />
+                                                      <button
+                                                          class="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                                                          @click=${() => this.handleRemove(entry.name)}
+                                                          aria-label="Remove attribute"
                                                       >
-                                                          <path
-                                                              stroke-linecap="round"
-                                                              stroke-linejoin="round"
-                                                              stroke-width="2"
-                                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                                          />
-                                                      </svg>
-                                                  </button>
-                                              </div>
-                                          `,
-                                      )}
+                                                          <svg
+                                                              class="w-5 h-5"
+                                                              fill="none"
+                                                              viewBox="0 0 24 24"
+                                                              stroke="currentColor"
+                                                          >
+                                                              <path
+                                                                  stroke-linecap="round"
+                                                                  stroke-linejoin="round"
+                                                                  stroke-width="2"
+                                                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                                              />
+                                                          </svg>
+                                                      </button>
+                                                  </div>
+                                              `,
+                                          )}
+                                      </div>
                                   </div>
-                              </div>
-                          `
-                        : nothing}
+                              `
+                            : nothing
+                    }
 
                     <!-- Element attributes (read-only) -->
                     <div class="attr-section">
                         <div class="text-sm font-medium text-gray-500 mb-1">Element Attributes</div>
                         <p class="attr-hint mb-2">Core attributes that define the element</p>
                         <div class="space-y-2">
-                            ${elementDefinedEntries.length > 0
-                                ? elementDefinedEntries.map((entry) =>
-                                      this.renderDisabledRow(entry),
-                                  )
-                                : html`<p class="text-sm text-gray-400 italic">None</p>`}
+                            ${
+                                elementDefinedEntries.length > 0
+                                    ? elementDefinedEntries.map((entry) =>
+                                          this.renderDisabledRow(entry),
+                                      )
+                                    : html`<p class="text-sm text-gray-400 italic">None</p>`
+                            }
                         </div>
                     </div>
 
@@ -558,9 +565,11 @@ export class AttributesModal extends ScmsElement {
                         <div class="text-sm font-medium text-gray-500 mb-1">SEO Attributes</div>
                         <p class="attr-hint mb-2">Use the SEO button to edit these</p>
                         <div class="space-y-2">
-                            ${seoEntries.length > 0
-                                ? seoEntries.map((entry) => this.renderDisabledRow(entry))
-                                : html`<p class="text-sm text-gray-400 italic">None set</p>`}
+                            ${
+                                seoEntries.length > 0
+                                    ? seoEntries.map((entry) => this.renderDisabledRow(entry))
+                                    : html`<p class="text-sm text-gray-400 italic">None set</p>`
+                            }
                         </div>
                     </div>
 
@@ -571,9 +580,11 @@ export class AttributesModal extends ScmsElement {
                         </div>
                         <p class="attr-hint mb-2">Use the A11y button to edit these</p>
                         <div class="space-y-2">
-                            ${a11yEntries.length > 0
-                                ? a11yEntries.map((entry) => this.renderDisabledRow(entry))
-                                : html`<p class="text-sm text-gray-400 italic">None set</p>`}
+                            ${
+                                a11yEntries.length > 0
+                                    ? a11yEntries.map((entry) => this.renderDisabledRow(entry))
+                                    : html`<p class="text-sm text-gray-400 italic">None set</p>`
+                            }
                         </div>
                     </div>
 
@@ -582,9 +593,11 @@ export class AttributesModal extends ScmsElement {
                         <div class="text-sm font-medium text-gray-500 mb-1">Other Attributes</div>
                         <p class="attr-hint mb-2">Additional attributes on this element</p>
                         <div class="space-y-2">
-                            ${otherEntries.length > 0
-                                ? otherEntries.map((entry) => this.renderDisabledRow(entry))
-                                : html`<p class="text-sm text-gray-400 italic">None</p>`}
+                            ${
+                                otherEntries.length > 0
+                                    ? otherEntries.map((entry) => this.renderDisabledRow(entry))
+                                    : html`<p class="text-sm text-gray-400 italic">None</p>`
+                            }
                         </div>
                     </div>
 
@@ -595,9 +608,11 @@ export class AttributesModal extends ScmsElement {
                         </div>
                         <p class="attr-hint mb-2">Cannot be modified (class, id, style)</p>
                         <div class="space-y-2">
-                            ${reservedEntries.length > 0
-                                ? reservedEntries.map((entry) => this.renderDisabledRow(entry))
-                                : html`<p class="text-sm text-gray-400 italic">None</p>`}
+                            ${
+                                reservedEntries.length > 0
+                                    ? reservedEntries.map((entry) => this.renderDisabledRow(entry))
+                                    : html`<p class="text-sm text-gray-400 italic">None</p>`
+                            }
                         </div>
                     </div>
                 </div>

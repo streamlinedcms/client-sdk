@@ -12,13 +12,11 @@ import type { AppPermissions } from "../types.js";
 
 /** Result from authenticate call */
 export type AuthResult =
-    | { valid: true; permissions: AppPermissions }
-    | { valid: false; error: string };
+    { valid: true; permissions: AppPermissions } | { valid: false; error: string };
 
 /** Result from signIn call */
 export type SignInResult =
-    | { valid: true; permissions: AppPermissions; key: string }
-    | { valid: false; error: string };
+    { valid: true; permissions: AppPermissions; key: string } | { valid: false; error: string };
 
 /** Methods exposed by the auth bridge iframe */
 interface AuthBridgeMethods {
