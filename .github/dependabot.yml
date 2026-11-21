@@ -29,6 +29,12 @@ updates:
               patterns: ["vitest", "@vitest/*"]
           minor-and-patch:
               update-types: [minor, patch]
+      ignore:
+          # @rollup/plugin-typescript doesn't support TypeScript 7 yet, so the
+          # build fails with it. Remove once the plugin supports 7; tracked in
+          # #138, waiting on https://github.com/rollup/plugins/issues/2016
+          - dependency-name: typescript
+            versions: [">=7"]
 
     - package-ecosystem: npm
       directory: /
