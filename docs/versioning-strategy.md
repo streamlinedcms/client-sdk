@@ -71,20 +71,17 @@ window.StreamlinedCMS.version // "1.2.3"
 
 ### Build Configuration
 
-The version is injected at build time from `package.json`:
+The version is injected at build time: the `SDK_VERSION` environment variable
+if set, otherwise `package.json`'s version (see `rollup.config.js`). Stable
+releases use `package.json`'s version. Staging and release branch builds set
+`SDK_VERSION` to their build name (e.g. `1.3.0-dev.<timestamp>.<sha>` or
+`1.5.0-beta.<timestamp>.<sha>`), so the running SDK reports exactly which build
+it is.
 
 ```javascript
 // rollup.config.js
-import { readFileSync } from 'fs';
-const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
-
-const replacePlugin = replace({
-    preventAssignment: true,
-    values: {
-        __SDK_VERSION__: JSON.stringify(pkg.version),
-        // ... other replacements
-    },
-});
+const SDK_VERSION = process.env.SDK_VERSION || pkg.version;
+// ...replaced into the bundle as __SDK_VERSION__
 ```
 
 ```typescript

@@ -2,9 +2,9 @@ name: Release Stage
 
 # When a release branch's PR to master changes stage, republish the branch's
 # current commit under the new stage by running deploy-release.yml on the
-# branch: marked ready for review, or opened or reopened as ready (rc), or moved
-# back to draft (beta). A PR opened as a draft needs nothing: pushes already
-# publish betas.
+# branch: marked ready for review, opened or reopened as ready, or retargeted to
+# master while ready (rc), or moved back to draft (beta). A PR opened as a draft
+# needs nothing: pushes already publish betas.
 #
 # This can't publish itself: the production environment (holding the
 # Cloudflare token) only allows master and release/* runs. A run requested with
@@ -16,7 +16,7 @@ name: Release Stage
 # only ever dispatches.
 on:
     pull_request_target:
-        types: [opened, reopened, ready_for_review, converted_to_draft]
+        types: [opened, reopened, edited, ready_for_review, converted_to_draft]
         branches: [master]
 
 permissions:
@@ -28,7 +28,8 @@ jobs:
         if: >-
             startsWith(github.head_ref, 'release/') &&
             github.event.pull_request.head.repo.full_name == github.repository &&
-            (github.event.action == 'converted_to_draft' || !github.event.pull_request.draft)
+            (github.event.action == 'converted_to_draft' || !github.event.pull_request.draft) &&
+            (github.event.action != 'edited' || github.event.changes.base != null)
         runs-on: ubuntu-latest
         steps:
             - name: Run the release branch deploy

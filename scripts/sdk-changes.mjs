@@ -21,7 +21,18 @@ const BUILD_INPUTS = [
 ];
 
 function git(...args) {
-    return execFileSync("git", args, { encoding: "utf8" }).trim();
+    try {
+        return execFileSync("git", args, {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "pipe"],
+        }).trim();
+    } catch (error) {
+        console.error(
+            `::error::git ${args.join(" ")} failed: ${error.stderr?.trim() || error.message}. ` +
+                `Fetch master and tags first (git fetch origin master --tags).`,
+        );
+        process.exit(1);
+    }
 }
 
 function isAncestor(commit, of) {
@@ -34,26 +45,27 @@ function isAncestor(commit, of) {
 }
 
 // Runtime packages by name and version, ignoring where npm placed them in
-// node_modules, so a dev dependency update that moves one isn't a change
+// node_modules, so a dev dependency update that moves one isn't a change.
+// The SDK's own direct dependencies are also compared at the top level, where
+// npm always installs them: with two versions of a package installed, which
+// one the SDK imports can change without the set of versions changing.
 function runtimeDependencies(ref) {
     const lock = JSON.parse(git("show", `${ref}:package-lock.json`));
-    return [
-        ...new Set(
-            Object.entries(lock.packages)
-                .filter(([path, entry]) => path !== "" && !entry.dev)
-                .map(([path, entry]) => `${path.split("node_modules/").at(-1)}@${entry.version}`),
-        ),
-    ]
-        .sort()
-        .join("\n");
+    const packages = Object.entries(lock.packages)
+        .filter(([path, entry]) => path !== "" && !entry.dev)
+        .map(([path, entry]) => `${path.split("node_modules/").at(-1)}@${entry.version}`);
+    const direct = Object.keys(lock.packages[""]?.dependencies ?? {}).map(
+        (name) => `direct ${name}@${lock.packages[`node_modules/${name}`]?.version}`,
+    );
+    return [...new Set(packages), ...direct].sort().join("\n");
 }
 
 /**
  * Returns a description of the SDK changes between tag and ref, or null if
- * there are none (including when ref is already part of the tag).
+ * there are none (including when ref is already part of a tag on master).
  */
 export function sdkChangesSince(tag, ref = "HEAD") {
-    if (isAncestor(ref, tag)) return null;
+    if (isAncestor(ref, tag) && isAncestor(tag, "origin/master")) return null;
 
     const files = git("diff", "--name-only", tag, ref, "--", ...BUILD_INPUTS);
     const dependenciesChanged = runtimeDependencies(tag) !== runtimeDependencies(ref);

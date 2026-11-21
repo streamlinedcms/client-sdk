@@ -11,8 +11,9 @@ name: Deploy Release
 # release-stage.yml runs this on the branch when the PR changes stage, so the
 # current commit is republished under the new stage without a push.
 #
-# The tests run in a job without the production environment, so test code and
-# its dependencies never run alongside the Cloudflare token.
+# The tests run in a job without the production environment, so test code never
+# runs in the job that gets the Cloudflare token. (The deploy job still installs
+# dependencies and builds, as deploy-prod.yml does.)
 on:
     push:
         branches:
@@ -131,8 +132,15 @@ jobs:
               env:
                   SDK_VERSION: ${{ needs.test.outputs.version }}
 
+            # The build name belongs to this run, and nothing points at it until
+            # it's published, so a re-run of this job may replace its files
             - name: Upload to CDN
-              run: node scripts/cdn-upload.js production --ci --skip-build --version="$VERSION"
+              run: |
+                  if [ -z "$VERSION" ]; then
+                      echo "::error::No build version from the test job"
+                      exit 1
+                  fi
+                  node scripts/cdn-upload.js production --ci --skip-build --overwrite --version="$VERSION"
               env:
                   VERSION: ${{ needs.test.outputs.version }}
                   CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}

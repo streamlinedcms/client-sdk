@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
 /**
- * Check that a PR to master includes everything already on master, so merging
- * it can't drop a change that reached master after the branch was made: a
- * hotfix missing from develop or from a release branch, or a stale hotfix or
- * Dependabot PR.
+ * Check that a PR to master already includes everything on master, so what
+ * ships is exactly what was tested on the branch. Without it, merging a release
+ * branch that lacks a hotfix would combine the two only at merge time: the
+ * released code would never have been tested as an rc. It also makes develop
+ * take hotfixes and release branch fixes before its next release, and brings a
+ * stale hotfix or Dependabot PR up to date first.
  *
  * Compares file contents between master and the point where the PR's branch
  * last joined it, not commits: the merge commit a release leaves on master
@@ -68,8 +70,9 @@ if (HEAD_REF === "develop") {
 }
 if (HEAD_REF.startsWith("dependabot/")) {
     fail(
-        `master has changed since Dependabot opened this PR. Comment '@dependabot rebase' on the PR, ` +
-            `then push the version bump commit again (the rebase drops it). Files: ${files}`,
+        `master has changed since Dependabot opened this PR. Merge master into the branch (or comment ` +
+            `'@dependabot recreate', which discards your commits), then push a version bump to the next ` +
+            `patch after master's version, which may have moved on. Files: ${files}`,
     );
 }
 fail(

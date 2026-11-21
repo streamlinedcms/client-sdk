@@ -31,7 +31,9 @@ jobs:
 
         steps:
             # Don't leave the write token in the checkout for npm ci and the
-            # build to find; only the tag step gets it
+            # build to find; only the tag step gets it. Later fetches of master
+            # work without credentials because the repo is public; if it ever
+            # goes private, pass the token to them too.
             - uses: actions/checkout@v7
               with:
                   fetch-depth: 0 # need tags to tell whether this version is released
@@ -118,7 +120,9 @@ jobs:
             - name: Tag the release
               if: steps.check.outputs.skip != 'true' && steps.current.outputs.superseded != 'true' && steps.still-current.outputs.superseded != 'true'
               run: |
-                  git tag "v$VERSION"
+                  git -c user.name="github-actions[bot]" \
+                      -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                      tag -a "v$VERSION" -m "v$VERSION"
                   git push "https://x-access-token:$GH_TOKEN@github.com/$GITHUB_REPOSITORY.git" "v$VERSION"
               env:
                   VERSION: ${{ steps.check.outputs.version }}

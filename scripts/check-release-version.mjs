@@ -8,8 +8,10 @@
  *
  * Release labels:
  *   release:patch / release:minor / release:major
- *     The version must be the last stable release bumped by the label, newer
- *     than master's, and not yet tagged.
+ *     The version must be master's version bumped by the label, and not yet
+ *     tagged. master normally holds the last stable release; if its release
+ *     failed for good, the fix ships as the next version and that one is
+ *     skipped, so no version is ever rebuilt with different code.
  *   release:none
  *     Merge without releasing: the version must be unchanged from master and
  *     already tagged.
@@ -58,11 +60,6 @@ function run(command, args, hint) {
 function parse(version) {
     const match = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.exec(version);
     return match ? match.slice(1).map(Number) : null;
-}
-
-function compare(a, b) {
-    const [va, vb] = [parse(a), parse(b)];
-    return va[0] - vb[0] || va[1] - vb[1] || va[2] - vb[2];
 }
 
 function bump(version, type) {
@@ -123,6 +120,9 @@ const masterVersion = JSON.parse(
 const tags = run("git", ["tag", "--list", "v*"], FETCH_HINT).split("\n").filter(Boolean);
 const isTagged = tags.includes(`v${version}`);
 
+if (!parse(masterVersion)) {
+    fail(`master's version ${masterVersion} isn't a stable X.Y.Z version; fix master first.`);
+}
 if (!parse(version)) {
     fail(
         `package.json version ${version} isn't a stable X.Y.Z version. master only holds stable ` +
@@ -155,6 +155,14 @@ if (type === "none") {
                 `If master was just released, wait for its release to finish tagging, ${RERUN}.`,
         );
     }
+    const masterChanges = sdkChangesSince(`v${version}`, "origin/master");
+    if (masterChanges) {
+        fail(
+            `release:none, but master itself already has SDK changes since v${version} (${masterChanges}) ` +
+                `that were never released, probably because two PRs set the same version. ` +
+                `Release them with a release label and a version bump before merging release:none PRs.`,
+        );
+    }
     const changes = sdkChangesSince(`v${version}`);
     if (changes) {
         fail(
@@ -168,37 +176,12 @@ if (type === "none") {
     process.exit(0);
 }
 
-const lastStable = tags
-    .map((tag) => tag.slice(1))
-    .filter(parse)
-    .sort(compare)
-    .at(-1);
-if (!lastStable) {
-    fail(`No stable release tag (vX.Y.Z) found to measure the version bump from. ${FETCH_HINT}`);
-}
-
-const expected = bump(lastStable, type);
+const expected = bump(masterVersion, type);
 if (version !== expected) {
-    const masterHint = !tags.includes(`v${masterVersion}`)
-        ? ` master's version ${masterVersion} was never released: re-run its failed Deploy Production run, ` +
-          `or keep ${masterVersion} in this PR so merging it releases it.`
-        : "";
     fail(
-        `release:${type} from the last stable release ${lastStable} means version ${expected}, ` +
-            `but package.json has ${version}. Change the version, or change the label and ${RERUN}.${masterHint}`,
+        `release:${type} from master's version ${masterVersion} means version ${expected}, ` +
+            `but package.json has ${version}. Change the version, or change the label and ${RERUN}.`,
     );
-}
-// master's version is normally released, but if its release failed and a
-// re-run can't fix it, a PR that keeps that version (with fixes) releases it
-const masterUnreleased = !tags.includes(`v${masterVersion}`);
-if (version === masterVersion && masterUnreleased) {
-    console.log(
-        `release:${type}: master's version ${version} isn't released yet; merging this PR releases it. OK.`,
-    );
-    process.exit(0);
-}
-if (compare(version, masterVersion) <= 0) {
-    fail(`Version ${version} isn't newer than master's ${masterVersion}.`);
 }
 if (isTagged) {
     fail(

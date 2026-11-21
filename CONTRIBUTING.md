@@ -211,12 +211,12 @@ is already tagged the merge releases nothing.
 
 If a release fails partway, re-run the failed Deploy Production run: it
 re-uploads every file and only tags once the release is complete. If a re-run
-can't fix it (the release itself is broken), merge a PR with the fix that keeps
-the same version and label; the check allows that while `master`'s version is
-unreleased. A run stops without releasing if `master` has moved on to a newer
-version, and fails if the version is already tagged but the SDK changed since
-that tag (two PRs set the same version); merge a PR with a new version to
-release those changes.
+can't fix it (the release itself is broken), merge the fix as the next version
+(e.g. 1.4.2 with `release:patch` when `master` is stuck at an unreleased
+1.4.1); the broken version is simply never released. A run stops without
+releasing if `master` has moved on to a newer version, and fails if the
+version is already tagged but the SDK changed since that tag (two PRs set the
+same version); merge a PR with a new version to release those changes.
 
 ### Setting the Version
 
@@ -230,15 +230,15 @@ has one.
 PRs to `master` need exactly one release label, and the
 `check-release-label / check` job fails unless the version matches it:
 
-| Label | Meaning | Example (last stable release `1.4.0`) |
+| Label | Meaning | Example (`master` at `1.4.0`) |
 |-------|---------|---------|
 | `release:patch` | Patch release | `1.4.1` |
 | `release:minor` | Minor release | `1.5.0` |
 | `release:major` | Major release | `2.0.0` |
 | `release:none` | Merge without releasing | stays `1.4.0` |
 
-The version must be a stable `X.Y.Z`, newer than `master`'s and not yet
-tagged, and the error says which version the label expects. Adding or removing
+The version must be a stable `X.Y.Z`: `master`'s version bumped by the label,
+and not yet tagged. The error says which version the label expects. Adding or removing
 a label doesn't start a new CI run; if you change it after the checks have
 run, re-run the `check-release-label / check` job.
 
@@ -254,7 +254,7 @@ The `includes-master` job fails a PR to `master` whose branch is missing
 changes already on `master`, such as a hotfix that landed after the branch was
 made. Merge `master` into the branch to fix it (for `develop`, see
 [Getting Changes Back to develop](#getting-changes-back-to-develop); for a
-Dependabot PR, ask Dependabot to rebase it instead).
+Dependabot PR, see [Hotfixes](#hotfixes)).
 
 ### Release Branches and Prereleases
 
@@ -295,9 +295,9 @@ build to see a push straight away. Prereleases never move the stable aliases.
 Fixes made on the release branch reach `develop` after the release; see below.
 Don't merge a release branch into `develop` while it's being tested.
 
-If a prerelease publish fails, re-run it: each run publishes under a new name,
-and it leaves the alias alone if the branch has moved on. If the tests failed,
-push a fix instead.
+If a prerelease publish fails, re-run it (either re-run button works): it
+replaces any files the failed attempt uploaded, and it leaves the alias alone
+if the branch has moved on. If the tests failed, push a fix instead.
 
 To abandon a release, close its PR and have an admin delete the branch. Its
 `X.Y.Z-beta`/`X.Y.Z-rc` aliases keep pointing at its last build until another
@@ -320,9 +320,10 @@ this works at any time, even while a release branch is in testing.
 
 That includes the PRs Dependabot opens for critical alerts in runtime
 dependencies (see `.github/dependabot.yml`): push a commit to the PR's branch
-that bumps the patch version, and the check passes. If anyone asks Dependabot
-to rebase the PR afterwards, the bump commit is lost and has to be pushed
-again.
+that bumps the patch version, and the check passes. After that, Dependabot
+won't rebase the PR. If `master` moves on before it merges (say another hotfix
+took 1.4.1), merge `master` into the branch and bump to the next patch again
+(1.4.2); `@dependabot recreate` also works but discards your commits.
 
 After a hotfix, merge `master` into any open release branch so its next
 prerelease, and the release itself, include the fix (`includes-master` won't
