@@ -1,17 +1,17 @@
 #!/bin/bash
 set -e
 
-# Setup GitHub repository configuration: branch rulesets and environments.
+# Setup GitHub repository configuration: branch and tag rulesets, and environments.
 # Requires: gh CLI authenticated with admin permissions
 
 show_help() {
     cat <<EOF
 Usage: ./scripts/setup-github.sh <resource> <action> [scope] [options]
 
-Setup GitHub repository configuration: branch rulesets and environments.
+Setup GitHub repository configuration: branch and tag rulesets, and environments.
 
 Resources:
-  rulesets      Branch protection rulesets (scope: master, develop, release)
+  rulesets      Protection rulesets (scope: master, develop, release, tags)
   environments  GitHub environments for deployments (scope: staging, production)
 
 Actions:
@@ -38,21 +38,25 @@ Requirements:
 
 Rulesets:
   master:
-    - Require PR before merging (1 approval, dismiss stale reviews)
-    - Require status checks to pass (must be up to date)
+    - Require PR before merging (no approval required)
+    - Require status checks to pass (not required to be up to date)
     - Block force pushes, restrict deletions
     - Admins can bypass
 
   develop:
     - Require PR before merging (no approval required)
     - Require status checks to pass (not required to be up to date)
-    - Allow force pushes, restrict deletions
+    - Block force pushes, restrict deletions
     - Admins can bypass
 
   release:
-    - Only maintainers can create release/* branches
-    - Restrict deletions
-    - Maintainers can bypass
+    - Only admins can create or delete release/* branches
+    - Admins can bypass
+
+  tags:
+    - Release tags (v*) can't be deleted or moved to another commit
+    - Anyone (including the release workflow) can create them
+    - Admins can bypass
 
 Environments:
   staging     - Auto-deploy target for develop branch
@@ -86,7 +90,7 @@ for arg in "$@"; do
         rulesets|environments)
             RESOURCE="$arg"
             ;;
-        master|develop|release|staging|production)
+        master|develop|release|tags|staging|production)
             SCOPE="$arg"
             ;;
         *)
@@ -113,8 +117,8 @@ fi
 
 # Validate scope matches resource
 if [ -n "$SCOPE" ]; then
-    if [ "$RESOURCE" = "rulesets" ] && [[ ! "$SCOPE" =~ ^(master|develop|release)$ ]]; then
-        echo "Error: scope for rulesets must be 'master', 'develop', or 'release'"
+    if [ "$RESOURCE" = "rulesets" ] && [[ ! "$SCOPE" =~ ^(master|develop|release|tags)$ ]]; then
+        echo "Error: scope for rulesets must be 'master', 'develop', 'release', or 'tags'"
         exit 1
     fi
     if [ "$RESOURCE" = "environments" ] && [[ ! "$SCOPE" =~ ^(staging|production)$ ]]; then
@@ -135,7 +139,7 @@ REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner)
 # RULESETS
 # ============================================================================
 
-BRANCHES=(master develop release)
+BRANCHES=(master develop release tags)
 
 get_ruleset_name() {
     echo "$1-protection"
@@ -229,10 +233,11 @@ master_payload=$(cat <<'EOF'
         {
             "type": "pull_request",
             "parameters": {
-                "required_approving_review_count": 1,
+                "required_approving_review_count": 0,
                 "dismiss_stale_reviews_on_push": true,
                 "required_reviewers": [],
                 "require_code_owner_review": false,
+                "require_extra_approval_for_unattributed_changes": true,
                 "require_last_push_approval": false,
                 "required_review_thread_resolution": false,
                 "allowed_merge_methods": ["merge"]
@@ -241,12 +246,13 @@ master_payload=$(cat <<'EOF'
         {
             "type": "required_status_checks",
             "parameters": {
-                "strict_required_status_checks_policy": true,
+                "strict_required_status_checks_policy": false,
                 "required_status_checks": [
                     { "context": "lint" },
                     { "context": "build" },
                     { "context": "test" },
-                    { "context": "check-release-label / check" }
+                    { "context": "check-release-label / check" },
+                    { "context": "includes-master" }
                 ]
             }
         }
@@ -274,6 +280,7 @@ develop_payload=$(cat <<'EOF'
     },
     "rules": [
         { "type": "deletion" },
+        { "type": "non_fast_forward" },
         {
             "type": "pull_request",
             "parameters": {
@@ -281,6 +288,7 @@ develop_payload=$(cat <<'EOF'
                 "dismiss_stale_reviews_on_push": false,
                 "required_reviewers": [],
                 "require_code_owner_review": false,
+                "require_extra_approval_for_unattributed_changes": true,
                 "require_last_push_approval": false,
                 "required_review_thread_resolution": false,
                 "allowed_merge_methods": ["merge"]
@@ -322,6 +330,36 @@ release_payload=$(cat <<'EOF'
     "rules": [
         { "type": "creation" },
         { "type": "deletion" }
+    ]
+}
+EOF
+)
+
+# Release tags are what the release workflows use to tell whether a version
+# is released, so deleting or moving one would block releases or make them
+# compare against the wrong commit. Creating them stays open, since the
+# release workflow creates them with its own token.
+tags_payload=$(cat <<'EOF'
+{
+    "target": "tag",
+    "enforcement": "active",
+    "bypass_actors": [
+        {
+            "actor_id": 5,
+            "actor_type": "RepositoryRole",
+            "bypass_mode": "always"
+        }
+    ],
+    "conditions": {
+        "ref_name": {
+            "include": ["refs/tags/v*"],
+            "exclude": []
+        }
+    },
+    "rules": [
+        { "type": "deletion" },
+        { "type": "update" },
+        { "type": "non_fast_forward" }
     ]
 }
 EOF

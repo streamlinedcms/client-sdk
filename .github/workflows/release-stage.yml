@@ -1,0 +1,40 @@
+name: Release Stage
+
+# When a release branch's PR to master changes stage, republish the branch's
+# current commit under the new stage by running deploy-release.yml on the
+# branch: marked ready for review, opened or reopened as ready, or retargeted to
+# master while ready (rc), or moved back to draft (beta). A PR opened as a draft
+# needs nothing: pushes already publish betas.
+#
+# This can't publish itself: the production environment (holding the
+# Cloudflare token) only allows master and release/* runs. A run requested with
+# the workflow's own token is on the branch, which it allows.
+#
+# pull_request_target, unlike pull_request, also runs while the PR has merge
+# conflicts (likely right after a hotfix), since it doesn't need a merge ref.
+# It runs master's copy of this file and checks out no code from the PR, so it
+# only ever dispatches.
+on:
+    pull_request_target:
+        types: [opened, reopened, edited, ready_for_review, converted_to_draft]
+        branches: [master]
+
+permissions:
+    actions: write # to run deploy-release.yml
+    contents: read
+
+jobs:
+    republish:
+        if: >-
+            startsWith(github.head_ref, 'release/') &&
+            github.event.pull_request.head.repo.full_name == github.repository &&
+            (github.event.action == 'converted_to_draft' || !github.event.pull_request.draft) &&
+            (github.event.action != 'edited' || github.event.changes.base != null)
+        runs-on: ubuntu-latest
+        steps:
+            - name: Run the release branch deploy
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+                  BRANCH: ${{ github.head_ref }}
+              run: gh workflow run deploy-release.yml --ref "$BRANCH"

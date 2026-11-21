@@ -71,20 +71,17 @@ window.StreamlinedCMS.version // "1.2.3"
 
 ### Build Configuration
 
-The version is injected at build time from `package.json`:
+The version is injected at build time: the `SDK_VERSION` environment variable
+if set, otherwise `package.json`'s version (see `rollup.config.js`). Stable
+releases use `package.json`'s version. Staging and release branch builds set
+`SDK_VERSION` to their build name (e.g. `1.3.0-dev.<timestamp>.<sha>` or
+`1.5.0-beta.<timestamp>.<sha>`), so the running SDK reports exactly which build
+it is.
 
 ```javascript
 // rollup.config.js
-import { readFileSync } from 'fs';
-const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
-
-const replacePlugin = replace({
-    preventAssignment: true,
-    values: {
-        __SDK_VERSION__: JSON.stringify(pkg.version),
-        // ... other replacements
-    },
-});
+const SDK_VERSION = process.env.SDK_VERSION || pkg.version;
+// ...replaced into the bundle as __SDK_VERSION__
 ```
 
 ```typescript
@@ -224,51 +221,48 @@ When to bump major version:
 
 ## Prerelease Versions
 
-Prerelease versions allow testing before stable release. They have their own alias pipeline, isolated from stable aliases.
+Prerelease versions allow testing before a stable release. Every push to a
+`release/X.Y.Z` branch publishes one, named after its commit, and its own
+alias for that release moves to it. Prereleases never update the stable
+aliases (`latest`, `v1`, `v1.0`). See the release process in
+[CONTRIBUTING.md](../CONTRIBUTING.md#release-branches-and-prereleases) for how
+a release branch moves from beta to rc to stable.
 
 ### Prerelease Types
 
 | Type | Example | Purpose |
 |------|---------|---------|
-| Alpha | `1.0.0-alpha.0` | Early testing, incomplete features |
-| Beta | `1.0.0-beta.0` | Feature complete, external testing welcome |
-| RC | `1.0.0-rc.0` | Release candidate, believed ready |
+| Beta | `1.5.0-beta.20261121151300.abc1234` | Testing; problems may still be fixed and scope may change |
+| RC | `1.5.0-rc.20261121151300.abc1234` | Release candidate, believed ready; only bug fixes after this |
+
+The stage comes from the release branch's PR to `master`: draft for beta,
+ready for review for rc.
 
 ### Prerelease URL Structure
 
 ```
-cdn.streamlinedcms.com/
-├── beta/streamlined-cms.js       → latest beta (any version)
-├── rc/streamlined-cms.js         → latest rc (any version)
-├── v1.0.0-beta/streamlined-cms.js → latest 1.0.0 beta build
-├── v1.0.0-rc/streamlined-cms.js   → latest 1.0.0 rc build
-├── v1.0.0-beta.3/streamlined-cms.js → exact prerelease
+cdn.streamlinedcms.com/client-sdk/
+├── v1.5.0-beta/streamlined-cms.js       → latest 1.5.0 beta build
+├── v1.5.0-rc/streamlined-cms.js         → latest 1.5.0 rc build
+├── v1.5.0-beta.20261121151300.abc1234/streamlined-cms.js → exact prerelease
 ```
 
 ### Prerelease Aliases
 
-Prerelease aliases are separate from stable aliases:
-
 | Alias | Resolves To | Updated When |
 |-------|-------------|--------------|
-| `beta` | Latest beta of any version | New beta published |
-| `rc` | Latest rc of any version | New rc published |
-| `1.0.0-beta` | Latest beta for 1.0.0 | New 1.0.0 beta published |
-| `1.0.0-rc` | Latest rc for 1.0.0 | New 1.0.0 rc published |
+| `1.5.0-beta` | Latest beta build for 1.5.0 | Push to `release/1.5.0` while its PR is a draft |
+| `1.5.0-rc` | Latest rc build for 1.5.0 | Push to `release/1.5.0` once its PR is ready, or when it becomes ready (marked ready, opened or reopened as ready, or retargeted to `master` while ready) |
 
-**Important:** Prerelease versions never update stable aliases (`latest`, `v1`, `v1.0`).
+There are no aliases across releases (such as a plain `beta`): with two
+release branches open, they'd take the alias from each other.
 
 ### Cache Headers for Prereleases
 
 | URL Pattern | Cache Strategy |
 |-------------|---------------|
-| `/v1.0.0-beta.3/` | Immutable, long TTL (exact prerelease) |
-| `/v1.0.0-beta/` | Short TTL, revalidate (alias) |
-| `/beta/` | Short TTL, revalidate (alias) |
-
-### Future Expansion
-
-Major/minor prerelease aliases (e.g., `beta/1`, `beta/1.0`) may be added if a use case emerges for tracking prereleases across version lines. Currently deferred as typical workflow has only one version in beta at a time.
+| `/v1.5.0-beta.20261121151300.abc1234/` | Immutable, long TTL (exact prerelease) |
+| `/v1.5.0-beta/` | Short TTL, revalidate (alias) |
 
 ---
 

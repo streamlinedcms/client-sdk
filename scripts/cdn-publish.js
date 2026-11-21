@@ -3,14 +3,18 @@
 /**
  * Update KV version aliases for the CDN.
  *
- * For stable versions (e.g., 1.2.3):
+ * By default it updates the stable aliases:
  *   - "latest" -> current version
  *   - "<major>" -> current version (e.g., "1")
  *   - "<major>.<minor>" -> current version (e.g., "1.2")
  *
- * For prerelease versions (e.g., 1.0.0-beta.0):
- *   - "<type>" -> current version (e.g., "beta")
- *   - "<base>-<type>" -> current version (e.g., "1.0.0-beta")
+ * --alias=<name> updates only that alias instead (e.g. "1.5.0-beta" for a
+ * release branch build), and --no-alias updates none.
+ *
+ * In production, a version with a prerelease suffix (anything after a "-")
+ * must use --no-alias or an --alias that is itself a prerelease alias
+ * (containing a "-"), so a prerelease build can never move the stable aliases.
+ * Staging's -dev builds still update its stable aliases.
  *
  * Usage: node scripts/cdn-publish.js <staging|production> [options]
  */
@@ -37,8 +41,11 @@ const versionOverride = versionArg ? versionArg.split("=")[1] : null;
 
 // --ci implies --yes (used in CI pipelines)
 const skipPrompts = flags.has("--yes") || flags.has("--ci");
-// --no-alias skips alias updates (for release branch testing)
+// --no-alias skips alias updates
 const noAlias = flags.has("--no-alias");
+// --alias=<name> updates only that alias (e.g. "1.5.0-beta")
+const aliasArg = args.find((arg) => arg.startsWith("--alias="));
+const aliasOverride = aliasArg ? aliasArg.split("=")[1] : null;
 
 if (!["staging", "production"].includes(environment)) {
     console.error("Usage: node scripts/cdn-publish.js <staging|production> [options]");
@@ -46,6 +53,7 @@ if (!["staging", "production"].includes(environment)) {
     console.error("  --ci             Same as --yes (for CI pipelines)");
     console.error("  --version=X.Y.Z  Override version (e.g., 0.1.22-dev.20260110143052)");
     console.error("  --no-alias       Only publish exact version, skip alias updates");
+    console.error("  --alias=NAME     Update only this alias (e.g., 1.5.0-beta)");
     process.exit(1);
 }
 
@@ -62,13 +70,31 @@ if (!namespaceId) {
 
 const version = versionOverride || packageJson.version;
 
-// Parse version to detect prerelease
-// Examples: "1.2.3" (stable), "1.0.0-beta.0" (prerelease), "1.0.0-rc.1" (prerelease)
-const prereleaseMatch = version.match(/^(\d+\.\d+\.\d+)-([a-z]+)\.(\d+)$/i);
-const isPrerelease = prereleaseMatch !== null;
-const baseVersion = prereleaseMatch ? prereleaseMatch[1] : version.split("-")[0];
-const prereleaseType = prereleaseMatch ? prereleaseMatch[2] : null; // "beta", "rc", "alpha"
-const [major, minor] = baseVersion.split(".");
+const isPrerelease = version.includes("-");
+const [major, minor] = version.split("-")[0].split(".");
+
+if (aliasArg && !aliasOverride) {
+    console.error("Error: --alias needs a name, e.g. --alias=1.5.0-beta");
+    process.exit(1);
+}
+if (noAlias && aliasOverride) {
+    console.error("Error: use either --alias or --no-alias, not both");
+    process.exit(1);
+}
+if (environment === "production" && isPrerelease && aliasOverride && !aliasOverride.includes("-")) {
+    console.error(
+        `Error: ${version} is a prerelease; in production its alias must be a prerelease alias ` +
+            `(e.g. ${version.split("-")[0]}-beta), not "${aliasOverride}"`,
+    );
+    process.exit(1);
+}
+if (environment === "production" && isPrerelease && !noAlias && !aliasOverride) {
+    console.error(
+        `Error: ${version} is a prerelease; in production it needs --alias=<name> or --no-alias, ` +
+            `so it can't move the stable aliases (latest, ${major}, ${major}.${minor})`,
+    );
+    process.exit(1);
+}
 
 // Asset collection name for KV key prefixing
 const collection = "client-sdk";
@@ -79,21 +105,14 @@ const collection = "client-sdk";
 const VERSION_MARKER = "_";
 const kvEntries = [[version, VERSION_MARKER]]; // Always include version marker
 
-if (!noAlias) {
-    if (isPrerelease) {
-        // Prerelease aliases: "beta" and "1.0.0-beta"
-        kvEntries.push(
-            [prereleaseType, version], // e.g., "beta" -> "1.0.0-beta.0"
-            [`${baseVersion}-${prereleaseType}`, version], // e.g., "1.0.0-beta" -> "1.0.0-beta.0"
-        );
-    } else {
-        // Stable aliases: "latest", "1", "1.2"
-        kvEntries.push(["latest", version], [major, version], [`${major}.${minor}`, version]);
-    }
+if (aliasOverride) {
+    kvEntries.push([aliasOverride, version]);
+} else if (!noAlias) {
+    // Stable aliases: "latest", "1", "1.2"
+    kvEntries.push(["latest", version], [major, version], [`${major}.${minor}`, version]);
 }
 
-const versionType = isPrerelease ? `prerelease (${prereleaseType})` : "stable";
-console.log(`Publishing SDK v${version} to ${environment} [${versionType}]:\n`);
+console.log(`Publishing SDK v${version} to ${environment}:\n`);
 
 console.log(`  Version marker:`);
 console.log(`    "${collection}/${version}" -> "${VERSION_MARKER}" (marks version as published)\n`);
@@ -101,18 +120,12 @@ console.log(`    "${collection}/${version}" -> "${VERSION_MARKER}" (marks versio
 if (noAlias) {
     console.log(`  Aliases: (skipped due to --no-alias)\n`);
 } else {
-    const aliasType = isPrerelease ? "Prerelease aliases" : "Stable aliases";
-    console.log(`  ${aliasType}:`);
+    console.log(aliasOverride ? `  Alias:` : `  Stable aliases:`);
     const aliases = kvEntries.slice(1);
     const maxKeyLen = Math.max(...aliases.map(([alias]) => `${collection}/${alias}`.length));
     for (const [alias, targetVersion] of aliases) {
         const key = `${collection}/${alias}`;
         console.log(`    "${key}"${" ".repeat(maxKeyLen - key.length)} -> "${targetVersion}"`);
-    }
-    if (isPrerelease) {
-        console.log(
-            `\n  Note: Stable aliases (latest, ${major}, ${major}.${minor}) are NOT updated.`,
-        );
     }
 }
 
@@ -150,16 +163,11 @@ if (noAlias) {
     console.log(`\nPublish complete. SDK v${version} is available (no aliases updated).`);
     console.log(`\nTest URL:`);
     console.log(`  https://${cdnDomain}/${collection}/v${version}/streamlined-cms.min.js`);
-} else if (isPrerelease) {
-    console.log(
-        `\nPublish complete. SDK v${version} is now available for ${prereleaseType} testing.`,
-    );
+} else if (aliasOverride) {
+    console.log(`\nPublish complete. SDK v${version} is available as ${aliasOverride}.`);
     console.log(`\nTest URLs:`);
     console.log(`  https://${cdnDomain}/${collection}/v${version}/streamlined-cms.min.js`);
-    console.log(`  https://${cdnDomain}/${collection}/${prereleaseType}/streamlined-cms.min.js`);
-    console.log(
-        `  https://${cdnDomain}/${collection}/${baseVersion}-${prereleaseType}/streamlined-cms.min.js`,
-    );
+    console.log(`  https://${cdnDomain}/${collection}/v${aliasOverride}/streamlined-cms.min.js`);
 } else {
     console.log(`\nPublish complete. SDK v${version} is now live.`);
     console.log(`\nTest URLs:`);

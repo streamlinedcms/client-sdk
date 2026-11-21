@@ -1,5 +1,8 @@
 name: Check Release Label
 
+# Checks that a PR to master has a release label matching the version in
+# package.json; see scripts/check-release-version.mjs for the rules. PRs to
+# other branches pass without checks.
 on:
     workflow_call:
         inputs:
@@ -7,113 +10,40 @@ on:
                 description: "Number of the PR whose labels to check"
                 required: true
                 type: number
-            require:
-                description: "Whether to fail if no release label found"
-                required: false
-                type: boolean
-                default: true
-            head_ref:
-                description: "Source branch name (for release branch validation)"
-                required: false
+            base_ref:
+                description: "Base branch of the PR"
+                required: true
                 type: string
-                default: ""
-        outputs:
-            type:
-                description: "The release type (major, minor, patch, none) or empty if no label"
-                value: ${{ jobs.check.outputs.type }}
-            found:
-                description: "Whether a release label was found (including release:none)"
-                value: ${{ jobs.check.outputs.found }}
+            head_ref:
+                description: "Source branch of the PR"
+                required: true
+                type: string
 
 jobs:
     check:
         runs-on: ubuntu-latest
         permissions:
-            contents: read # checkout for release branch version validation
+            contents: read
             pull-requests: read # to read the PR's current labels
-        outputs:
-            type: ${{ steps.check.outputs.type }}
-            found: ${{ steps.check.outputs.found }}
 
         steps:
+            - uses: actions/checkout@v7
+              with:
+                  fetch-depth: 0 # need tags and master to compare versions
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v7
+              with:
+                  node-version-file: .nvmrc
+
             # The labels are looked up when this runs rather than taken from the
             # event that started the run: CI doesn't run on label changes, and a
             # re-run reuses the original event, so its labels would be stale.
-            - name: Check for release label
-              id: check
+            - name: Check release label and version
+              run: node scripts/check-release-version.mjs
               env:
                   GH_TOKEN: ${{ github.token }}
-              run: |
-                  LABELS=$(gh api "repos/${{ github.repository }}/issues/${{ inputs.pr_number }}/labels" --jq '.[].name')
-                  echo "Labels: $(echo $LABELS)"
-
-                  TYPES=$(echo "$LABELS" | grep -E '^release:(major|minor|patch|none)$' | sed 's/^release://' || true)
-                  COUNT=$(echo "$TYPES" | grep -c . || true)
-
-                  if [ "$COUNT" -gt 1 ]; then
-                      echo "::error::PR has more than one release label ($(echo $TYPES)); keep exactly one and re-run this job"
-                      exit 1
-                  elif [ "$COUNT" -eq 1 ]; then
-                      echo "type=$TYPES" >> $GITHUB_OUTPUT
-                      echo "found=true" >> $GITHUB_OUTPUT
-                      echo "Found release:$TYPES label"
-                  else
-                      echo "type=" >> $GITHUB_OUTPUT
-                      echo "found=false" >> $GITHUB_OUTPUT
-                      if [ "${{ inputs.require }}" = "true" ]; then
-                          echo "::error::PRs to master require a release:patch, release:minor, release:major or release:none label; add one and re-run this job"
-                          exit 1
-                      fi
-                      echo "No release label found (not required)"
-                  fi
-
-            - name: Checkout for version validation
-              if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true' && steps.check.outputs.type != 'none'
-              uses: actions/checkout@v7
-
-            - name: Validate release branch version
-              if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true' && steps.check.outputs.type != 'none'
-              run: |
-                  HEAD_REF="${{ inputs.head_ref }}"
-                  BUMP_TYPE="${{ steps.check.outputs.type }}"
-
-                  # Extract expected version from branch name (release/1.0.0-beta → 1.0.0)
-                  BRANCH_VERSION="${HEAD_REF#release/}"
-                  # Strip any prerelease suffix for base version comparison
-                  EXPECTED_BASE="${BRANCH_VERSION%%-*}"
-
-                  echo "Branch: $HEAD_REF"
-                  echo "Expected base version: $EXPECTED_BASE"
-                  echo "Bump type: $BUMP_TYPE"
-
-                  # Get current version from package.json
-                  CURRENT_VERSION=$(node -p "require('./package.json').version")
-                  CURRENT_BASE="${CURRENT_VERSION%%-*}"
-                  echo "Current version: $CURRENT_VERSION (base: $CURRENT_BASE)"
-
-                  # Calculate what npm version would produce
-                  # Use node to simulate the bump without actually changing anything
-                  RESULT_VERSION=$(node -e "
-                    const semver = require('semver');
-                    const current = '$CURRENT_BASE';
-                    const type = '$BUMP_TYPE';
-                    console.log(semver.inc(current, type));
-                  " 2>/dev/null || node -e "
-                    // Fallback if semver not available - parse manually
-                    const [major, minor, patch] = '$CURRENT_BASE'.split('.').map(Number);
-                    const type = '$BUMP_TYPE';
-                    if (type === 'major') console.log(\`\${major + 1}.0.0\`);
-                    else if (type === 'minor') console.log(\`\${major}.\${minor + 1}.0\`);
-                    else console.log(\`\${major}.\${minor}.\${patch + 1}\`);
-                  ")
-
-                  echo "Calculated result: $RESULT_VERSION"
-
-                  if [ "$RESULT_VERSION" != "$EXPECTED_BASE" ]; then
-                      echo "::error::Version mismatch: release:$BUMP_TYPE bump from $CURRENT_BASE produces $RESULT_VERSION, but branch expects $EXPECTED_BASE"
-                      echo ""
-                      echo "Suggested fix: Use release:major, release:minor, or release:patch label that produces $EXPECTED_BASE"
-                      exit 1
-                  fi
-
-                  echo "Version validated: $BUMP_TYPE bump will produce $EXPECTED_BASE"
+                  GH_REPO: ${{ github.repository }}
+                  PR_NUMBER: ${{ inputs.pr_number }}
+                  BASE_REF: ${{ inputs.base_ref }}
+                  HEAD_REF: ${{ inputs.head_ref }}
