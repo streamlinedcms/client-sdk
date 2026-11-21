@@ -3,10 +3,10 @@ name: Check Release Label
 on:
     workflow_call:
         inputs:
-            labels:
-                description: "JSON array of PR label names"
+            pr_number:
+                description: "Number of the PR whose labels to check"
                 required: true
-                type: string
+                type: number
             require:
                 description: "Whether to fail if no release label found"
                 required: false
@@ -19,52 +19,60 @@ on:
                 default: ""
         outputs:
             type:
-                description: "The release type (major, minor, patch) or empty if none"
+                description: "The release type (major, minor, patch, none) or empty if no label"
                 value: ${{ jobs.check.outputs.type }}
             found:
-                description: "Whether a release label was found"
+                description: "Whether a release label was found (including release:none)"
                 value: ${{ jobs.check.outputs.found }}
 
 jobs:
     check:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read # checkout for release branch version validation
+            pull-requests: read # to read the PR's current labels
         outputs:
             type: ${{ steps.check.outputs.type }}
             found: ${{ steps.check.outputs.found }}
 
         steps:
+            # The labels are looked up when this runs rather than taken from the
+            # event that started the run: CI doesn't run on label changes, and a
+            # re-run reuses the original event, so its labels would be stale.
             - name: Check for release label
               id: check
+              env:
+                  GH_TOKEN: ${{ github.token }}
               run: |
-                  LABELS='${{ inputs.labels }}'
-                  if echo "$LABELS" | grep -q 'release:major'; then
-                      echo "type=major" >> $GITHUB_OUTPUT
+                  LABELS=$(gh api "repos/${{ github.repository }}/issues/${{ inputs.pr_number }}/labels" --jq '.[].name')
+                  echo "Labels: $(echo $LABELS)"
+
+                  TYPES=$(echo "$LABELS" | grep -E '^release:(major|minor|patch|none)$' | sed 's/^release://' || true)
+                  COUNT=$(echo "$TYPES" | grep -c . || true)
+
+                  if [ "$COUNT" -gt 1 ]; then
+                      echo "::error::PR has more than one release label ($(echo $TYPES)); keep exactly one and re-run this job"
+                      exit 1
+                  elif [ "$COUNT" -eq 1 ]; then
+                      echo "type=$TYPES" >> $GITHUB_OUTPUT
                       echo "found=true" >> $GITHUB_OUTPUT
-                      echo "Found release:major label"
-                  elif echo "$LABELS" | grep -q 'release:minor'; then
-                      echo "type=minor" >> $GITHUB_OUTPUT
-                      echo "found=true" >> $GITHUB_OUTPUT
-                      echo "Found release:minor label"
-                  elif echo "$LABELS" | grep -q 'release:patch'; then
-                      echo "type=patch" >> $GITHUB_OUTPUT
-                      echo "found=true" >> $GITHUB_OUTPUT
-                      echo "Found release:patch label"
+                      echo "Found release:$TYPES label"
                   else
                       echo "type=" >> $GITHUB_OUTPUT
                       echo "found=false" >> $GITHUB_OUTPUT
                       if [ "${{ inputs.require }}" = "true" ]; then
-                          echo "::error::PRs to master require a release:patch, release:minor, or release:major label"
+                          echo "::error::PRs to master require a release:patch, release:minor, release:major or release:none label; add one and re-run this job"
                           exit 1
                       fi
                       echo "No release label found (not required)"
                   fi
 
             - name: Checkout for version validation
-              if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true'
-              uses: actions/checkout@v4
+              if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true' && steps.check.outputs.type != 'none'
+              uses: actions/checkout@v7
 
             - name: Validate release branch version
-              if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true'
+              if: startsWith(inputs.head_ref, 'release/') && steps.check.outputs.found == 'true' && steps.check.outputs.type != 'none'
               run: |
                   HEAD_REF="${{ inputs.head_ref }}"
                   BUMP_TYPE="${{ steps.check.outputs.type }}"

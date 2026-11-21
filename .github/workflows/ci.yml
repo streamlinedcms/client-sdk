@@ -1,6 +1,11 @@
 name: CI
 
 on:
+    # Label changes deliberately don't trigger a run: opening a PR with a label
+    # would start two runs at once, and GitHub can judge the PR by whichever
+    # one it records last, even if that one was cancelled. check-release-label
+    # reads the labels when it runs instead, so after changing a release label,
+    # re-run the "check-release-label / check" job.
     pull_request:
         branches: [master, develop]
 
@@ -8,12 +13,12 @@ jobs:
     lint:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v7
               with:
-                  node-version: "22"
+                  node-version-file: .nvmrc
                   cache: "npm"
 
             - name: Install dependencies
@@ -25,12 +30,12 @@ jobs:
     build:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v7
               with:
-                  node-version: "22"
+                  node-version-file: .nvmrc
                   cache: "npm"
 
             - name: Install dependencies
@@ -45,7 +50,7 @@ jobs:
               run: npm run build
 
             - name: Upload build artifacts
-              uses: actions/upload-artifact@v4
+              uses: actions/upload-artifact@v7
               with:
                   name: dist
                   path: dist/
@@ -55,19 +60,19 @@ jobs:
         needs: build
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@v7
 
             - name: Setup Node.js
-              uses: actions/setup-node@v4
+              uses: actions/setup-node@v7
               with:
-                  node-version: "22"
+                  node-version-file: .nvmrc
                   cache: "npm"
 
             - name: Install dependencies
               run: npm ci
 
             - name: Download build artifacts
-              uses: actions/download-artifact@v4
+              uses: actions/download-artifact@v8
               with:
                   name: dist
                   path: dist/
@@ -77,7 +82,10 @@ jobs:
 
     check-release-label:
         uses: ./.github/workflows/check-release-label.yml
+        permissions:
+            contents: read
+            pull-requests: read
         with:
-            labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+            pr_number: ${{ github.event.pull_request.number }}
             require: ${{ github.base_ref == 'master' }}
             head_ref: ${{ github.head_ref }}
