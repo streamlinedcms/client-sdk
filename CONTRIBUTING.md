@@ -211,6 +211,17 @@ PRs to `master` require a release label to determine version bump:
 | `release:patch` | Patch | `0.1.22` → `0.1.23` |
 | `release:minor` | Minor | `0.1.22` → `0.2.0` |
 | `release:major` | Major | `0.1.22` → `1.0.0` |
+| `release:none` | None | `0.1.22` stays `0.1.22` |
+
+To merge into `master` without releasing, for example to get dev dependency
+updates or tooling changes onto `master` (Dependabot reads its config and
+reports alerts from there), use `release:none`. Merging it doesn't bump the
+version or publish to the CDN, so only use it for changes that don't affect
+the built SDK. `master` is still synced back to `develop` afterwards.
+
+A PR can have only one release label. Adding or removing a label doesn't start
+a new CI run; if you change it after the checks have run, re-run the
+`check-release-label / check` job.
 
 ### Release Branches
 

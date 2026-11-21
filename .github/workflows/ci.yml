@@ -1,6 +1,11 @@
 name: CI
 
 on:
+    # Label changes deliberately don't trigger a run: opening a PR with a label
+    # would start two runs at once, and GitHub can judge the PR by whichever
+    # one it records last, even if that one was cancelled. check-release-label
+    # reads the labels when it runs instead, so after changing a release label,
+    # re-run the "check-release-label / check" job.
     pull_request:
         branches: [master, develop]
 
@@ -77,7 +82,10 @@ jobs:
 
     check-release-label:
         uses: ./.github/workflows/check-release-label.yml
+        permissions:
+            contents: read
+            pull-requests: read
         with:
-            labels: ${{ toJson(github.event.pull_request.labels.*.name) }}
+            pr_number: ${{ github.event.pull_request.number }}
             require: ${{ github.base_ref == 'master' }}
             head_ref: ${{ github.head_ref }}
