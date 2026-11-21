@@ -28,7 +28,7 @@ function git(...args) {
         }).trim();
     } catch (error) {
         console.error(
-            `::error::git ${args.join(" ")} failed: ${error.stderr?.trim() || error.message}. ` +
+            `::error::git ${args.join(" ")} failed: ${(error.stderr?.trim() || error.message).replace(/\.$/, "")}. ` +
                 `Fetch master and tags first (git fetch origin master --tags).`,
         );
         process.exit(1);
@@ -66,9 +66,16 @@ function runtimeDependencies(ref) {
  */
 export function sdkChangesSince(tag, ref = "HEAD") {
     if (isAncestor(ref, tag) && isAncestor(tag, "origin/master")) return null;
+    return sdkChangesBetween(tag, ref);
+}
 
-    const files = git("diff", "--name-only", tag, ref, "--", ...BUILD_INPUTS);
-    const dependenciesChanged = runtimeDependencies(tag) !== runtimeDependencies(ref);
+/**
+ * Returns a description of the SDK changes between two commits, or null if
+ * there are none.
+ */
+export function sdkChangesBetween(from, to) {
+    const files = git("diff", "--name-only", from, to, "--", ...BUILD_INPUTS);
+    const dependenciesChanged = runtimeDependencies(from) !== runtimeDependencies(to);
     if (!files && !dependenciesChanged) return null;
 
     return [

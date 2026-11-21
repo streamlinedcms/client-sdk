@@ -21,7 +21,8 @@
  * Requires tags and master to be fetched (checkout fetch-depth: 0).
  *
  * Environment:
- *   BASE_REF    Base branch of the PR. Anything but master passes without checks.
+ *   BASE_REF    Base branch of the PR, for local runs. Anything but master passes
+ *               without checks. In CI the current base is looked up instead.
  *   HEAD_REF    Source branch of the PR.
  *   PR_NUMBER, GH_REPO, GH_TOKEN
  *               Used to look up the PR's labels when this runs, rather than
@@ -34,7 +35,7 @@ import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { sdkChangesSince } from "./sdk-changes.mjs";
 
-const { BASE_REF, HEAD_REF = "" } = process.env;
+const { HEAD_REF = "" } = process.env;
 const RERUN = "then re-run this job";
 const LABEL = /^release:(major|minor|patch|none)$/;
 
@@ -51,7 +52,7 @@ function run(command, args, hint) {
         }).trim();
     } catch (error) {
         fail(
-            `${command} ${args.join(" ")} failed: ${error.stderr?.trim() || error.message}. ${hint}`,
+            `${command} ${args.join(" ")} failed: ${(error.stderr?.trim() || error.message).replace(/\.$/, "")}. ${hint}`,
         );
     }
 }
@@ -94,6 +95,23 @@ function releaseLabels() {
         .filter(Boolean);
 }
 
+// The base is looked up when this runs, like the labels, so a run started
+// before the PR was retargeted doesn't skip the master checks when re-run. (It
+// still checks the code merged with the old base; the run the retarget
+// triggers checks the new one.)
+const BASE_REF = process.env.PR_NUMBER
+    ? run(
+          "gh",
+          [
+              "api",
+              `repos/${process.env.GH_REPO}/pulls/${process.env.PR_NUMBER}`,
+              "--jq",
+              ".base.ref",
+          ],
+          "Couldn't read the PR's base branch.",
+      )
+    : process.env.BASE_REF;
+
 if (BASE_REF !== "master") {
     console.log(`PR to ${BASE_REF}, not master: nothing to check.`);
     process.exit(0);
@@ -119,6 +137,9 @@ const masterVersion = JSON.parse(
 ).version;
 const tags = run("git", ["tag", "--list", "v*"], FETCH_HINT).split("\n").filter(Boolean);
 const isTagged = tags.includes(`v${version}`);
+if (tags.length === 0) {
+    fail(`No release tags (v*) found. ${FETCH_HINT}`);
+}
 
 if (!parse(masterVersion)) {
     fail(`master's version ${masterVersion} isn't a stable X.Y.Z version; fix master first.`);
@@ -152,7 +173,8 @@ if (type === "none") {
     if (!isTagged) {
         fail(
             `release:none, but version ${version} has no v${version} tag, so merging would release it. ` +
-                `If master was just released, wait for its release to finish tagging, ${RERUN}.`,
+                `If master was just released, wait for its release to finish tagging, ${RERUN}. ` +
+                `If master's release failed for good, merge a release PR with the next version first.`,
         );
     }
     const masterChanges = sdkChangesSince(`v${version}`, "origin/master");
@@ -184,8 +206,16 @@ if (version !== expected) {
     );
 }
 if (isTagged) {
+    const onMaster = run(
+        "git",
+        ["tag", "--list", `v${version}`, "--merged", "origin/master"],
+        FETCH_HINT,
+    );
     fail(
-        `Version ${version} is already released (tag v${version} exists). Bump the version in package.json.`,
+        onMaster
+            ? `Version ${version} is already released (tag v${version} exists). Bump the version in package.json.`
+            : `Tag v${version} exists but isn't on master, so it wasn't made by a release. ` +
+                  `An admin needs to delete it (release tags are protected) before ${version} can be released.`,
     );
 }
 

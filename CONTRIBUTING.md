@@ -213,10 +213,17 @@ If a release fails partway, re-run the failed Deploy Production run: it
 re-uploads every file and only tags once the release is complete. If a re-run
 can't fix it (the release itself is broken), merge the fix as the next version
 (e.g. 1.4.2 with `release:patch` when `master` is stuck at an unreleased
-1.4.1); the broken version is simply never released. A run stops without
-releasing if `master` has moved on to a newer version, and fails if the
-version is already tagged but the SDK changed since that tag (two PRs set the
-same version); merge a PR with a new version to release those changes.
+1.4.1), from a branch off `master`; the broken version is never tagged, though
+if it failed after publishing started, its exact-version URL may stay
+reachable. If the stuck release came from a release branch, fix it from a
+hotfix branch and delete the release branch, which can only carry its own
+version.
+
+A run stops without releasing if `master` has moved on to a newer version. It
+fails if the version is already tagged but the SDK changed since that tag, or
+if `master` already carried the same unreleased version (its release failed)
+and the SDK changed since; usually that means two PRs set the same version.
+Merge a PR with the next version to release those changes.
 
 ### Setting the Version
 
@@ -295,9 +302,11 @@ build to see a push straight away. Prereleases never move the stable aliases.
 Fixes made on the release branch reach `develop` after the release; see below.
 Don't merge a release branch into `develop` while it's being tested.
 
-If a prerelease publish fails, re-run it (either re-run button works): it
-replaces any files the failed attempt uploaded, and it leaves the alias alone
-if the branch has moved on. If the tests failed, push a fix instead.
+If a prerelease publish fails, use "Re-run failed jobs": it replaces any files
+the failed attempt uploaded, and leaves the alias alone if the branch has moved
+on or the version has been released since. ("Re-run all jobs" also works, under
+a new build name.) Only re-run the branch's latest run: re-running an older one
+cancels any newer run in progress. If the tests failed, push a fix instead.
 
 To abandon a release, close its PR and have an admin delete the branch. Its
 `X.Y.Z-beta`/`X.Y.Z-rc` aliases keep pointing at its last build until another

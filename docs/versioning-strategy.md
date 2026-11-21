@@ -252,7 +252,7 @@ cdn.streamlinedcms.com/client-sdk/
 | Alias | Resolves To | Updated When |
 |-------|-------------|--------------|
 | `1.5.0-beta` | Latest beta build for 1.5.0 | Push to `release/1.5.0` while its PR is a draft |
-| `1.5.0-rc` | Latest rc build for 1.5.0 | Push to `release/1.5.0` once its PR is ready, or when it's marked ready |
+| `1.5.0-rc` | Latest rc build for 1.5.0 | Push to `release/1.5.0` once its PR is ready, or when it becomes ready (marked ready, opened or reopened as ready, or retargeted to `master` while ready) |
 
 There are no aliases across releases (such as a plain `beta`): with two
 release branches open, they'd take the alias from each other.

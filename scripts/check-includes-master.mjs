@@ -20,14 +20,17 @@
  * fetch-depth: 0).
  *
  * Environment:
- *   BASE_REF    Base branch of the PR. Anything but master passes without checks.
+ *   BASE_REF    Base branch of the PR, for local runs. Anything but master passes
+ *               without checks. In CI (PR_NUMBER, GH_REPO and GH_TOKEN set) the
+ *               PR's current base is looked up instead, so a run started before
+ *               the PR was retargeted doesn't skip this check when re-run.
  *   HEAD_REF    Source branch of the PR.
  *   HEAD_SHA    Commit at the tip of the PR's source branch (default HEAD).
  */
 
 import { execFileSync } from "node:child_process";
 
-const { BASE_REF, HEAD_REF = "", HEAD_SHA = "HEAD" } = process.env;
+const { HEAD_REF = "", HEAD_SHA = "HEAD" } = process.env;
 
 function fail(message) {
     console.error(`::error::${message}`);
@@ -42,11 +45,30 @@ function git(...args) {
         }).trim();
     } catch (error) {
         fail(
-            `git ${args.join(" ")} failed: ${error.stderr?.trim() || error.message}. ` +
+            `git ${args.join(" ")} failed: ${(error.stderr?.trim() || error.message).replace(/\.$/, "")}. ` +
                 `Fetch master and the PR's branch first.`,
         );
     }
 }
+
+const BASE_REF = process.env.PR_NUMBER
+    ? (() => {
+          try {
+              return execFileSync(
+                  "gh",
+                  [
+                      "api",
+                      `repos/${process.env.GH_REPO}/pulls/${process.env.PR_NUMBER}`,
+                      "--jq",
+                      ".base.ref",
+                  ],
+                  { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+              ).trim();
+          } catch (error) {
+              fail(`Couldn't read the PR's base branch: ${error.stderr?.trim() || error.message}`);
+          }
+      })()
+    : process.env.BASE_REF;
 
 if (BASE_REF !== "master") {
     console.log(`PR to ${BASE_REF}, not master: nothing to check.`);

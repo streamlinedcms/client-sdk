@@ -6,7 +6,17 @@ on:
     # one it records last, even if that one was cancelled. check-release-label
     # reads the labels when it runs instead, so after changing a release label,
     # re-run the "check-release-label / check" job.
+    #
+    # Edits do trigger a run, because changing a PR's base (e.g. retargeting a
+    # PR opened against develop to master) changes which checks apply, and the
+    # results from the old base would otherwise still count. Every job runs on
+    # every edit rather than skipping title-only edits: a skipped required check
+    # counts as passing, which would hide an earlier failure. That includes
+    # edits to closed PRs, even though their runs may fail (a merged PR's merge
+    # ref is gone): check results belong to the commit, so skipped checks from
+    # a closed PR would count for any open PR with the same head commit.
     pull_request:
+        types: [opened, synchronize, reopened, edited]
         branches: [master, develop]
 
 jobs:
@@ -96,11 +106,13 @@ jobs:
             base_ref: ${{ github.base_ref }}
             head_ref: ${{ github.head_ref }}
 
-    # PRs to master must include everything already on master, so a hotfix that
-    # landed after the branch was made can't be dropped; see
-    # scripts/check-includes-master.mjs
+    # PRs to master must already include everything on master, so what ships is
+    # what was tested on the branch; see scripts/check-includes-master.mjs
     includes-master:
         runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: read # to read the PR's current base
         steps:
             - uses: actions/checkout@v7
               with:
@@ -114,6 +126,9 @@ jobs:
             - name: Check the PR includes master
               run: node scripts/check-includes-master.mjs
               env:
+                  GH_TOKEN: ${{ github.token }}
+                  GH_REPO: ${{ github.repository }}
+                  PR_NUMBER: ${{ github.event.pull_request.number }}
                   BASE_REF: ${{ github.base_ref }}
                   HEAD_REF: ${{ github.head_ref }}
                   HEAD_SHA: ${{ github.event.pull_request.head.sha }}

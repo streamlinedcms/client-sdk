@@ -8,8 +8,11 @@ name: Deploy Production
 #
 # If v<version> already exists there is nothing to release (a release:none
 # merge, or a re-run after success), unless the SDK changed since that tag,
-# which fails the run. The tag is created last, so a failed release can simply
-# be re-run; the upload replaces any files a failed attempt left behind.
+# which fails the run. It also fails if master already carried this unreleased
+# version before this push and the SDK changed since (two PRs set the same
+# version and the first one's release failed). The tag is created last, so a
+# failed release can simply be re-run; the upload replaces any files a failed
+# attempt left behind.
 #
 # A run stops without releasing if master has moved on to a newer version, so
 # re-running an old failed release can't move the aliases backwards.
@@ -47,6 +50,8 @@ jobs:
 
             - name: Determine version and whether it is already released
               id: check
+              env:
+                  BEFORE: ${{ github.event.before }} # master's tip before this push
               run: |
                   VERSION=$(node -p "require('./package.json').version")
                   echo "version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -55,6 +60,7 @@ jobs:
                       node scripts/check-released-unchanged.mjs "$VERSION"
                       echo "skip=true" >> "$GITHUB_OUTPUT"
                   else
+                      node scripts/check-unreleased-unchanged.mjs "$VERSION"
                       echo "Releasing v$VERSION"
                   fi
 
