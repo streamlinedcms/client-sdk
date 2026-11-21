@@ -246,15 +246,17 @@ export class ChangeRequestOverlay extends ScmsElement {
         return html`
             <div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
                 <span class="text-sm font-medium text-gray-900">Request a change</span>
-                ${closable
-                    ? html`<button
-                          class="text-gray-400 hover:text-gray-600 p-1 [&>span>svg]:w-5 [&>span>svg]:h-5"
-                          @click=${this.handleCancel}
-                          aria-label="Close"
-                      >
-                          <span class="inline-flex">${unsafeSVG(X)}</span>
-                      </button>`
-                    : nothing}
+                ${
+                    closable
+                        ? html`<button
+                              class="text-gray-400 hover:text-gray-600 p-1 [&>span>svg]:w-5 [&>span>svg]:h-5"
+                              @click=${this.handleCancel}
+                              aria-label="Close"
+                          >
+                              <span class="inline-flex">${unsafeSVG(X)}</span>
+                          </button>`
+                        : nothing
+                }
             </div>
         `;
     }
@@ -278,29 +280,33 @@ export class ChangeRequestOverlay extends ScmsElement {
         return html`
             <div class="p-4 overflow-auto">
                 <div class="preview-frame rounded-md border border-gray-200 overflow-hidden mb-3">
-                    ${this.screenshotUrl
-                        ? html`<img
-                              src=${this.screenshotUrl}
-                              alt="Captured screenshot preview"
-                              class="block max-w-full max-h-[52vh] mx-auto"
-                          />`
-                        : nothing}
+                    ${
+                        this.screenshotUrl
+                            ? html`<img
+                                  src=${this.screenshotUrl}
+                                  alt="Captured screenshot preview"
+                                  class="block max-w-full max-h-[52vh] mx-auto"
+                              />`
+                            : nothing
+                    }
                 </div>
-                ${this.manual
-                    ? html`<p class="text-xs text-gray-500 mb-3 flex items-center gap-2">
-                          <span>Using the screenshot you provided.</span>
-                          <button
-                              class="text-blue-600 hover:text-blue-800 underline"
-                              @click=${this.handleRevert}
-                          >
-                              Use the automatic capture instead
-                          </button>
-                      </p>`
-                    : html`<p class="text-sm text-gray-600 mb-3">
-                          Does this screenshot look right? The page was recreated from your browser,
-                          so some details may differ. You can use it as-is, or replace it with one
-                          you capture yourself.
-                      </p>`}
+                ${
+                    this.manual
+                        ? html`<p class="text-xs text-gray-500 mb-3 flex items-center gap-2">
+                              <span>Using the screenshot you provided.</span>
+                              <button
+                                  class="text-blue-600 hover:text-blue-800 underline"
+                                  @click=${this.handleRevert}
+                              >
+                                  Use the automatic capture instead
+                              </button>
+                          </p>`
+                        : html`<p class="text-sm text-gray-600 mb-3">
+                              Does this screenshot look right? The page was recreated from your
+                              browser, so some details may differ. You can use it as-is, or replace
+                              it with one you capture yourself.
+                          </p>`
+                }
                 <p class="text-xs text-gray-500">
                     You can also paste an image from your clipboard to replace the screenshot.
                 </p>
@@ -390,18 +396,20 @@ export class ChangeRequestOverlay extends ScmsElement {
                     >
                         Close
                     </button>
-                    ${this.fallbackUrl
-                        ? html`<a
-                              href=${this.fallbackUrl}
-                              target="_blank"
-                              rel="noopener"
-                              class="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors inline-flex items-center gap-1.5 [&>span>svg]:w-4 [&>span>svg]:h-4"
-                              @click=${this.handleCancel}
-                          >
-                              <span class="inline-flex">${unsafeSVG(ExternalLink)}</span>
-                              Open the editor
-                          </a>`
-                        : nothing}
+                    ${
+                        this.fallbackUrl
+                            ? html`<a
+                                  href=${this.fallbackUrl}
+                                  target="_blank"
+                                  rel="noopener"
+                                  class="px-4 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors inline-flex items-center gap-1.5 [&>span>svg]:w-4 [&>span>svg]:h-4"
+                                  @click=${this.handleCancel}
+                              >
+                                  <span class="inline-flex">${unsafeSVG(ExternalLink)}</span>
+                                  Open the editor
+                              </a>`
+                            : nothing
+                    }
                 </div>
             </div>
         `;

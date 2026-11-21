@@ -73,23 +73,25 @@ export class HelpPanel extends ScmsElement {
                 </div>
 
                 <div class="overflow-y-auto px-4 pb-4">
-                    ${this.loading
-                        ? html`<div class="text-sm text-gray-500 py-2">Loading tours...</div>`
-                        : this.tours.map(
-                              (tour) => html`
-                                  <button
-                                      class="block w-full text-left p-3 mb-2 last:mb-0 border border-gray-200 rounded-md bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all"
-                                      @click=${() => this.handleTourSelect(tour.id)}
-                                  >
-                                      <div class="font-medium text-sm text-gray-700">
-                                          ${tour.label}
-                                      </div>
-                                      <div class="text-xs text-gray-500 mt-0.5">
-                                          ${tour.description}
-                                      </div>
-                                  </button>
-                              `,
-                          )}
+                    ${
+                        this.loading
+                            ? html`<div class="text-sm text-gray-500 py-2">Loading tours...</div>`
+                            : this.tours.map(
+                                  (tour) => html`
+                                      <button
+                                          class="block w-full text-left p-3 mb-2 last:mb-0 border border-gray-200 rounded-md bg-gray-50 hover:bg-gray-100 hover:border-gray-300 transition-all"
+                                          @click=${() => this.handleTourSelect(tour.id)}
+                                      >
+                                          <div class="font-medium text-sm text-gray-700">
+                                              ${tour.label}
+                                          </div>
+                                          <div class="text-xs text-gray-500 mt-0.5">
+                                              ${tour.description}
+                                          </div>
+                                      </button>
+                                  `,
+                              )
+                    }
                 </div>
             </div>
         `;

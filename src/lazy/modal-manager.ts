@@ -54,11 +54,7 @@ export interface ModalManagerHelpers {
 
 /** Modal state property names that can be closed */
 type ModalKey =
-    | "htmlEditorModal"
-    | "linkEditorModal"
-    | "seoModal"
-    | "accessibilityModal"
-    | "attributesModal";
+    "htmlEditorModal" | "linkEditorModal" | "seoModal" | "accessibilityModal" | "attributesModal";
 
 export class ModalManager {
     constructor(

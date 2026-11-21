@@ -515,9 +515,11 @@ export class FormattingToolbar extends ScmsElement {
         return html`
             <button
                 type="button"
-                class="p-1.5 rounded transition-colors ${isActive
-                    ? "bg-gray-200 text-gray-900"
-                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"}"
+                class="p-1.5 rounded transition-colors ${
+                    isActive
+                        ? "bg-gray-200 text-gray-900"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                }"
                 title=${title}
                 @mousedown=${(e: Event) => e.preventDefault()}
                 @click=${() => this.exec(command)}
@@ -556,8 +558,9 @@ export class FormattingToolbar extends ScmsElement {
         return html`
             <div
                 class="toolbar-container"
-                style="position:fixed; top:${this
-                    .posY}px; left:${left}; right:${right}; transform:${transform};"
+                style="position:fixed; top:${
+                    this.posY
+                }px; left:${left}; right:${right}; transform:${transform};"
             >
                 ${this.renderDragHandle()}
                 <div class="toolbar-buttons">
@@ -570,23 +573,29 @@ export class FormattingToolbar extends ScmsElement {
                     ${this.renderButton("h1", Heading1, "Heading 1")}
                     ${this.renderButton("h2", Heading2, "Heading 2")}
                     ${this.renderButton("h3", Heading3, "Heading 3")}
-                    ${this.linkMode
-                        ? nothing
-                        : html`
-                              ${this.renderSeparator()}
-                              ${this.renderButton("bulletList", List, "Bullet List")}
-                              ${this.renderButton("orderedList", ListOrdered, "Ordered List")}
-                              ${this.renderButton("blockquote", Quote, "Blockquote")}
-                          `}
+                    ${
+                        this.linkMode
+                            ? nothing
+                            : html`
+                                  ${this.renderSeparator()}
+                                  ${this.renderButton("bulletList", List, "Bullet List")}
+                                  ${this.renderButton("orderedList", ListOrdered, "Ordered List")}
+                                  ${this.renderButton("blockquote", Quote, "Blockquote")}
+                              `
+                    }
                     ${this.linkMode ? nothing : this.renderSeparator()}
                     ${this.linkMode ? nothing : this.renderButton("link", LinkIcon, "Link")}
-                    ${this.linkMode
-                        ? nothing
-                        : this.renderButton("horizontalRule", Minus, "Horizontal Rule")}
+                    ${
+                        this.linkMode
+                            ? nothing
+                            : this.renderButton("horizontalRule", Minus, "Horizontal Rule")
+                    }
                     ${this.linkMode ? this.renderSeparator() : nothing}
-                    ${this.linkMode
-                        ? this.renderButton("goToLink", ExternalLink, "Go to Link")
-                        : nothing}
+                    ${
+                        this.linkMode
+                            ? this.renderButton("goToLink", ExternalLink, "Go to Link")
+                            : nothing
+                    }
                     ${this.renderSeparator()} ${this.renderButton("undo", Undo2, "Undo")}
                     ${this.renderButton("redo", Redo2, "Redo")}
                 </div>
