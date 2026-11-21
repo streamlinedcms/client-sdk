@@ -739,19 +739,20 @@ export class Toolbar extends ScmsElement {
                 aria-pressed=${this.contentViewerActive}
             >
                 ${unsafeSVG(ScanEye)}
-                ${this.contentViewerActive && this.hiddenElementCount > 0
-                    ? html`<button
-                          class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full leading-none"
-                          @click=${this.handleShowHiddenElements}
-                          title="${this.hiddenElementCount} hidden element${this
-                              .hiddenElementCount === 1
-                              ? ""
-                              : "s"}"
-                          aria-label="Show hidden elements"
-                      >
-                          ${this.hiddenElementCount}
-                      </button>`
-                    : nothing}
+                ${
+                    this.contentViewerActive && this.hiddenElementCount > 0
+                        ? html`<button
+                              class="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full leading-none"
+                              @click=${this.handleShowHiddenElements}
+                              title="${this.hiddenElementCount} hidden element${
+                                  this.hiddenElementCount === 1 ? "" : "s"
+                              }"
+                              aria-label="Show hidden elements"
+                          >
+                              ${this.hiddenElementCount}
+                          </button>`
+                        : nothing
+                }
             </button>
         `;
     }
@@ -843,20 +844,28 @@ export class Toolbar extends ScmsElement {
                     <div class="flex items-center">
                         ${this.renderUndoButton()} ${this.renderSelectOuterButton()}
                         ${this.renderContentViewerButton()}
-                        ${this.hasChanges
-                            ? html`<span class="mx-3">${this.renderSaveButton()}</span>`
-                            : nothing}
+                        ${
+                            this.hasChanges
+                                ? html`<span class="mx-3">${this.renderSaveButton()}</span>`
+                                : nothing
+                        }
                         ${this.renderRequestChangeButton()}
-                        ${this.mockAuth
-                            ? nothing
-                            : html`<div
-                                  class="ml-1 pl-3 border-l border-gray-200 flex items-center"
-                              >
-                                  ${this.renderSignOutButton()}
-                                  ${this.denyAppGui
-                                      ? nothing
-                                      : html`<span class="ml-2">${this.renderAdminLink()}</span>`}
-                              </div>`}
+                        ${
+                            this.mockAuth
+                                ? nothing
+                                : html`<div
+                                      class="ml-1 pl-3 border-l border-gray-200 flex items-center"
+                                  >
+                                      ${this.renderSignOutButton()}
+                                      ${
+                                          this.denyAppGui
+                                              ? nothing
+                                              : html`<span class="ml-2"
+                                                    >${this.renderAdminLink()}</span
+                                                >`
+                                      }
+                                  </div>`
+                        }
                         <div class="ml-3 flex items-center gap-1">${this.renderHelpButton()}</div>
                     </div>
                 </div>
@@ -874,9 +883,9 @@ export class Toolbar extends ScmsElement {
             >
                 <span>${title}</span>
                 <svg
-                    class="w-4 h-4 transition-transform duration-200 ${isCollapsed
-                        ? ""
-                        : "rotate-180"}"
+                    class="w-4 h-4 transition-transform duration-200 ${
+                        isCollapsed ? "" : "rotate-180"
+                    }"
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -980,33 +989,35 @@ export class Toolbar extends ScmsElement {
         return html`
             <div class="mobile-section mb-4 pb-4 border-b border-gray-200" data-section="metadata">
                 ${this.renderMobileSectionHeader("Metadata", "metadata")}
-                ${isCollapsed
-                    ? nothing
-                    : html`
-                          <div class="flex flex-col gap-2">
-                              <button
-                                  class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
-                                  @click=${this.handleEditSeo}
-                                  data-action="seo"
-                              >
-                                  SEO (Search Engine Optimization)
-                              </button>
-                              <button
-                                  class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
-                                  data-action="accessibility"
-                                  @click=${this.handleEditAccessibility}
-                              >
-                                  Accessibility
-                              </button>
-                              <button
-                                  class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
-                                  data-action="attributes"
-                                  @click=${this.handleEditAttributes}
-                              >
-                                  Attributes
-                              </button>
-                          </div>
-                      `}
+                ${
+                    isCollapsed
+                        ? nothing
+                        : html`
+                              <div class="flex flex-col gap-2">
+                                  <button
+                                      class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                                      @click=${this.handleEditSeo}
+                                      data-action="seo"
+                                  >
+                                      SEO (Search Engine Optimization)
+                                  </button>
+                                  <button
+                                      class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                                      data-action="accessibility"
+                                      @click=${this.handleEditAccessibility}
+                                  >
+                                      Accessibility
+                                  </button>
+                                  <button
+                                      class="w-full px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-300 rounded-md hover:bg-gray-50 transition-colors text-left"
+                                      data-action="attributes"
+                                      @click=${this.handleEditAttributes}
+                                  >
+                                      Attributes
+                                  </button>
+                              </div>
+                          `
+                }
             </div>
         `;
     }
@@ -1017,16 +1028,18 @@ export class Toolbar extends ScmsElement {
         return html`
             <div class="mobile-section mb-4 pb-4 border-b border-gray-200" data-section="actions">
                 ${this.renderMobileSectionHeader("Actions", "actions")}
-                ${isCollapsed
-                    ? nothing
-                    : html`
-                          <scms-hold-button
-                              label="Hold to reset element"
-                              hold-duration="800"
-                              @hold-complete=${this.handleReset}
-                              class="w-full"
-                          ></scms-hold-button>
-                      `}
+                ${
+                    isCollapsed
+                        ? nothing
+                        : html`
+                              <scms-hold-button
+                                  label="Hold to reset element"
+                                  hold-duration="800"
+                                  @hold-complete=${this.handleReset}
+                                  class="w-full"
+                              ></scms-hold-button>
+                          `
+                }
             </div>
         `;
     }
@@ -1050,104 +1063,108 @@ export class Toolbar extends ScmsElement {
         return html`
             <div class="mobile-section mb-4 pb-4 border-b border-gray-200" data-section="template">
                 ${this.renderMobileSectionHeader("Template Item", "template")}
-                ${isCollapsed
-                    ? nothing
-                    : html`
-                          <div class="flex flex-col gap-2">
-                              ${this.renderStructureMismatchWarning()}
-                              <!-- Reorder buttons -->
-                              <div class="flex gap-2">
-                                  <button
-                                      class=${canMoveUp ? enabledClass : disabledClass}
-                                      ?disabled=${!canMoveUp}
-                                      data-action="move-up"
-                                      @click=${this.handleMoveInstanceUp}
-                                  >
-                                      <svg
-                                          class="w-4 h-4 mr-1"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
+                ${
+                    isCollapsed
+                        ? nothing
+                        : html`
+                              <div class="flex flex-col gap-2">
+                                  ${this.renderStructureMismatchWarning()}
+                                  <!-- Reorder buttons -->
+                                  <div class="flex gap-2">
+                                      <button
+                                          class=${canMoveUp ? enabledClass : disabledClass}
+                                          ?disabled=${!canMoveUp}
+                                          data-action="move-up"
+                                          @click=${this.handleMoveInstanceUp}
                                       >
-                                          <path
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M5 15l7-7 7 7"
-                                          />
-                                      </svg>
-                                      Move Up
-                                  </button>
-                                  <button
-                                      class=${canMoveDown ? enabledClass : disabledClass}
-                                      ?disabled=${!canMoveDown}
-                                      data-action="move-down"
-                                      @click=${this.handleMoveInstanceDown}
-                                  >
-                                      <svg
-                                          class="w-4 h-4 mr-1"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
+                                          <svg
+                                              class="w-4 h-4 mr-1"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                          >
+                                              <path
+                                                  stroke-linecap="round"
+                                                  stroke-linejoin="round"
+                                                  stroke-width="2"
+                                                  d="M5 15l7-7 7 7"
+                                              />
+                                          </svg>
+                                          Move Up
+                                      </button>
+                                      <button
+                                          class=${canMoveDown ? enabledClass : disabledClass}
+                                          ?disabled=${!canMoveDown}
+                                          data-action="move-down"
+                                          @click=${this.handleMoveInstanceDown}
                                       >
-                                          <path
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M19 9l-7 7-7-7"
-                                          />
-                                      </svg>
-                                      Move Down
-                                  </button>
+                                          <svg
+                                              class="w-4 h-4 mr-1"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                          >
+                                              <path
+                                                  stroke-linecap="round"
+                                                  stroke-linejoin="round"
+                                                  stroke-width="2"
+                                                  d="M19 9l-7 7-7-7"
+                                              />
+                                          </svg>
+                                          Move Down
+                                      </button>
+                                  </div>
+                                  <!-- Add/Delete buttons -->
+                                  <div class="flex gap-2">
+                                      <button
+                                          class="flex-1 px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800 border border-green-300 rounded-md hover:bg-green-50 transition-colors inline-flex items-center justify-center"
+                                          data-action="add-item"
+                                          @click=${this.handleAddInstance}
+                                      >
+                                          <svg
+                                              class="w-4 h-4 mr-1"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                          >
+                                              <path
+                                                  stroke-linecap="round"
+                                                  stroke-linejoin="round"
+                                                  stroke-width="2"
+                                                  d="M12 4v16m8-8H4"
+                                              />
+                                          </svg>
+                                          Add Item
+                                      </button>
+                                      <button
+                                          class=${
+                                              canDelete
+                                                  ? "flex-1 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 transition-colors inline-flex items-center justify-center"
+                                                  : disabledClass
+                                          }
+                                          ?disabled=${!canDelete}
+                                          data-action="delete-item"
+                                          @click=${this.handleDeleteInstance}
+                                      >
+                                          <svg
+                                              class="w-4 h-4 mr-1"
+                                              fill="none"
+                                              viewBox="0 0 24 24"
+                                              stroke="currentColor"
+                                          >
+                                              <path
+                                                  stroke-linecap="round"
+                                                  stroke-linejoin="round"
+                                                  stroke-width="2"
+                                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                              />
+                                          </svg>
+                                          Delete
+                                      </button>
+                                  </div>
                               </div>
-                              <!-- Add/Delete buttons -->
-                              <div class="flex gap-2">
-                                  <button
-                                      class="flex-1 px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800 border border-green-300 rounded-md hover:bg-green-50 transition-colors inline-flex items-center justify-center"
-                                      data-action="add-item"
-                                      @click=${this.handleAddInstance}
-                                  >
-                                      <svg
-                                          class="w-4 h-4 mr-1"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                      >
-                                          <path
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M12 4v16m8-8H4"
-                                          />
-                                      </svg>
-                                      Add Item
-                                  </button>
-                                  <button
-                                      class=${canDelete
-                                          ? "flex-1 px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 border border-red-300 rounded-md hover:bg-red-50 transition-colors inline-flex items-center justify-center"
-                                          : disabledClass}
-                                      ?disabled=${!canDelete}
-                                      data-action="delete-item"
-                                      @click=${this.handleDeleteInstance}
-                                  >
-                                      <svg
-                                          class="w-4 h-4 mr-1"
-                                          fill="none"
-                                          viewBox="0 0 24 24"
-                                          stroke="currentColor"
-                                      >
-                                          <path
-                                              stroke-linecap="round"
-                                              stroke-linejoin="round"
-                                              stroke-width="2"
-                                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                          />
-                                      </svg>
-                                      Delete
-                                  </button>
-                              </div>
-                          </div>
-                      `}
+                          `
+                }
             </div>
         `;
     }
@@ -1195,30 +1212,32 @@ export class Toolbar extends ScmsElement {
                         Sign Out
                     </button>
                     <div class="justify-self-center">${this.renderModeToggle()}</div>
-                    ${this.appUrl && this.appId && !this.denyAppGui
-                        ? html`
-                              <a
-                                  href="${this.appUrl}/apps/${encodeURIComponent(this.appId)}"
-                                  target="_blank"
-                                  class="justify-self-end px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors inline-flex items-center gap-1"
-                              >
-                                  Admin
-                                  <svg
-                                      class="w-3 h-3"
-                                      fill="none"
-                                      viewBox="0 0 24 24"
-                                      stroke="currentColor"
+                    ${
+                        this.appUrl && this.appId && !this.denyAppGui
+                            ? html`
+                                  <a
+                                      href="${this.appUrl}/apps/${encodeURIComponent(this.appId)}"
+                                      target="_blank"
+                                      class="justify-self-end px-3 py-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 transition-colors inline-flex items-center gap-1"
                                   >
-                                      <path
-                                          stroke-linecap="round"
-                                          stroke-linejoin="round"
-                                          stroke-width="2"
-                                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                                      />
-                                  </svg>
-                              </a>
-                          `
-                        : nothing}
+                                      Admin
+                                      <svg
+                                          class="w-3 h-3"
+                                          fill="none"
+                                          viewBox="0 0 24 24"
+                                          stroke="currentColor"
+                                      >
+                                          <path
+                                              stroke-linecap="round"
+                                              stroke-linejoin="round"
+                                              stroke-width="2"
+                                              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                          />
+                                      </svg>
+                                  </a>
+                              `
+                            : nothing
+                    }
                 </div>
             </div>
         `;
@@ -1274,21 +1293,25 @@ export class Toolbar extends ScmsElement {
 
                 <!-- Expandable drawer -->
                 <div
-                    class="${this.expanded
-                        ? "overflow-y-auto"
-                        : "overflow-hidden"} transition-all duration-200 ease-out"
-                    style="max-height: ${this.expanded
-                        ? "calc(100vh - 56px - env(safe-area-inset-bottom, 0px))"
-                        : "0"}"
+                    class="${
+                        this.expanded ? "overflow-y-auto" : "overflow-hidden"
+                    } transition-all duration-200 ease-out"
+                    style="max-height: ${
+                        this.expanded
+                            ? "calc(100vh - 56px - env(safe-area-inset-bottom, 0px))"
+                            : "0"
+                    }"
                 >
                     <div class="px-4 py-3 border-t border-gray-100">
                         <!-- Element section (only when element selected) -->
                         ${this.activeElement ? this.renderMobileElementSection() : nothing}
 
                         <!-- Template section (when element is in a template OR instance is selected) -->
-                        ${this.activeElement || this.templateId
-                            ? this.renderMobileTemplateSection()
-                            : nothing}
+                        ${
+                            this.activeElement || this.templateId
+                                ? this.renderMobileTemplateSection()
+                                : nothing
+                        }
 
                         <!-- Metadata section (only when element selected) -->
                         ${this.activeElement ? this.renderMobileMetadataSection() : nothing}

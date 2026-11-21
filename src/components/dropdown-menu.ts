@@ -163,25 +163,29 @@ export class DropdownMenu extends ScmsElement {
                 aria-haspopup="true"
                 aria-expanded=${this.open}
             >
-                ${this.icon
-                    ? html`<span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(this.icon)}</span>`
-                    : null}
+                ${
+                    this.icon
+                        ? html`<span class="[&>svg]:w-4 [&>svg]:h-4">${unsafeSVG(this.icon)}</span>`
+                        : null
+                }
                 <span>${this.label}</span>
                 <span class="[&>svg]:w-3 [&>svg]:h-3 text-gray-400">
                     ${unsafeSVG(chevronIcon)}
                 </span>
             </button>
 
-            ${this.open
-                ? html`
-                      <div
-                          class="absolute ${menuPositionClass} min-w-40 bg-white border border-gray-200 rounded-md z-50 overflow-hidden"
-                          @click=${this.handleSlotClick}
-                      >
-                          <slot></slot>
-                      </div>
-                  `
-                : null}
+            ${
+                this.open
+                    ? html`
+                          <div
+                              class="absolute ${menuPositionClass} min-w-40 bg-white border border-gray-200 rounded-md z-50 overflow-hidden"
+                              @click=${this.handleSlotClick}
+                          >
+                              <slot></slot>
+                          </div>
+                      `
+                    : null
+            }
         `;
     }
 }

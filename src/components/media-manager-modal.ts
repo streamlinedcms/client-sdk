@@ -622,21 +622,25 @@ export class MediaManagerModal extends ScmsElement {
                     </button>
                 </div>
                 <div
-                    class="iframe-container${this.connectionReady && this.isReady && !this.error
-                        ? " ready"
-                        : ""}"
+                    class="iframe-container${
+                        this.connectionReady && this.isReady && !this.error ? " ready" : ""
+                    }"
                 >
-                    ${statusMessage
-                        ? html`<div class="status">
-                              <div class="spinner"></div>
-                              <span class="status-text">${statusMessage}</span>
-                          </div>`
-                        : null}
-                    ${this.error
-                        ? html`<div class="status">
-                              <span class="status-error">${this.error}</span>
-                          </div>`
-                        : null}
+                    ${
+                        statusMessage
+                            ? html`<div class="status">
+                                  <div class="spinner"></div>
+                                  <span class="status-text">${statusMessage}</span>
+                              </div>`
+                            : null
+                    }
+                    ${
+                        this.error
+                            ? html`<div class="status">
+                                  <span class="status-error">${this.error}</span>
+                              </div>`
+                            : null
+                    }
                 </div>
             </div>
         `;
