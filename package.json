@@ -68,7 +68,7 @@
     "@vitest/coverage-v8": "^5.1.0",
     "autoprefixer": "^10.4.22",
     "concurrently": "^9.2.1",
-    "dotenv": "^17.2.3",
+    "dotenv": "^18.0.10",
     "eruda": "^3.4.3",
     "get-port": "^7.1.0",
     "jsdom": "^31.0.1",
