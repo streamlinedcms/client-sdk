@@ -10,6 +10,8 @@
  * Customer usage: <script src="streamlined-cms.js" data-app-id="..."></script>
  */
 
+import { applyContentToElement } from "./apply-content.js";
+
 (function () {
     // Find our own script tag to get config (do this first, before any DOM modifications)
     const loaderScript = document.currentScript as HTMLScriptElement;
@@ -133,19 +135,6 @@
      */
     function buildTemplateKey(templateId: string, instanceId: string, elementId: string): string {
         return `${templateId}.${instanceId}.${elementId}`;
-    }
-
-    /**
-     * Set text content with \n converted to <br> elements.
-     * Uses DOM APIs (createTextNode + createElement) to avoid XSS from innerHTML.
-     */
-    function setTextWithBreaks(element: HTMLElement, text: string): void {
-        element.textContent = "";
-        const parts = text.split("\n");
-        for (let i = 0; i < parts.length; i++) {
-            if (i > 0) element.appendChild(document.createElement("br"));
-            if (parts[i]) element.appendChild(document.createTextNode(parts[i]));
-        }
     }
 
     /**
@@ -571,98 +560,6 @@
     }
 
     /**
-     * Apply content to a single DOM element.
-     * Returns the element (may be a new element if image was replaced).
-     */
-    function applyContentToElement(
-        element: HTMLElement,
-        type: EditableType,
-        content: string,
-    ): HTMLElement {
-        try {
-            const data = JSON.parse(content) as { type?: string };
-
-            if (data.type === "text") {
-                setTextWithBreaks(element, (data as { type: "text"; value: string }).value);
-                return element;
-            } else if (data.type === "html") {
-                element.innerHTML = (data as { type: "html"; value: string }).value;
-                return element;
-            } else if (data.type === "image" && element instanceof HTMLImageElement) {
-                const src = (data as { type: "image"; src: string }).src;
-                const newImg = document.createElement("img");
-                for (let i = 0; i < element.attributes.length; i++) {
-                    const attr = element.attributes[i];
-                    newImg.setAttribute(attr.name, attr.value);
-                }
-                newImg.src = src;
-                element.replaceWith(newImg);
-                return newImg;
-            } else if (data.type === "link" && element instanceof HTMLAnchorElement) {
-                const linkData = data as {
-                    type: "link";
-                    href: string;
-                    target: string;
-                    value: string;
-                };
-                element.href = linkData.href;
-                element.target = linkData.target;
-                element.innerHTML = linkData.value;
-                return element;
-            } else if (data.type === "href" && element instanceof HTMLAnchorElement) {
-                const hrefData = data as { type: "href"; href: string; target: string };
-                element.href = hrefData.href;
-                element.target = hrefData.target;
-                return element;
-            } else if (data.type) {
-                // Unknown type with type field - don't process
-                return element;
-            }
-
-            // No type field in JSON - use element's declared type
-            if (type === "link" && element instanceof HTMLAnchorElement) {
-                const linkData = data as { href?: string; target?: string; value?: string };
-                if (linkData.href !== undefined) {
-                    element.href = linkData.href;
-                    element.target = linkData.target || "";
-                    element.innerHTML = linkData.value || "";
-                }
-            } else if (type === "href" && element instanceof HTMLAnchorElement) {
-                const hrefData = data as { href?: string; target?: string };
-                if (hrefData.href !== undefined) {
-                    element.href = hrefData.href;
-                    element.target = hrefData.target || "";
-                }
-            } else if (type === "image" && element instanceof HTMLImageElement) {
-                const imageData = data as { src?: string };
-                if (imageData.src !== undefined) {
-                    const newImg = document.createElement("img");
-                    for (let i = 0; i < element.attributes.length; i++) {
-                        const attr = element.attributes[i];
-                        newImg.setAttribute(attr.name, attr.value);
-                    }
-                    newImg.src = imageData.src;
-                    element.replaceWith(newImg);
-                    return newImg;
-                }
-            } else if (type === "text") {
-                const textData = data as { value?: string };
-                if (textData.value !== undefined) {
-                    setTextWithBreaks(element, textData.value);
-                }
-            } else if (type === "html") {
-                const htmlData = data as { value?: string };
-                if (htmlData.value !== undefined) {
-                    element.innerHTML = htmlData.value;
-                }
-            }
-        } catch {
-            // Not JSON - ignore, content should always be JSON
-        }
-        return element;
-    }
-
-    /**
      * Update all elements for a key with content
      */
     function updateElements(
@@ -675,7 +572,9 @@
 
         for (let i = 0; i < infos.length; i++) {
             const info = infos[i];
-            const newElement = applyContentToElement(info.element, info.type, content);
+            const newElement = applyContentToElement(info.element, info.type, content, {
+                replaceImage: true,
+            });
             if (newElement !== info.element) {
                 // Element was replaced (image), update the reference
                 info.element = newElement;

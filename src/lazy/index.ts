@@ -15,6 +15,7 @@ import { KeyStorage, type EditorMode } from "../key-storage.js";
 import { PopupManager, type MediaFile } from "../popup-manager.js";
 import type { EditableType } from "../types.js";
 import { buildTemplateKey, EDITABLE_SELECTOR } from "../types.js";
+import { parseContentAttributes } from "../apply-content.js";
 
 /**
  * Configuration for StreamlinedCMS
@@ -468,14 +469,17 @@ class EditorController {
 
             // Collect all keys that have saved content
             // Ungrouped elements
-            for (const elementId of Object.keys(data.elements)) {
+            for (const [elementId, element] of Object.entries(data.elements)) {
                 this.state.savedContentKeys.add(elementId);
+                this.loadSavedAttributes(elementId, element.content);
             }
 
             // Grouped elements (key format: groupId:elementId)
             for (const [groupId, group] of Object.entries(data.groups)) {
-                for (const elementId of Object.keys(group.elements)) {
-                    this.state.savedContentKeys.add(`${groupId}:${elementId}`);
+                for (const [elementId, element] of Object.entries(group.elements)) {
+                    const key = `${groupId}:${elementId}`;
+                    this.state.savedContentKeys.add(key);
+                    this.loadSavedAttributes(key, element.content);
                 }
             }
 
@@ -487,6 +491,31 @@ class EditorController {
             this.log.warn("Could not fetch saved content keys", error);
             return true; // Network error - assume ok to avoid blocking editing
         }
+    }
+
+    /**
+     * Record an element's saved attributes so the next save keeps them.
+     * The loader already applied them to the DOM, but the DOM can't tell saved
+     * attributes from the site's own, so they come from the saved content.
+     * Skips keys that already have attributes (from a draft or an unsaved
+     * dialog edit) so those aren't overwritten.
+     */
+    private loadSavedAttributes(key: string, content: string): void {
+        if (this.state.elementAttributes.has(key)) return;
+        const attributes = parseContentAttributes(content);
+        if (!attributes) return;
+        this.state.elementAttributes.set(key, attributes);
+
+        // Recompute the element's content to include them. Its load-time value
+        // is updated too, so loading doesn't register as an unsaved change.
+        const infos = this.state.editableElements.get(key);
+        if (!infos || infos.length === 0) return;
+        const updated = this.contentManager.getElementContent(key, infos[0]);
+        const original = this.state.originalContent.get(key);
+        if (this.state.currentContent.get(key) === original) {
+            this.state.currentContent.set(key, updated);
+        }
+        this.state.originalContent.set(key, updated);
     }
 
     async init(): Promise<void> {
