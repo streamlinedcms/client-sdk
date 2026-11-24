@@ -35,14 +35,23 @@ export async function setContent(appId: string, elementId: string, content: stri
  * Get the stored content string for an element on the test server,
  * or null if nothing is stored.
  * @param appId - The app ID
- * @param elementId - The element ID (ungrouped)
+ * @param elementId - The element ID (use "groupId:elementId" for grouped elements)
  */
 export async function getContent(appId: string, elementId: string): Promise<string | null> {
     const response = await fetch(`${serverUrl}/v1/apps/${appId}/content`);
     if (!response.ok) {
         throw new Error(`Failed to get content: ${response.statusText}`);
     }
-    const data = (await response.json()) as { elements: Record<string, { content: string }> };
+    const data = (await response.json()) as {
+        elements: Record<string, { content: string }>;
+        groups: Record<string, { elements: Record<string, { content: string }> }>;
+    };
+    const separator = elementId.indexOf(":");
+    if (separator !== -1) {
+        const groupId = elementId.slice(0, separator);
+        const groupedId = elementId.slice(separator + 1);
+        return data.groups[groupId]?.elements[groupedId]?.content ?? null;
+    }
     return data.elements[elementId]?.content ?? null;
 }
 

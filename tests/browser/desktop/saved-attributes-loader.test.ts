@@ -74,6 +74,49 @@ beforeAll(async () => {
             attributes: { title: "" },
         }),
     );
+    // No type field: applied by the element's declared type
+    await setContent(
+        appId,
+        "saved-attr-untyped",
+        JSON.stringify({
+            value: "Saved untyped",
+            attributes: { title: "Saved untyped title" },
+        }),
+    );
+    // A name with a space is invalid in the DOM; the attributes dialog rejects
+    // it, but the API accepts it
+    await setContent(
+        appId,
+        "saved-attr-invalid",
+        JSON.stringify({
+            type: "text",
+            value: "Saved invalid",
+            attributes: { "bad name": "bad", title: "Saved valid title" },
+        }),
+    );
+    await setContent(
+        appId,
+        "saved-attr-group:grouped",
+        JSON.stringify({
+            type: "text",
+            value: "Saved grouped",
+            attributes: { title: "Saved grouped title" },
+        }),
+    );
+    await setContent(
+        appId,
+        "saved-attr-items.item1.label",
+        JSON.stringify({
+            type: "text",
+            value: "Saved item label",
+            attributes: { title: "Saved item title" },
+        }),
+    );
+    await setContent(
+        appId,
+        "saved-attr-items._order",
+        JSON.stringify({ type: "order", value: ["item1"] }),
+    );
 
     await runLoader(appId);
 });
@@ -115,4 +158,32 @@ test("an attribute saved as empty removes the page's own value", () => {
     const el = document.querySelector('[data-scms-text="saved-attr-clear"]') as HTMLElement;
     expect(el.textContent).toBe("Saved clear");
     expect(el.hasAttribute("title")).toBe(false);
+});
+
+test("untyped content: saved attributes are applied", () => {
+    const el = document.querySelector('[data-scms-text="saved-attr-untyped"]') as HTMLElement;
+    expect(el.textContent).toBe("Saved untyped");
+    expect(el.getAttribute("title")).toBe("Saved untyped title");
+});
+
+test("an invalid attribute name is skipped without losing the content or other attributes", () => {
+    const el = document.querySelector('[data-scms-text="saved-attr-invalid"]') as HTMLElement;
+    expect(el.textContent).toBe("Saved invalid");
+    expect(el.getAttribute("title")).toBe("Saved valid title");
+});
+
+test("grouped element: saved attributes are applied", () => {
+    const el = document.querySelector(
+        '[data-scms-group="saved-attr-group"] [data-scms-text="grouped"]',
+    ) as HTMLElement;
+    expect(el.textContent).toBe("Saved grouped");
+    expect(el.getAttribute("title")).toBe("Saved grouped title");
+});
+
+test("template item: saved attributes are applied", () => {
+    const el = document.querySelector(
+        '[data-scms-template="saved-attr-items"] [data-scms-instance="item1"] [data-scms-text="label"]',
+    ) as HTMLElement;
+    expect(el.textContent).toBe("Saved item label");
+    expect(el.getAttribute("title")).toBe("Saved item title");
 });
