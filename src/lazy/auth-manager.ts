@@ -20,8 +20,8 @@ import type { AuthBridge } from "./auth-bridge.js";
  */
 export interface AuthManagerHelpers {
     setMode: (mode: "author" | "viewer") => void;
-    /** Fetch saved content, then enter author mode (see EditorController) */
-    enterAuthorMode: () => Promise<void>;
+    /** Enter author mode; false if overtaken by a newer request (see EditorController) */
+    enterAuthorMode: () => Promise<boolean>;
     enableEditing: () => void;
     disableEditing: () => void;
     showToolbar: () => void;
@@ -227,7 +227,10 @@ export class AuthManager {
                 trigger.addEventListener("click", this.handleSignOutClick);
             });
 
-            await this.helpers.enterAuthorMode();
+            if (!(await this.helpers.enterAuthorMode())) {
+                // Signed out (or signed in again) before saved content arrived
+                return;
+            }
 
             this.log.info("User authenticated via popup, entering author mode");
             this.helpers.emitSignIn();
@@ -253,6 +256,7 @@ export class AuthManager {
         this.state.currentMode = "viewer";
 
         this.helpers.disableEditing();
+        this.helpers.removeLoadingIndicator();
 
         // Convert all custom triggers back to sign-in
         this.state.customSignInTriggers.forEach((originalText, trigger) => {

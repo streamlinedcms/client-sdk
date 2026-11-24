@@ -873,40 +873,48 @@ class EditorController {
     }
 
     /**
-     * Fetch saved content, then enter author mode. Author mode needs it (saved
-     * attributes, among other things) before any edit, so editing only turns
-     * on once it has arrived. If the user switched mode, signed out or signed
-     * in again while it was loading, the newer request wins and this one is
-     * dropped.
+     * Enter author mode. The toolbar shows at once, but editing waits for saved
+     * content, which author mode needs before any edit (saved attributes, among
+     * other things). If the user switched mode, signed out or signed in again
+     * while it was loading, the newer request wins and editing stays off.
      * @param refetch - Fetch even if this session already has (sign-in does,
      *   since a new key's access is checked by the fetch)
+     * @returns false if a newer request overtook this one
      */
-    private async enterAuthorMode({ refetch }: { refetch: boolean }): Promise<void> {
+    private async enterAuthorMode({ refetch }: { refetch: boolean }): Promise<boolean> {
         const request = ++this.modeRequest;
-        let success = true;
-        if (refetch || !this.savedContentFetched) {
-            success = await this.fetchSavedContentKeys();
+        const needsFetch = refetch || !this.savedContentFetched;
+        this.setMode("author", { editing: !needsFetch });
+        if (!needsFetch) {
+            return true;
         }
+
+        const success = await this.fetchSavedContentKeys();
         if (request !== this.modeRequest || !this.state.apiKey) {
-            return;
+            return false;
         }
-        this.setMode("author");
-        if (!success) {
+        if (success) {
+            this.enableEditingIfPermitted();
+        } else {
             this.disableEditing();
         }
+        return true;
     }
 
-    private setMode(mode: EditorMode): void {
+    /**
+     * @param editing - In author mode, whether to turn editing on now (false
+     *   while saved content is still loading)
+     */
+    private setMode(mode: EditorMode, { editing = true }: { editing?: boolean } = {}): void {
         this.state.currentMode = mode;
         this.keyStorage.storeMode(mode);
 
         if (mode === "author") {
             this.log.debug("Entering author mode");
-            // Only enable editing if user has contentWrite permission
-            if (this.state.permissions?.contentWrite !== false) {
-                this.enableEditing();
+            if (editing) {
+                this.enableEditingIfPermitted();
             } else {
-                this.log.info("User lacks contentWrite permission, editing disabled");
+                this.disableEditing();
             }
         } else {
             this.log.debug("Entering viewer mode");
@@ -914,6 +922,15 @@ class EditorController {
         }
 
         this.showToolbar();
+    }
+
+    private enableEditingIfPermitted(): void {
+        // Only enable editing if user has contentWrite permission
+        if (this.state.permissions?.contentWrite !== false) {
+            this.enableEditing();
+        } else {
+            this.log.info("User lacks contentWrite permission, editing disabled");
+        }
     }
 
     /**
@@ -1530,7 +1547,10 @@ class EditorController {
         });
 
         // Enter author mode
-        await this.enterAuthorMode({ refetch: true });
+        if (!(await this.enterAuthorMode({ refetch: true }))) {
+            // Signed out (or signed in again) before saved content arrived
+            return { success: false, error: "Sign-in was cancelled" };
+        }
 
         this.log.info("Programmatic sign-in successful");
         this.emit("signin");
