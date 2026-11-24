@@ -20,9 +20,10 @@ import type { AuthBridge } from "./auth-bridge.js";
  */
 export interface AuthManagerHelpers {
     setMode: (mode: "author" | "viewer") => void;
+    /** Enter author mode; editing turns on once saved content arrives (see EditorController) */
+    enterAuthorMode: () => Promise<void>;
     enableEditing: () => void;
     disableEditing: () => void;
-    fetchSavedContentKeys: () => Promise<boolean>;
     showToolbar: () => void;
     removeToolbar: () => void;
     hasUnsavedChanges: () => boolean;
@@ -107,12 +108,10 @@ export class AuthManager {
 
             const storedMode = this.keyStorage.getStoredMode();
             const mode = storedMode === "author" ? "author" : "viewer";
-            this.helpers.setMode(mode);
             if (mode === "author") {
-                const success = await this.helpers.fetchSavedContentKeys();
-                if (!success) {
-                    this.helpers.disableEditing();
-                }
+                await this.helpers.enterAuthorMode();
+            } else {
+                this.helpers.setMode(mode);
             }
             this.log.debug("Restored auth state", {
                 mode: this.state.currentMode,
@@ -228,10 +227,10 @@ export class AuthManager {
                 trigger.addEventListener("click", this.handleSignOutClick);
             });
 
-            this.helpers.setMode("author");
-            const success = await this.helpers.fetchSavedContentKeys();
-            if (!success) {
-                this.helpers.disableEditing();
+            await this.helpers.enterAuthorMode();
+            if (this.state.apiKey !== key) {
+                // Signed out (or signed in again) before saved content arrived
+                return;
             }
 
             this.log.info("User authenticated via popup, entering author mode");
@@ -258,6 +257,8 @@ export class AuthManager {
         this.state.currentMode = "viewer";
 
         this.helpers.disableEditing();
+        // A later sign-in may hit the same access problem and must warn again
+        this.state.domainWarningShown = false;
 
         // Convert all custom triggers back to sign-in
         this.state.customSignInTriggers.forEach((originalText, trigger) => {

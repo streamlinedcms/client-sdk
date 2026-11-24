@@ -4,3 +4,4 @@ dist
 node_modules
 __screenshots__
 .test-server-port
+.vitest

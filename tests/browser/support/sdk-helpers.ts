@@ -3,9 +3,13 @@
  * These utilities are used across multiple test files.
  */
 
+import { vi } from "vitest";
 import { initLazy } from "../../../src/lazy/index.js";
+import { AuthBridge } from "../../../src/lazy/auth-bridge.js";
+import { KeyStorage, type EditorMode } from "../../../src/key-storage.js";
 import { initTestHelpers } from "./test-helpers.js";
 import type { EditorController } from "../../../src/lazy/index.js";
+import type { AppPermissions } from "../../../src/types.js";
 
 // Declare global variables injected by vitest config
 declare const __SDK_API_URL__: string;
@@ -34,8 +38,9 @@ export function generateTestAppId(): string {
 /**
  * Run the loader script to fetch content and populate DOM.
  * Returns a promise that resolves when the loader completes.
+ * Call it on its own to see the page as a visitor gets it, without the editor.
  */
-async function runLoader(appId: string): Promise<void> {
+export async function runLoader(appId: string): Promise<void> {
     const TIMEOUT_MS = 5000;
 
     // Remove any existing loader script for this appId
@@ -187,4 +192,105 @@ export function setElementContent(element: HTMLElement, newContent: string): voi
  */
 export function setupTestHelpers(): void {
     initTestHelpers(__SDK_API_URL__.replace("/v1", ""));
+}
+
+const FULL_PERMISSIONS: AppPermissions = {
+    contentRead: true,
+    contentWrite: true,
+    mediaRead: true,
+    mediaUpload: true,
+    mediaEditOwn: true,
+    mediaEditOthers: true,
+    mediaDeleteOwn: true,
+    mediaDeleteOthers: true,
+    manageMembers: false,
+    manageBilling: false,
+    manageSettings: false,
+    denyAppGui: false,
+    changeRequestValue: false,
+    changeRequestEstimate: false,
+    changeRequestMessage: false,
+};
+
+/**
+ * Start the editor with real (non-mock) auth: with a stored API key and a
+ * remembered mode, as a returning user, or signed out when mode is null.
+ * Mock auth always starts in author mode, so it can't cover these paths.
+ * The auth bridge is stubbed to accept the key and any programmatic sign-in.
+ * Run the loader first. Returns initLazy's promise, which settles once auth
+ * setup has finished.
+ */
+export function initLazyWithStoredKey(
+    appId: string,
+    mode: EditorMode | null,
+): Promise<EditorController> {
+    vi.spyOn(AuthBridge.prototype, "init").mockImplementation(() => {});
+    vi.spyOn(AuthBridge.prototype, "authenticate").mockResolvedValue({
+        valid: true,
+        permissions: FULL_PERMISSIONS,
+    });
+    vi.spyOn(AuthBridge.prototype, "signIn").mockResolvedValue({
+        valid: true,
+        permissions: FULL_PERMISSIONS,
+        key: "test-signin-key",
+    });
+
+    if (mode) {
+        const keyStorage = new KeyStorage(appId);
+        keyStorage.storeKey("test-stored-key");
+        keyStorage.storeMode(mode);
+    }
+
+    return initLazy({
+        apiUrl: __SDK_API_URL__,
+        appUrl: "http://unused-in-tests",
+        appId,
+        logLevel: __SDK_LOG_LEVEL__,
+    }).then((c) => {
+        controller = c;
+        return c;
+    });
+}
+
+/**
+ * Wait until the editor has received saved content, then let it finish
+ * handling the response.
+ */
+export async function waitForSavedContent(): Promise<void> {
+    const c = controller as unknown as { savedContentFetched: boolean };
+    await waitForCondition(() => c.savedContentFetched);
+    await new Promise((r) => setTimeout(r, 0));
+}
+
+/**
+ * Hold the editor's saved-content fetches (GET .../content) until released,
+ * to test what happens while one is in flight. Install after the loader runs.
+ */
+export function holdContentFetches(): {
+    /** Whether a held fetch is waiting */
+    isWaiting: () => boolean;
+    /** Let held fetches through, and stop holding new ones */
+    release: () => void;
+} {
+    const realFetch = window.fetch.bind(window);
+    let held = true;
+    const waiting: Array<() => void> = [];
+
+    vi.spyOn(window, "fetch").mockImplementation(async (input, init) => {
+        const url =
+            typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+        if (held && method === "GET" && /\/apps\/[^/]+\/content$/.test(new URL(url).pathname)) {
+            await new Promise<void>((resolve) => waiting.push(resolve));
+        }
+        return realFetch(input, init);
+    });
+
+    return {
+        isWaiting: () => waiting.length > 0,
+        release: () => {
+            held = false;
+            waiting.splice(0).forEach((resolve) => resolve());
+        },
+    };
 }

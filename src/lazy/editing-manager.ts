@@ -215,6 +215,12 @@ export class EditingManager {
         clickedElement?: HTMLElement,
         coords?: { x: number; y: number },
     ): void {
+        // Editing is off in viewer mode and while author mode loads saved
+        // content; an edit then would be saved without its saved attributes
+        if (!this.state.editingEnabled) {
+            this.log.debug("Editing is off; not starting", { key });
+            return;
+        }
         const infos = this.state.editableElements.get(key);
         if (!infos || infos.length === 0) {
             this.log.warn("Element not found", { key });

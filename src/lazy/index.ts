@@ -15,6 +15,7 @@ import { KeyStorage, type EditorMode } from "../key-storage.js";
 import { PopupManager, type MediaFile } from "../popup-manager.js";
 import type { EditableType } from "../types.js";
 import { buildTemplateKey, EDITABLE_SELECTOR } from "../types.js";
+import { parseContentAttributes, withContentAttributes } from "../apply-content.js";
 
 /**
  * Configuration for StreamlinedCMS
@@ -132,6 +133,10 @@ class EditorController {
     private keyStorage: KeyStorage;
     private popupManager: PopupManager;
     private authBridge: AuthBridge;
+    /** Whether saved content has been fetched this session (see fetchSavedContentKeys) */
+    private savedContentFetched = false;
+    /** Counts mode requests, so a slow switch to author mode can tell it was superseded */
+    private modeRequest = 0;
     private state: EditorState;
     private draftManager: DraftManager;
     private contentManager: ContentManager;
@@ -336,9 +341,9 @@ class EditorController {
             this.authBridge,
             {
                 setMode: this.setMode.bind(this),
+                enterAuthorMode: () => this.enterAuthorMode({ refetch: true }),
                 enableEditing: this.enableEditing.bind(this),
                 disableEditing: this.disableEditing.bind(this),
-                fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
                 showToolbar: this.showToolbar.bind(this),
                 removeToolbar: this.removeToolbar.bind(this),
                 hasUnsavedChanges: () => this.saveManager.hasUnsavedChanges(),
@@ -378,7 +383,11 @@ class EditorController {
         // Initialize content viewer manager
         this.contentViewerManager = new ContentViewerManager(this.state, this.log, {
             selectAndEdit: (key, element) => {
-                this.editingManager.startEditing(key, element);
+                if (this.state.editingEnabled) {
+                    this.editingManager.startEditing(key, element);
+                } else {
+                    this.scrollToElement(element);
+                }
             },
             scrollToElement: this.scrollToElement.bind(this),
             updateToolbarContentViewer: (active, hiddenCount) => {
@@ -468,17 +477,21 @@ class EditorController {
 
             // Collect all keys that have saved content
             // Ungrouped elements
-            for (const elementId of Object.keys(data.elements)) {
+            for (const [elementId, element] of Object.entries(data.elements)) {
                 this.state.savedContentKeys.add(elementId);
+                this.loadSavedAttributes(elementId, element.content);
             }
 
             // Grouped elements (key format: groupId:elementId)
             for (const [groupId, group] of Object.entries(data.groups)) {
-                for (const elementId of Object.keys(group.elements)) {
-                    this.state.savedContentKeys.add(`${groupId}:${elementId}`);
+                for (const [elementId, element] of Object.entries(group.elements)) {
+                    const key = `${groupId}:${elementId}`;
+                    this.state.savedContentKeys.add(key);
+                    this.loadSavedAttributes(key, element.content);
                 }
             }
 
+            this.savedContentFetched = true;
             this.log.debug("Fetched saved content keys", {
                 count: this.state.savedContentKeys.size,
             });
@@ -487,6 +500,44 @@ class EditorController {
             this.log.warn("Could not fetch saved content keys", error);
             return true; // Network error - assume ok to avoid blocking editing
         }
+    }
+
+    /**
+     * Record an element's saved attributes so the next save keeps them.
+     * The loader already applied them to the DOM, but the DOM can't tell saved
+     * attributes from the site's own, so they come from the saved content.
+     */
+    private loadSavedAttributes(key: string, content: string): void {
+        const attributes = parseContentAttributes(content);
+        if (!attributes) return;
+
+        const original = this.state.originalContent.get(key);
+        if (original === undefined) {
+            // Element isn't registered yet; its content will be built with these
+            if (!this.state.elementAttributes.has(key)) {
+                this.state.elementAttributes.set(key, attributes);
+            }
+            return;
+        }
+
+        // The load-time value is the editor's copy of the saved version (what
+        // Reset restores and changes are measured against), so it gets the
+        // saved attributes. It's edited as a string rather than rebuilt from
+        // the DOM, which may be showing a restored draft.
+        const withSaved = withContentAttributes(original, attributes);
+        this.state.originalContent.set(key, withSaved);
+
+        // A restored draft can match the load-time value exactly (e.g. one that
+        // only removed attributes), so drafts are checked by key, on the first
+        // successful fetch only: a save clears the draft.
+        const restoredFromDraft =
+            !this.savedContentFetched && this.draftManager.restoredKeys.has(key);
+        if (!restoredFromDraft && this.state.currentContent.get(key) === original) {
+            this.state.currentContent.set(key, withSaved);
+            this.state.elementAttributes.set(key, attributes);
+        }
+        // Otherwise the element has unsaved changes (a restored draft, or an
+        // edit since loading), and their attributes stand, including none.
     }
 
     async init(): Promise<void> {
@@ -518,11 +569,7 @@ class EditorController {
             this._authResolve();
 
             this.modalManager.initMediaManagerModal();
-            this.setMode("author");
-            const success = await this.fetchSavedContentKeys();
-            if (!success) {
-                this.disableEditing();
-            }
+            await this.enterAuthorMode({ refetch: true });
 
             // Resolve editing and bridges stages
             this._editingResolve();
@@ -816,17 +863,60 @@ class EditorController {
         this.templateManager.updateToolbarTemplateContext();
     };
 
-    private setMode(mode: EditorMode): void {
+    /**
+     * Switch mode from the toolbar. A page that loaded in viewer mode hasn't
+     * fetched saved content yet, so entering author mode fetches it first.
+     */
+    private async handleModeChange(mode: EditorMode): Promise<void> {
+        if (mode === "author") {
+            await this.enterAuthorMode({ refetch: false });
+        } else {
+            this.modeRequest++;
+            this.setMode(mode);
+        }
+    }
+
+    /**
+     * Enter author mode. The toolbar shows at once, but editing waits for saved
+     * content, which author mode needs before any edit (saved attributes, among
+     * other things). If the user switched mode, signed out or signed in again
+     * while it was loading, the newer request wins and editing stays off.
+     * @param refetch - Fetch even if this session already has (sign-in does,
+     *   since a new key's access is checked by the fetch)
+     */
+    private async enterAuthorMode({ refetch }: { refetch: boolean }): Promise<void> {
+        const request = ++this.modeRequest;
+        const needsFetch = refetch || !this.savedContentFetched;
+        this.setMode("author", { editing: !needsFetch });
+        if (!needsFetch) {
+            return;
+        }
+
+        const success = await this.fetchSavedContentKeys();
+        if (request !== this.modeRequest || !this.state.apiKey) {
+            return;
+        }
+        if (success) {
+            this.enableEditingIfPermitted();
+        } else {
+            this.disableEditing();
+        }
+    }
+
+    /**
+     * @param editing - In author mode, whether to turn editing on now (false
+     *   while saved content is still loading)
+     */
+    private setMode(mode: EditorMode, { editing = true }: { editing?: boolean } = {}): void {
         this.state.currentMode = mode;
         this.keyStorage.storeMode(mode);
 
         if (mode === "author") {
             this.log.debug("Entering author mode");
-            // Only enable editing if user has contentWrite permission
-            if (this.state.permissions?.contentWrite !== false) {
-                this.enableEditing();
+            if (editing) {
+                this.enableEditingIfPermitted();
             } else {
-                this.log.info("User lacks contentWrite permission, editing disabled");
+                this.disableEditing();
             }
         } else {
             this.log.debug("Entering viewer mode");
@@ -834,6 +924,15 @@ class EditorController {
         }
 
         this.showToolbar();
+    }
+
+    private enableEditingIfPermitted(): void {
+        // Only enable editing if user has contentWrite permission
+        if (this.state.permissions?.contentWrite !== false) {
+            this.enableEditing();
+        } else {
+            this.log.info("User lacks contentWrite permission, editing disabled");
+        }
     }
 
     /**
@@ -998,7 +1097,7 @@ class EditorController {
         toolbar.canRequestChange = canRequestChange;
 
         toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
-            this.setMode(e.detail.mode);
+            void this.handleModeChange(e.detail.mode);
         }) as EventListener);
 
         toolbar.addEventListener("save", () => {
@@ -1450,10 +1549,10 @@ class EditorController {
         });
 
         // Enter author mode
-        this.setMode("author");
-        const fetchSuccess = await this.fetchSavedContentKeys();
-        if (!fetchSuccess) {
-            this.disableEditing();
+        await this.enterAuthorMode({ refetch: true });
+        if (this.state.apiKey !== result.key) {
+            // Signed out (or signed in again) before saved content arrived
+            return { success: false, error: "Sign-in was cancelled" };
         }
 
         this.log.info("Programmatic sign-in successful");

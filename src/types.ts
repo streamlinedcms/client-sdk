@@ -164,16 +164,22 @@ export type ElementAttributes = Record<string, string>;
 /**
  * Apply attributes to an HTML element.
  * Sets attributes with truthy values, removes attributes with falsy values.
+ * Skips names the DOM rejects (the API doesn't validate them), so one bad
+ * name doesn't stop the rest of the element's content from applying.
  */
 export function applyAttributesToElement(
     element: HTMLElement,
     attributes: ElementAttributes,
 ): void {
     for (const [name, value] of Object.entries(attributes)) {
-        if (value) {
-            element.setAttribute(name, value);
-        } else {
-            element.removeAttribute(name);
+        try {
+            if (value) {
+                element.setAttribute(name, value);
+            } else {
+                element.removeAttribute(name);
+            }
+        } catch {
+            // Invalid attribute name - skip it
         }
     }
 }
