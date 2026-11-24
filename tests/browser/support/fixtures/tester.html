@@ -441,6 +441,27 @@
                     alt="Picture replaced"
                 />
             </picture>
+            <picture>
+                <source srcset="https://example.com/original.webp" type="image/webp" />
+                <img
+                    data-scms-image="picture-unchanged"
+                    src="https://example.com/original.png"
+                    alt="Picture unchanged"
+                />
+            </picture>
+            <picture>
+                <source srcset="https://example.com/original.webp" />
+                <img data-scms-image="picture-no-src" alt="Picture without src" />
+            </picture>
+            <img
+                data-scms-image="srcset-no-src"
+                srcset="
+                    https://example.com/original-600.png   600w,
+                    https://example.com/original-1200.png 1200w
+                "
+                sizes="600px"
+                alt="Srcset without src"
+            />
             <img
                 data-scms-image="srcset-edit"
                 src="https://example.com/original.png"
