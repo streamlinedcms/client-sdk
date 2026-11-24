@@ -15,6 +15,7 @@ import type { ContentManager } from "./content-manager.js";
 import { updateEmptyState } from "./content-manager.js";
 import type { UndoManager } from "./undo-manager.js";
 import { EDITABLE_SELECTOR, IMAGE_PLACEHOLDER_DATA_URI, type EditableType } from "../types.js";
+import { parseHtml, parseElement, serializeHtml } from "../parse-html.js";
 
 /**
  * Helpers that TemplateManager needs from EditorController
@@ -72,18 +73,17 @@ export class TemplateManager {
      * - For editable elements: keeps only reserved attributes (id, class, data-scms-*)
      */
     private stripTemplateContent(html: string): string {
-        const div = document.createElement("div");
-        div.innerHTML = html;
+        const fragment = parseHtml(html);
 
         // Strip instance IDs (they vary between instances)
-        div.querySelectorAll("[data-scms-instance]").forEach((el) =>
-            el.removeAttribute("data-scms-instance"),
-        );
+        fragment
+            .querySelectorAll("[data-scms-instance]")
+            .forEach((el) => el.removeAttribute("data-scms-instance"));
 
         // For editable elements, strip all attributes except reserved ones
         // This handles src, href, alt, title, and any custom attributes set via modals
         const editableSelector = EDITABLE_SELECTOR;
-        div.querySelectorAll(editableSelector).forEach((el) => {
+        fragment.querySelectorAll(editableSelector).forEach((el) => {
             const attributesToRemove: string[] = [];
             for (let i = 0; i < el.attributes.length; i++) {
                 const attr = el.attributes[i];
@@ -110,7 +110,7 @@ export class TemplateManager {
         // layout that must survive into instance clones. Text inside a nested
         // editable of another type (e.g. data-scms-text inside data-scms-href)
         // is still blanked because the nearest editable ancestor owns it.
-        const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) {
             const node = walker.currentNode as Text;
@@ -120,7 +120,7 @@ export class TemplateManager {
         }
         textNodes.forEach((node) => (node.textContent = ""));
 
-        return div.innerHTML;
+        return serializeHtml(fragment);
     }
 
     /**
@@ -441,9 +441,7 @@ export class TemplateManager {
         const newInstanceId = this.generateInstanceId();
 
         // Create new instance from original template HTML (with default content)
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = templateHtml;
-        const clone = tempDiv.firstElementChild as HTMLElement;
+        const clone = parseElement(templateHtml);
         if (!clone) {
             this.log.error("Failed to create clone from template HTML");
             return null;
@@ -573,9 +571,7 @@ export class TemplateManager {
 
         const { container, templateHtml, groupId } = templateInfo;
 
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = templateHtml;
-        const clone = tempDiv.firstElementChild as HTMLElement;
+        const clone = parseElement(templateHtml);
         if (!clone) {
             this.log.error("Failed to create clone from template HTML");
             return null;

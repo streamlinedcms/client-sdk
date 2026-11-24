@@ -305,6 +305,48 @@
             </div>
         </div>
 
+        <!-- Templates whose items are table rows (isolated) -->
+        <div class="test-section">
+            <h2>Table Row Templates</h2>
+            <table>
+                <tbody data-scms-template="table-rows">
+                    <tr class="table-row">
+                        <td data-scms-text="name">Default Name</td>
+                        <td data-scms-text="role">Default Role</td>
+                    </tr>
+                </tbody>
+            </table>
+            <table>
+                <tbody data-scms-template="table-rows-rendering">
+                    <tr class="table-row">
+                        <td data-scms-text="name">Default Name</td>
+                        <td data-scms-text="role">Default Role</td>
+                    </tr>
+                    <tr class="table-row">
+                        <td data-scms-text="name">Second Name</td>
+                        <td data-scms-text="role">Second Role</td>
+                    </tr>
+                </tbody>
+            </table>
+            <table>
+                <tbody data-scms-template="table-rows-mismatch">
+                    <tr class="table-row">
+                        <td data-scms-text="name">Default Name</td>
+                        <td data-scms-text="role">Default Role</td>
+                    </tr>
+                    <tr class="table-row">
+                        <td data-scms-text="name">Matching Name</td>
+                        <td data-scms-text="role">Matching Role</td>
+                    </tr>
+                    <tr class="table-row">
+                        <td data-scms-text="name">Extra Name</td>
+                        <td data-scms-text="role">Extra Role</td>
+                        <td data-scms-text="note">Extra cell</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
         <!-- Elements for attribute-only modal save detection tests (isolated) -->
         <div class="test-section">
             <a href="https://example.com" data-scms-link="attr-save-link">Attr Save Link</a>

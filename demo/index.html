@@ -314,6 +314,29 @@
                 font-size: 0.9em;
             }
 
+            /* Pricing table for the table-row template demo */
+            .pricing-table {
+                width: 100%;
+                margin-top: 20px;
+                border-collapse: collapse;
+                background: white;
+            }
+
+            .pricing-table th,
+            .pricing-table td {
+                padding: 10px 14px;
+                border: 1px solid #e5e7eb;
+                text-align: left;
+            }
+
+            .pricing-table th {
+                background: #f9fafb;
+            }
+
+            .pricing-table tbody tr:nth-child(even) {
+                background: #f9fafb;
+            }
+
             /* Link demo styles */
             .link-demo {
                 display: flex;
@@ -848,6 +871,41 @@
                             </p>
                         </div>
                     </div>
+                </div>
+
+                <div class="content-section">
+                    <h2 data-scms-text="pricing-heading">Pricing</h2>
+                    <p>
+                        Templates work with table rows too: the <code>&lt;tbody&gt;</code> is the
+                        template container and each <code>&lt;tr&gt;</code> is an item.
+                    </p>
+
+                    <table class="pricing-table">
+                        <thead>
+                            <tr>
+                                <th>Plan</th>
+                                <th>Price</th>
+                                <th>Includes</th>
+                            </tr>
+                        </thead>
+                        <tbody data-scms-template="pricing-row">
+                            <tr>
+                                <td data-scms-text="plan">Starter</td>
+                                <td data-scms-text="price">$9/month</td>
+                                <td data-scms-text="includes">One site, basic support</td>
+                            </tr>
+                            <tr>
+                                <td data-scms-text="plan">Business</td>
+                                <td data-scms-text="price">$29/month</td>
+                                <td data-scms-text="includes">Five sites, priority support</td>
+                            </tr>
+                            <tr>
+                                <td data-scms-text="plan">Agency</td>
+                                <td data-scms-text="price">$79/month</td>
+                                <td data-scms-text="includes">Unlimited sites, phone support</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
