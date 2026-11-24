@@ -66,7 +66,37 @@ export function withContentAttributes(content: string, attributes: ElementAttrib
     }
 }
 
+/**
+ * Browsers show an image from srcset, or from a <source> in its <picture>,
+ * over src. Those list the page's own image, so they must go once src is a
+ * different one.
+ */
+function dropResponsiveSources(img: HTMLImageElement): void {
+    img.removeAttribute("srcset");
+    img.removeAttribute("sizes");
+    const parent = img.parentElement;
+    if (parent instanceof HTMLPictureElement) {
+        parent.querySelectorAll(":scope > source").forEach((source) => source.remove());
+    }
+}
+
+/**
+ * Whether src names a different image than the element shows. Compared as
+ * resolved URLs, since the editor saves the resolved one.
+ */
+function isDifferentImage(img: HTMLImageElement, src: string): boolean {
+    try {
+        return new URL(src, document.baseURI).href !== img.src;
+    } catch {
+        return src !== img.getAttribute("src");
+    }
+}
+
 function setImageSrc(img: HTMLImageElement, src: string, replace: boolean): HTMLElement {
+    // An image saved for its attributes alone keeps the page's responsive sizes
+    if (isDifferentImage(img, src)) {
+        dropResponsiveSources(img);
+    }
     if (!replace) {
         img.src = src;
         return img;
