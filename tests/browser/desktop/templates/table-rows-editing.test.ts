@@ -84,3 +84,25 @@ test("only a row whose cells differ from the template is flagged as mismatched",
         true,
     ]);
 });
+
+test("undoing a row's deletion brings the row back", async () => {
+    const rows = getRows(TEMPLATE_ID);
+    const last = rows[rows.length - 1];
+    const instanceId = last.getAttribute("data-scms-instance");
+    (last.querySelector(".scms-instance-delete") as HTMLElement).click();
+    await waitForCondition(() => getRows(TEMPLATE_ID).length === rows.length - 1);
+
+    const undoButton = Array.from(getToolbar().shadowRoot?.querySelectorAll("button") ?? []).find(
+        (button) => button.getAttribute("aria-label") === "Undo",
+    );
+    undoButton!.click();
+    await waitForCondition(() => getRows(TEMPLATE_ID).length === rows.length);
+
+    const restored = getRows(TEMPLATE_ID)[rows.length - 1];
+    expect(restored.getAttribute("data-scms-instance")).toBe(instanceId);
+    expect(
+        Array.from(restored.querySelectorAll("td")).map((cell) =>
+            cell.getAttribute("data-scms-text"),
+        ),
+    ).toEqual(["name", "role"]);
+});
