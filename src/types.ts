@@ -223,11 +223,7 @@ export interface HrefContentData extends BaseContentData {
 }
 
 export type ContentData =
-    | TextContentData
-    | HtmlContentData
-    | ImageContentData
-    | LinkContentData
-    | HrefContentData;
+    TextContentData | HtmlContentData | ImageContentData | LinkContentData | HrefContentData;
 
 /**
  * Template instance info for repeating content blocks

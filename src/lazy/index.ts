@@ -135,6 +135,8 @@ class EditorController {
     private authBridge: AuthBridge;
     /** Whether saved content has been fetched this session (see fetchSavedContentKeys) */
     private savedContentFetched = false;
+    /** Counts mode requests, so a slow switch to author mode can tell it was superseded */
+    private modeRequest = 0;
     private state: EditorState;
     private draftManager: DraftManager;
     private contentManager: ContentManager;
@@ -339,9 +341,9 @@ class EditorController {
             this.authBridge,
             {
                 setMode: this.setMode.bind(this),
+                enterAuthorMode: () => this.enterAuthorMode({ refetch: true }),
                 enableEditing: this.enableEditing.bind(this),
                 disableEditing: this.disableEditing.bind(this),
-                fetchSavedContentKeys: this.fetchSavedContentKeys.bind(this),
                 showToolbar: this.showToolbar.bind(this),
                 removeToolbar: this.removeToolbar.bind(this),
                 hasUnsavedChanges: () => this.saveManager.hasUnsavedChanges(),
@@ -523,7 +525,7 @@ class EditorController {
 
         // A restored draft can match the load-time value exactly (e.g. one that
         // only removed attributes), so drafts are checked by key, on the first
-        // fetch only: a save clears the draft.
+        // successful fetch only: a save clears the draft.
         const restoredFromDraft =
             !this.savedContentFetched && this.draftManager.restoredKeys.has(key);
         if (!restoredFromDraft && this.state.currentContent.get(key) === original) {
@@ -563,11 +565,7 @@ class EditorController {
             this._authResolve();
 
             this.modalManager.initMediaManagerModal();
-            this.setMode("author");
-            const success = await this.fetchSavedContentKeys();
-            if (!success) {
-                this.disableEditing();
-            }
+            await this.enterAuthorMode({ refetch: true });
 
             // Resolve editing and bridges stages
             this._editingResolve();
@@ -863,19 +861,39 @@ class EditorController {
 
     /**
      * Switch mode from the toolbar. A page that loaded in viewer mode hasn't
-     * fetched saved content, which author mode needs (saved attributes, among
-     * other things), so fetch it before entering author mode.
+     * fetched saved content yet, so entering author mode fetches it first.
      */
     private async handleModeChange(mode: EditorMode): Promise<void> {
-        if (mode === "author" && !this.savedContentFetched) {
-            const success = await this.fetchSavedContentKeys();
+        if (mode === "author") {
+            await this.enterAuthorMode({ refetch: false });
+        } else {
+            this.modeRequest++;
             this.setMode(mode);
-            if (!success) {
-                this.disableEditing();
-            }
+        }
+    }
+
+    /**
+     * Fetch saved content, then enter author mode. Author mode needs it (saved
+     * attributes, among other things) before any edit, so editing only turns
+     * on once it has arrived. If the user switched mode, signed out or signed
+     * in again while it was loading, the newer request wins and this one is
+     * dropped.
+     * @param refetch - Fetch even if this session already has (sign-in does,
+     *   since a new key's access is checked by the fetch)
+     */
+    private async enterAuthorMode({ refetch }: { refetch: boolean }): Promise<void> {
+        const request = ++this.modeRequest;
+        let success = true;
+        if (refetch || !this.savedContentFetched) {
+            success = await this.fetchSavedContentKeys();
+        }
+        if (request !== this.modeRequest || !this.state.apiKey) {
             return;
         }
-        this.setMode(mode);
+        this.setMode("author");
+        if (!success) {
+            this.disableEditing();
+        }
     }
 
     private setMode(mode: EditorMode): void {
@@ -1512,11 +1530,7 @@ class EditorController {
         });
 
         // Enter author mode
-        this.setMode("author");
-        const fetchSuccess = await this.fetchSavedContentKeys();
-        if (!fetchSuccess) {
-            this.disableEditing();
-        }
+        await this.enterAuthorMode({ refetch: true });
 
         this.log.info("Programmatic sign-in successful");
         this.emit("signin");

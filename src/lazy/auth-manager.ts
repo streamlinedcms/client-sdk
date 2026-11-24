@@ -20,9 +20,10 @@ import type { AuthBridge } from "./auth-bridge.js";
  */
 export interface AuthManagerHelpers {
     setMode: (mode: "author" | "viewer") => void;
+    /** Fetch saved content, then enter author mode (see EditorController) */
+    enterAuthorMode: () => Promise<void>;
     enableEditing: () => void;
     disableEditing: () => void;
-    fetchSavedContentKeys: () => Promise<boolean>;
     showToolbar: () => void;
     removeToolbar: () => void;
     hasUnsavedChanges: () => boolean;
@@ -107,12 +108,10 @@ export class AuthManager {
 
             const storedMode = this.keyStorage.getStoredMode();
             const mode = storedMode === "author" ? "author" : "viewer";
-            this.helpers.setMode(mode);
             if (mode === "author") {
-                const success = await this.helpers.fetchSavedContentKeys();
-                if (!success) {
-                    this.helpers.disableEditing();
-                }
+                await this.helpers.enterAuthorMode();
+            } else {
+                this.helpers.setMode(mode);
             }
             this.log.debug("Restored auth state", {
                 mode: this.state.currentMode,
@@ -228,11 +227,7 @@ export class AuthManager {
                 trigger.addEventListener("click", this.handleSignOutClick);
             });
 
-            this.helpers.setMode("author");
-            const success = await this.helpers.fetchSavedContentKeys();
-            if (!success) {
-                this.helpers.disableEditing();
-            }
+            await this.helpers.enterAuthorMode();
 
             this.log.info("User authenticated via popup, entering author mode");
             this.helpers.emitSignIn();
