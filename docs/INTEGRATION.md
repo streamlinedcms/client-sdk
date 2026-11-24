@@ -141,8 +141,8 @@ For `<img>` elements only. Authors pick a new image from the media manager, and 
 <img data-scms-image="hero-image" src="default-hero.jpg" alt="Hero image" />
 ```
 
-- **Background images set with CSS aren't editable.** Use a real `<img>` positioned behind the content instead (see [Edit Mode and Layout](#edit-mode-and-layout) for how to position it).
-- `<picture>`/`<source>` and `srcset` aren't managed. If the `<img>` has a `srcset`, the browser keeps using it after the author changes the `src`, so leave `srcset` off editable images.
+- **Background images set with CSS aren't editable.** Use a real `<img>` positioned behind the content instead (for example `class="absolute inset-0 h-full w-full object-cover"`).
+- **Responsive images work.** An editable `<img>` can have a `srcset` and `sizes`, or sit in a `<picture>` with `<source>`s. When an author replaces the image, the SDK removes those so the new image shows, at a single size. An image saved without being replaced (for example, only its alt text changed) keeps them.
 
 ### Links (`data-scms-href`)
 
@@ -393,6 +393,7 @@ Put `data-scms-template` on the **wrapper** that holds the items. Every element 
 - Leave every existing item in your HTML; there's no need to cut it down to one.
 - Every item must have the same structure as the first: the same elements, classes and IDs. The SDK flags items that differ.
 - Headings, intro text and "view all" links go **outside** the wrapper. Anything inside it is treated as an item.
+- Table rows can be items: put `data-scms-template` on the `<tbody>`, and each `<tr>` is an item. Keep the header row in a `<thead>`, outside the wrapper.
 - Once an author saves the template, the saved items replace the items in your HTML.
 - Templates inside templates aren't supported; the inner one is ignored.
 
@@ -474,33 +475,13 @@ When an author signs in and editing turns on, the SDK adds styles and controls t
 
 **What the SDK changes in edit mode:**
 
-- **Every editable gets `position: relative`.** It overrides your own positioning, so an editable that relies on `position: absolute`, `fixed` or `sticky` drops back into the page flow. ([client-sdk#105](https://github.com/streamlinedcms/client-sdk/issues/105) tracks this.)
 - **Each template wrapper gets an "Add item" `<button>` as its last child.** It takes up space in grid and flex layouts, and `:last-child` styles move to it. Style the last item with `:last-of-type` instead (the button is a different element from your items).
-- **Template items get delete and drag controls**, absolutely positioned in their top corners, once there are two or more items.
+- **Template items get delete and drag controls**, absolutely positioned in their top corners, once there are two or more items. An item you haven't positioned gets `position: relative` while the controls show, so they sit in its corners; your own positioning (`absolute`, `fixed`, `sticky`) is left alone. Editable elements themselves keep whatever positioning you give them.
 - **Empty editables show "Click to edit"** so the author can find them, which adds a line of text to elements that are normally empty.
 - **HTML elements' content is replaced by the editor** when an author clicks in. Styles your framework scoped to the original markup stop applying to it (see [HTML](#html-data-scms-html)).
 - **Links don't navigate** while editing, so authors can select them.
 - **Collapsible content stays collapsed.** Editables inside a closed `<details>` element or a hidden tab can't be clicked until the author opens it, and clicking an editable inside a `<summary>` may also open or close it.
-
-### Don't position editable elements
-
-Put the positioning on a wrapper and keep the editable itself unpositioned. A full-bleed background photo is the common case:
-
-```html
-<!-- WRONG: in edit mode the image loses position: absolute and pushes the content down -->
-<section class="relative">
-    <img class="absolute inset-0 h-full w-full object-cover" data-scms-image="bg" src="bg.jpg" alt="" />
-    <div class="relative">…</div>
-</section>
-
-<!-- RIGHT: the wrapper is positioned; the editable image just fills it -->
-<section class="relative">
-    <div class="absolute inset-0">
-        <img class="h-full w-full object-cover" data-scms-image="bg" src="bg.jpg" alt="" />
-    </div>
-    <div class="relative">…</div>
-</section>
-```
+- **Elements drawn over an editable stay over it.** If you position a decorative element (an overlay, a stripe, a gradient) on top of an editable, clicks on the covered part reach the decoration, as they do for visitors, so the author can only select the editable through its uncovered part. Give purely decorative overlays `pointer-events: none`.
 
 ### Text in attributes and form controls
 
