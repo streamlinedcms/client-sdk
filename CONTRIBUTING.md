@@ -182,6 +182,10 @@ npm run format
 npm run format:check
 ```
 
+## Git Hooks
+
+`npm install` and `npm ci` link `scripts/git-hooks/pre-push` into `.git/hooks`. Before each push it runs CI's quick checks, `format:check` and `typecheck`. First it checks that `node_modules` matches `package-lock.json`, and if not, tells you to run `npm ci`: pulling a lockfile change doesn't reinstall anything, and an outdated Prettier checks differently from CI's. `git push --no-verify` skips it. The org-wide rule and how to set a hook up are in the [Git Hooks guide](https://github.com/streamlinedcms/planning/blob/master/guides/git-hooks.md) in the planning repo.
+
 ## Node Version
 
 `.nvmrc` pins the Node version every workflow uses; use the same one locally. `package.json` sets the minimum under `engines`, and `.npmrc` makes `npm ci` fail on a Node version a dependency doesn't support, instead of only warning.

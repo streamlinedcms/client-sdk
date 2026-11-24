@@ -12,6 +12,7 @@
   },
   "scripts": {
     "postinstall": "npx playwright install chromium",
+    "prepare": "node scripts/install-git-hooks.mjs",
     "typecheck": "tsc --noEmit",
     "build": "rollup -c",
     "dev": "rollup -c -w",
