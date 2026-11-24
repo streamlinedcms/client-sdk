@@ -3,9 +3,13 @@
  * These utilities are used across multiple test files.
  */
 
+import { vi } from "vitest";
 import { initLazy } from "../../../src/lazy/index.js";
+import { AuthBridge } from "../../../src/lazy/auth-bridge.js";
+import { KeyStorage, type EditorMode } from "../../../src/key-storage.js";
 import { initTestHelpers } from "./test-helpers.js";
 import type { EditorController } from "../../../src/lazy/index.js";
+import type { AppPermissions } from "../../../src/types.js";
 
 // Declare global variables injected by vitest config
 declare const __SDK_API_URL__: string;
@@ -188,4 +192,83 @@ export function setElementContent(element: HTMLElement, newContent: string): voi
  */
 export function setupTestHelpers(): void {
     initTestHelpers(__SDK_API_URL__.replace("/v1", ""));
+}
+
+const FULL_PERMISSIONS: AppPermissions = {
+    contentRead: true,
+    contentWrite: true,
+    mediaRead: true,
+    mediaUpload: true,
+    mediaEditOwn: true,
+    mediaEditOthers: true,
+    mediaDeleteOwn: true,
+    mediaDeleteOthers: true,
+    manageMembers: false,
+    manageBilling: false,
+    manageSettings: false,
+    denyAppGui: false,
+    changeRequestValue: false,
+    changeRequestEstimate: false,
+    changeRequestMessage: false,
+};
+
+/**
+ * Start the editor as a returning user: a stored API key and a remembered
+ * mode, instead of mock auth (which always starts in author mode). The auth
+ * bridge is stubbed to accept the key. Run the loader first.
+ * Returns initLazy's promise, which settles once auth setup has finished.
+ */
+export function initLazyWithStoredKey(appId: string, mode: EditorMode): Promise<EditorController> {
+    vi.spyOn(AuthBridge.prototype, "init").mockImplementation(() => {});
+    vi.spyOn(AuthBridge.prototype, "authenticate").mockResolvedValue({
+        valid: true,
+        permissions: FULL_PERMISSIONS,
+    });
+
+    const keyStorage = new KeyStorage(appId);
+    keyStorage.storeKey("test-stored-key");
+    keyStorage.storeMode(mode);
+
+    return initLazy({
+        apiUrl: __SDK_API_URL__,
+        appUrl: "http://unused-in-tests",
+        appId,
+        logLevel: __SDK_LOG_LEVEL__,
+    }).then((c) => {
+        controller = c;
+        return c;
+    });
+}
+
+/**
+ * Hold the editor's saved-content fetches (GET .../content) until released,
+ * to test what happens while one is in flight. Install after the loader runs.
+ */
+export function holdContentFetches(): {
+    /** Whether a held fetch is waiting */
+    isWaiting: () => boolean;
+    /** Let held fetches through, and stop holding new ones */
+    release: () => void;
+} {
+    const realFetch = window.fetch.bind(window);
+    let held = true;
+    const waiting: Array<() => void> = [];
+
+    vi.spyOn(window, "fetch").mockImplementation(async (input, init) => {
+        const url =
+            typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+        if (held && method === "GET" && /\/apps\/[^/]+\/content$/.test(new URL(url).pathname)) {
+            await new Promise<void>((resolve) => waiting.push(resolve));
+        }
+        return realFetch(input, init);
+    });
+
+    return {
+        isWaiting: () => waiting.length > 0,
+        release: () => {
+            held = false;
+            waiting.splice(0).forEach((resolve) => resolve());
+        },
+    };
 }

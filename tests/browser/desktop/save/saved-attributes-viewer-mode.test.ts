@@ -5,16 +5,17 @@
  * entering author mode. Switching to author from the toolbar must still load
  * saved attributes, or the next save erases them.
  *
- * Uses a stored API key instead of mock auth (mock auth always starts in
- * author mode), with the auth bridge stubbed to accept it.
+ * Starts as a returning user with a stored API key, since mock auth always
+ * starts in author mode.
  *
  * Regression test for: https://github.com/streamlinedcms/client-sdk/issues/107
  */
 
-import { test, expect, beforeAll, vi } from "vitest";
+import { test, expect, beforeAll } from "vitest";
 import { setContent, getContent } from "~/@browser-support/test-helpers.js";
 import {
     runLoader,
+    initLazyWithStoredKey,
     waitForSelector,
     waitForCondition,
     clickToolbarButton,
@@ -22,32 +23,7 @@ import {
     setupTestHelpers,
     generateTestAppId,
 } from "~/@browser-support/sdk-helpers.js";
-import { initLazy } from "~/src/lazy/index.js";
-import { AuthBridge } from "~/src/lazy/auth-bridge.js";
-import { KeyStorage } from "~/src/key-storage.js";
-import type { AppPermissions } from "~/src/types.js";
 import type { Toolbar } from "~/src/components/toolbar.js";
-
-declare const __SDK_API_URL__: string;
-declare const __SDK_LOG_LEVEL__: string | false;
-
-const permissions: AppPermissions = {
-    contentRead: true,
-    contentWrite: true,
-    mediaRead: true,
-    mediaUpload: true,
-    mediaEditOwn: true,
-    mediaEditOthers: true,
-    mediaDeleteOwn: true,
-    mediaDeleteOthers: true,
-    manageMembers: false,
-    manageBilling: false,
-    manageSettings: false,
-    denyAppGui: false,
-    changeRequestValue: false,
-    changeRequestEstimate: false,
-    changeRequestMessage: false,
-};
 
 let appId: string;
 
@@ -69,23 +45,8 @@ beforeAll(async () => {
         }),
     );
 
-    vi.spyOn(AuthBridge.prototype, "init").mockImplementation(() => {});
-    vi.spyOn(AuthBridge.prototype, "authenticate").mockResolvedValue({
-        valid: true,
-        permissions,
-    });
-
-    const keyStorage = new KeyStorage(appId);
-    keyStorage.storeKey("test-viewer-key");
-    keyStorage.storeMode("viewer");
-
     await runLoader(appId);
-    await initLazy({
-        apiUrl: __SDK_API_URL__,
-        appUrl: "http://unused-in-tests",
-        appId,
-        logLevel: __SDK_LOG_LEVEL__,
-    });
+    await initLazyWithStoredKey(appId, "viewer");
     await waitForSelector("scms-toolbar");
 });
 
