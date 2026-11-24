@@ -89,7 +89,7 @@ import { AuthManager } from "./auth-manager.js";
 import { AuthBridge } from "./auth-bridge.js";
 import { ChangeRequestManager, type ExtraEnvironment } from "./change-request-manager.js";
 import { ContentViewerManager } from "./content-viewer-manager.js";
-import { injectEditStyles } from "./styles.js";
+import { injectEditStyles, EDITING_ATTRIBUTE } from "./styles.js";
 import { normalizeWhitespace, normalizeHtmlWhitespace } from "./normalize.js";
 import { TourManager, getTourDefinitions } from "./tours/index.js";
 import { UndoManager } from "./undo-manager.js";
@@ -1069,6 +1069,7 @@ class EditorController {
         document.addEventListener("click", this.handleDocumentClick);
 
         injectEditStyles();
+        document.documentElement.setAttribute(EDITING_ATTRIBUTE, "");
         this.templateManager.showTemplateControls();
     }
 
@@ -1095,6 +1096,7 @@ class EditorController {
         // Remove click-outside handler
         document.removeEventListener("click", this.handleDocumentClick);
 
+        document.documentElement.removeAttribute(EDITING_ATTRIBUTE);
         this.templateManager.hideTemplateControls();
         this.editingManager.deselectInstance();
         this.editingManager.deselectElement();

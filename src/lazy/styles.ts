@@ -12,6 +12,12 @@
 const STYLE_ID = "streamlined-cms-styles";
 
 /**
+ * Set on <html> while editing is on, for styles that only apply then. The
+ * stylesheet stays once injected, so they must not show in viewer mode.
+ */
+export const EDITING_ATTRIBUTE = "data-scms-editing";
+
+/**
  * Inject edit mode styles into the document head.
  * Idempotent - will not inject styles if already present.
  */
@@ -116,13 +122,13 @@ export function injectEditStyles(): void {
             }
         }
 
-        /* Template structure mismatch indicator */
-        [data-scms-structure-mismatch] {
+        /* Template structure mismatch indicator, while editing only (see EDITING_ATTRIBUTE) */
+        [data-scms-editing] [data-scms-structure-mismatch] {
             outline: 2px dashed #f97316 !important;
             outline-offset: -2px;
         }
 
-        [data-scms-structure-mismatch]::after {
+        [data-scms-editing] [data-scms-structure-mismatch]::after {
             content: "⚠";
             position: absolute;
             bottom: 4px;

@@ -288,6 +288,11 @@ export class TemplateManager {
             let hasInlineControls = false;
 
             instances.forEach((instanceElement) => {
+                // The mismatch warning sits in the item's corner, controls or not
+                if (instanceElement.hasAttribute("data-scms-structure-mismatch")) {
+                    this.anchorInstance(instanceElement);
+                }
+
                 // Skip inline controls if instance is also the editable element
                 if (this.helpers.isInstanceAlsoEditable(instanceElement)) return;
 
@@ -774,6 +779,9 @@ export class TemplateManager {
                 if (deleteBtn) deleteBtn.remove();
                 const dragHandle = el.querySelector(".scms-instance-drag-handle");
                 if (dragHandle) dragHandle.remove();
+                if (!el.hasAttribute("data-scms-structure-mismatch")) {
+                    this.removeInstanceAnchor(el);
+                }
             });
             // Destroy sortable instance
             const sortable = this.state.sortableInstances.get(templateId);
@@ -1147,7 +1155,8 @@ export class TemplateManager {
     }
 
     /**
-     * Position an instance so its controls can sit in its corner. Only an
+     * Position an instance so its controls (and any mismatch warning) can sit
+     * in its corner. Only an
      * instance the site leaves unpositioned is changed: one the site positions
      * (absolute, fixed, sticky) already anchors them, and changing it would
      * move it on the page.
@@ -1160,12 +1169,13 @@ export class TemplateManager {
     }
 
     /**
-     * Undo anchorInstance once an instance's controls are gone.
+     * Undo anchorInstance once nothing sits in the instance's corner.
      */
     private removeInstanceAnchor(instanceElement: HTMLElement): void {
         const previous = this.anchoredInstances.get(instanceElement);
         if (previous === undefined) return;
         instanceElement.style.position = previous;
+        this.anchoredInstances.delete(instanceElement);
         if (!instanceElement.getAttribute("style")) {
             instanceElement.removeAttribute("style");
         }
