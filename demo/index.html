@@ -714,6 +714,50 @@
                         />
                     </div>
                 </div>
+
+                <div class="content-section">
+                    <div class="demo-area image-demo">
+                        <h3>Responsive Image (srcset)</h3>
+                        <p>
+                            This image lists several sizes in <code>srcset</code>, as site builders
+                            often generate. The browser picks from that list, so each size is
+                            labelled. Replace the image and the new one should show.
+                        </p>
+                        <img
+                            data-scms-image="image-demo-srcset"
+                            src="https://placehold.co/600x300/f59e0b/white?text=Plain+src"
+                            srcset="
+                                https://placehold.co/600x300/f59e0b/white?text=srcset+600w    600w,
+                                https://placehold.co/1200x600/f59e0b/white?text=srcset+1200w 1200w
+                            "
+                            sizes="(max-width: 700px) 100vw, 600px"
+                            alt="Demo responsive image"
+                        />
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="demo-area image-demo">
+                        <h3>Picture Element</h3>
+                        <p>
+                            This image is wrapped in <code>&lt;picture&gt;</code> with a
+                            <code>&lt;source&gt;</code>, which the browser prefers over the
+                            <code>&lt;img&gt;</code>. Replace the image and the new one should show.
+                        </p>
+                        <picture>
+                            <source
+                                srcset="
+                                    https://placehold.co/600x300/8b5cf6/white?text=picture+source
+                                "
+                            />
+                            <img
+                                data-scms-image="image-demo-picture"
+                                src="https://placehold.co/600x300/8b5cf6/white?text=Plain+src"
+                                alt="Demo picture image"
+                            />
+                        </picture>
+                    </div>
+                </div>
             </div>
 
             <!-- LINKS PAGE -->
