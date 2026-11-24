@@ -28,7 +28,6 @@ export function injectEditStyles(): void {
             outline-offset: -2px;
             transition: outline 0.2s;
             cursor: pointer;
-            position: relative;
         }
 
         .streamlined-editable:hover {
@@ -121,7 +120,6 @@ export function injectEditStyles(): void {
         [data-scms-structure-mismatch] {
             outline: 2px dashed #f97316 !important;
             outline-offset: -2px;
-            position: relative;
         }
 
         [data-scms-structure-mismatch]::after {

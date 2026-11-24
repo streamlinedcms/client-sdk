@@ -44,6 +44,8 @@ export interface TemplateManagerHelpers {
 
 export class TemplateManager {
     private instanceDeleteButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
+    /** Instances positioned to anchor their controls, with their previous inline position */
+    private anchoredInstances = new WeakMap<HTMLElement, string>();
     private _skipUndoPush = false;
 
     constructor(
@@ -343,10 +345,12 @@ export class TemplateManager {
                     if (dragHandle) {
                         dragHandle.remove();
                     }
+                    this.removeInstanceAnchor(instanceElement);
                 });
         });
         // Clear the WeakMap tracking
         this.instanceDeleteButtons = new WeakMap();
+        this.anchoredInstances = new WeakMap();
 
         // Destroy all sortable instances
         this.state.sortableInstances.forEach((sortable) => {
@@ -1101,8 +1105,7 @@ export class TemplateManager {
         deleteBtn.title = "Remove this item";
         deleteBtn.setAttribute("aria-label", "Remove this item");
 
-        // Position relative to instance
-        instanceElement.style.position = "relative";
+        this.anchorInstance(instanceElement);
 
         deleteBtn.addEventListener("click", (e) => {
             e.preventDefault();
@@ -1139,7 +1142,33 @@ export class TemplateManager {
         `;
         dragHandle.title = "Drag to reorder";
 
+        this.anchorInstance(instanceElement);
         instanceElement.appendChild(dragHandle);
+    }
+
+    /**
+     * Position an instance so its controls can sit in its corner. Only an
+     * instance the site leaves unpositioned is changed: one the site positions
+     * (absolute, fixed, sticky) already anchors them, and changing it would
+     * move it on the page.
+     */
+    private anchorInstance(instanceElement: HTMLElement): void {
+        if (this.anchoredInstances.has(instanceElement)) return;
+        if (getComputedStyle(instanceElement).position !== "static") return;
+        this.anchoredInstances.set(instanceElement, instanceElement.style.position);
+        instanceElement.style.position = "relative";
+    }
+
+    /**
+     * Undo anchorInstance once an instance's controls are gone.
+     */
+    private removeInstanceAnchor(instanceElement: HTMLElement): void {
+        const previous = this.anchoredInstances.get(instanceElement);
+        if (previous === undefined) return;
+        instanceElement.style.position = previous;
+        if (!instanceElement.getAttribute("style")) {
+            instanceElement.removeAttribute("style");
+        }
     }
 
     /**
