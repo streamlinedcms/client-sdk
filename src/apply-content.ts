@@ -85,6 +85,11 @@ function dropResponsiveSources(img: HTMLImageElement): void {
  * resolved URLs, since the editor saves the resolved one.
  */
 function isDifferentImage(img: HTMLImageElement, src: string): boolean {
+    // The editor saves an empty src for an image with no src of its own (its
+    // picture comes from srcset or a <source>), which names no new image
+    if (!src) {
+        return false;
+    }
     try {
         return new URL(src, document.baseURI).href !== img.src;
     } catch {

@@ -63,6 +63,27 @@ beforeAll(async () => {
         }),
     );
 
+    await setContent(
+        appId,
+        "picture-unchanged",
+        JSON.stringify({
+            type: "image",
+            src: "https://example.com/original.png",
+            attributes: { alt: "Saved alt" },
+        }),
+    );
+    // An image with no src of its own is saved with an empty src
+    await setContent(
+        appId,
+        "picture-no-src",
+        JSON.stringify({ type: "image", src: "", attributes: { alt: "Saved alt" } }),
+    );
+    await setContent(
+        appId,
+        "srcset-no-src",
+        JSON.stringify({ type: "image", src: "", attributes: { alt: "Saved alt" } }),
+    );
+
     await runLoader(appId);
 });
 
@@ -100,5 +121,24 @@ test("an image the page names by a relative address, saved unchanged, keeps its 
     expect(img.getAttribute("srcset")).toBe(
         "/images/original-600.png 600w, /images/original-1200.png 1200w",
     );
+    expect(img.getAttribute("sizes")).toBe("600px");
+});
+
+test("an image in a <picture> saved unchanged keeps the picture's sources", () => {
+    const img = image("picture-unchanged");
+    expect(img.getAttribute("alt")).toBe("Saved alt");
+    expect(img.parentElement!.querySelectorAll("source")).toHaveLength(1);
+});
+
+test("an image without its own src, saved for its alt text, keeps the picture's sources", () => {
+    const img = image("picture-no-src");
+    expect(img.getAttribute("alt")).toBe("Saved alt");
+    expect(img.parentElement!.querySelectorAll("source")).toHaveLength(1);
+});
+
+test("an image without its own src, saved for its alt text, keeps its srcset", () => {
+    const img = image("srcset-no-src");
+    expect(img.getAttribute("alt")).toBe("Saved alt");
+    expect(img.hasAttribute("srcset")).toBe(true);
     expect(img.getAttribute("sizes")).toBe("600px");
 });

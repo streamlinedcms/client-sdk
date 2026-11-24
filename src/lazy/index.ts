@@ -499,6 +499,9 @@ class EditorController {
             }
 
             this.savedContentFetched = true;
+            if (this.state.toolbar) {
+                this.state.toolbar.canSave = true;
+            }
             this.log.debug("Fetched saved content keys", {
                 count: this.state.savedContentKeys.size,
             });
@@ -1138,7 +1141,11 @@ class EditorController {
             void this.handleModeChange(e.detail.mode);
         }) as EventListener);
 
+        toolbar.canSave = this.savedContentFetched;
+
         toolbar.addEventListener("save", () => {
+            // A save before saved content loads would erase saved attributes
+            if (!this.savedContentFetched) return;
             this.saveManager.handleSave();
         });
 
