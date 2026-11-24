@@ -393,6 +393,57 @@
             </ul>
         </div>
 
+        <!-- Images with responsive sources, for image replacement tests (isolated) -->
+        <div class="test-section">
+            <h2>Responsive Images</h2>
+            <img
+                data-scms-image="srcset-replaced"
+                src="https://example.com/original.png"
+                srcset="
+                    https://example.com/original-600.png   600w,
+                    https://example.com/original-1200.png 1200w
+                "
+                sizes="600px"
+                alt="Srcset replaced"
+            />
+            <img
+                data-scms-image="srcset-unchanged"
+                src="https://example.com/original.png"
+                srcset="
+                    https://example.com/original-600.png   600w,
+                    https://example.com/original-1200.png 1200w
+                "
+                sizes="600px"
+                alt="Srcset unchanged"
+            />
+            <picture>
+                <source srcset="https://example.com/original.webp" type="image/webp" />
+                <img
+                    data-scms-image="picture-replaced"
+                    src="https://example.com/original.png"
+                    alt="Picture replaced"
+                />
+            </picture>
+            <img
+                data-scms-image="srcset-edit"
+                src="https://example.com/original.png"
+                srcset="
+                    https://example.com/original-600.png   600w,
+                    https://example.com/original-1200.png 1200w
+                "
+                sizes="600px"
+                alt="Srcset edit"
+            />
+            <picture>
+                <source srcset="https://example.com/original.webp" type="image/webp" />
+                <img
+                    data-scms-image="picture-edit"
+                    src="https://example.com/original.png"
+                    alt="Picture edit"
+                />
+            </picture>
+        </div>
+
         <!-- Elements for attribute-only modal save detection tests (isolated) -->
         <div class="test-section">
             <a href="https://example.com" data-scms-link="attr-save-link">Attr Save Link</a>
