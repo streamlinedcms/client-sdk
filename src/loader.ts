@@ -11,6 +11,7 @@
  */
 
 import { applyContentToElement } from "./apply-content.js";
+import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
 
 (function () {
     // Find our own script tag to get config (do this first, before any DOM modifications)
@@ -144,19 +145,18 @@ import { applyContentToElement } from "./apply-content.js";
      * - For editable elements: keeps only reserved attributes (id, class, data-scms-*)
      */
     function stripTemplateContent(html: string): string {
-        const div = document.createElement("div");
-        div.innerHTML = html;
+        const fragment = parseHtml(html);
 
         // Strip instance IDs (they vary between instances)
-        div.querySelectorAll("[data-scms-instance]").forEach((el) =>
-            el.removeAttribute("data-scms-instance"),
-        );
+        fragment
+            .querySelectorAll("[data-scms-instance]")
+            .forEach((el) => el.removeAttribute("data-scms-instance"));
 
         // For editable elements, strip all attributes except reserved ones
         // This handles src, href, alt, title, and any custom attributes set via modals
         const editableSelector =
             "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link], [data-scms-href]";
-        div.querySelectorAll(editableSelector).forEach((el) => {
+        fragment.querySelectorAll(editableSelector).forEach((el) => {
             const attributesToRemove: string[] = [];
             for (let i = 0; i < el.attributes.length; i++) {
                 const attr = el.attributes[i];
@@ -179,7 +179,7 @@ import { applyContentToElement } from "./apply-content.js";
 
         // Replace all text nodes with empty strings, except those inside
         // data-scms-href elements (where developer layout lives).
-        const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) {
             const node = walker.currentNode as Text;
@@ -189,7 +189,7 @@ import { applyContentToElement } from "./apply-content.js";
         }
         textNodes.forEach((node) => (node.textContent = ""));
 
-        return div.innerHTML;
+        return serializeHtml(fragment);
     }
 
     /**
@@ -545,9 +545,7 @@ import { applyContentToElement } from "./apply-content.js";
 
             // Clone from clean template for each API instance ID
             for (let i = 0; i < instanceIds.length; i++) {
-                const tempDiv = document.createElement("div");
-                tempDiv.innerHTML = cleanTemplateHtml || templateElement.outerHTML;
-                const clone = tempDiv.firstElementChild as HTMLElement;
+                const clone = parseElement(cleanTemplateHtml || templateElement.outerHTML);
                 if (!clone) continue;
 
                 clone.setAttribute("data-scms-instance", instanceIds[i]);
