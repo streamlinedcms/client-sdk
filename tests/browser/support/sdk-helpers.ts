@@ -34,8 +34,9 @@ export function generateTestAppId(): string {
 /**
  * Run the loader script to fetch content and populate DOM.
  * Returns a promise that resolves when the loader completes.
+ * Call it on its own to see the page as a visitor gets it, without the editor.
  */
-async function runLoader(appId: string): Promise<void> {
+export async function runLoader(appId: string): Promise<void> {
     const TIMEOUT_MS = 5000;
 
     // Remove any existing loader script for this appId

@@ -32,6 +32,21 @@ export async function setContent(appId: string, elementId: string, content: stri
 }
 
 /**
+ * Get the stored content string for an element on the test server,
+ * or null if nothing is stored.
+ * @param appId - The app ID
+ * @param elementId - The element ID (ungrouped)
+ */
+export async function getContent(appId: string, elementId: string): Promise<string | null> {
+    const response = await fetch(`${serverUrl}/v1/apps/${appId}/content`);
+    if (!response.ok) {
+        throw new Error(`Failed to get content: ${response.statusText}`);
+    }
+    const data = (await response.json()) as { elements: Record<string, { content: string }> };
+    return data.elements[elementId]?.content ?? null;
+}
+
+/**
  * Clear all stored content on the test server.
  */
 export async function clearContent(): Promise<void> {
