@@ -294,3 +294,49 @@ export function holdContentFetches(): {
         },
     };
 }
+
+/**
+ * Make the editor's saved-content fetches (GET .../content) fail until
+ * stopped, either with a server error or with no response at all. Install
+ * after the loader runs.
+ */
+export function failContentFetches(kind: "server" | "network"): {
+    /** How many fetches have failed so far */
+    failures: () => number;
+    /** Let later fetches through */
+    stop: () => void;
+} {
+    const realFetch = window.fetch.bind(window);
+    let failing = true;
+    let failures = 0;
+
+    vi.spyOn(window, "fetch").mockImplementation(async (input, init) => {
+        const url =
+            typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+        if (failing && method === "GET" && /\/apps\/[^/]+\/content$/.test(new URL(url).pathname)) {
+            failures++;
+            if (kind === "network") {
+                throw new TypeError("Failed to fetch");
+            }
+            return new Response("Internal Server Error", { status: 500 });
+        }
+        return realFetch(input, init);
+    });
+
+    return {
+        failures: () => failures,
+        stop: () => {
+            failing = false;
+        },
+    };
+}
+
+/**
+ * Shorten the waits between retries of a failed saved-content fetch, so tests
+ * don't wait seconds for them. Call before entering author mode.
+ */
+export function setSavedContentRetryDelays(delays: number[]): void {
+    (controller as unknown as { savedContentRetryDelays: number[] }).savedContentRetryDelays =
+        delays;
+}

@@ -121,6 +121,14 @@ type HookEvent = "signin" | "signout";
  */
 type HookHandler = () => void;
 
+/**
+ * How a saved-content fetch went: loaded, refused (402/403, already shown in
+ * the toolbar), or failed some other way (no response, a server error).
+ */
+type SavedContentResult = "loaded" | "denied" | "failed";
+
+const SAVED_CONTENT_FAILED_WARNING = "Couldn't load saved content, so editing is off.";
+
 class EditorController {
     static readonly version: string = __SDK_VERSION__;
 
@@ -137,6 +145,11 @@ class EditorController {
     private savedContentFetched = false;
     /** Counts mode requests, so a slow switch to author mode can tell it was superseded */
     private modeRequest = 0;
+    /**
+     * Waits in ms before each retry of a failed saved-content fetch. Once
+     * they're used up, the toolbar says editing is off.
+     */
+    private savedContentRetryDelays = [1000, 2000, 4000];
     private state: EditorState;
     private draftManager: DraftManager;
     private contentManager: ContentManager;
@@ -347,14 +360,7 @@ class EditorController {
                 showToolbar: this.showToolbar.bind(this),
                 removeToolbar: this.removeToolbar.bind(this),
                 hasUnsavedChanges: () => this.saveManager.hasUnsavedChanges(),
-                setToolbarWarning: (message) => {
-                    if (this.state.toolbar) {
-                        this.state.toolbar.warning = message;
-                    }
-                    if (message) {
-                        this.state.domainWarningShown = true;
-                    }
-                },
+                setToolbarWarning: this.setToolbarWarning.bind(this),
                 removeLoadingIndicator: () => this.removeLoadingIndicator(),
                 emitSignIn: () => this.emit("signin"),
                 emitSignOut: () => this.emit("signout"),
@@ -456,21 +462,22 @@ class EditorController {
     /**
      * Fetch content from API to determine which elements have saved content.
      * Elements with saved content should not have their whitespace normalized.
-     * Returns true on success, false if access denied (402/403).
+     * Also records saved attributes, which author mode needs before any edit.
      */
-    private async fetchSavedContentKeys(): Promise<boolean> {
+    private async fetchSavedContentKeys(): Promise<SavedContentResult> {
         try {
             const url = `${this.config.apiUrl}/apps/${this.config.appId}/content`;
             const response = await this.apiFetch(url);
 
             if (response.status === 402 || response.status === 403) {
                 // Access denied - apiFetch already showed warning
-                return false;
+                return "denied";
             }
 
             if (!response.ok) {
-                // Other error (404, 500, etc.) - all elements will be normalized
-                return true;
+                // A site with no saved content still gets a 200, so this is a failure
+                this.log.warn("Could not fetch saved content keys", { status: response.status });
+                return "failed";
             }
 
             const data = (await response.json()) as ContentResponse;
@@ -495,10 +502,10 @@ class EditorController {
             this.log.debug("Fetched saved content keys", {
                 count: this.state.savedContentKeys.size,
             });
-            return true;
+            return "loaded";
         } catch (error) {
             this.log.warn("Could not fetch saved content keys", error);
-            return true; // Network error - assume ok to avoid blocking editing
+            return "failed";
         }
     }
 
@@ -879,8 +886,10 @@ class EditorController {
     /**
      * Enter author mode. The toolbar shows at once, but editing waits for saved
      * content, which author mode needs before any edit (saved attributes, among
-     * other things). If the user switched mode, signed out or signed in again
-     * while it was loading, the newer request wins and editing stays off.
+     * other things). A fetch that fails other than by access denied is retried,
+     * since that usually clears up; if it never loads, the toolbar says so. If
+     * the user switched mode, signed out or signed in again while it was
+     * loading, the newer request wins and editing stays off.
      * @param refetch - Fetch even if this session already has (sign-in does,
      *   since a new key's access is checked by the fetch)
      */
@@ -892,14 +901,41 @@ class EditorController {
             return;
         }
 
-        const success = await this.fetchSavedContentKeys();
-        if (request !== this.modeRequest || !this.state.apiKey) {
+        const superseded = () => request !== this.modeRequest || !this.state.apiKey;
+        let result = await this.fetchSavedContentKeys();
+        for (const delay of this.savedContentRetryDelays) {
+            if (result !== "failed" || superseded()) {
+                break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, delay));
+            if (superseded()) {
+                return;
+            }
+            result = await this.fetchSavedContentKeys();
+        }
+        if (superseded()) {
             return;
         }
-        if (success) {
+        if (result === "loaded") {
             this.enableEditingIfPermitted();
         } else {
             this.disableEditing();
+            if (result === "failed") {
+                this.setToolbarWarning(SAVED_CONTENT_FAILED_WARNING);
+            }
+        }
+    }
+
+    /**
+     * Show a warning banner in the toolbar, or clear it with null. The next
+     * successful API request clears a shown warning.
+     */
+    private setToolbarWarning(message: string | null): void {
+        if (this.state.toolbar) {
+            this.state.toolbar.warning = message;
+        }
+        if (message) {
+            this.state.domainWarningShown = true;
         }
     }
 
