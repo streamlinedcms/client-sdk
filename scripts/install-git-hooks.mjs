@@ -1,36 +1,77 @@
-// Link the repo's git hooks (scripts/git-hooks/) into .git/hooks.
-// Runs as npm's prepare step. Writes to the repo's own hooks folder even when
-// a global core.hooksPath is set, since a global hook can hand off to it.
+// Install the repo's git hooks (scripts/git-hooks/) into the repo's shared
+// hooks folder, as small hooks that run the checked-in script from whichever
+// checkout git is running in. That covers worktrees, which share the main
+// repo's hooks folder, and needs no symlinks (which Windows often refuses).
+//
+// Runs as npm's prepare step. It never fails the install: a hook is a
+// convenience, so problems are only warned about.
+//
+// Writes to the repo's own hooks folder even when a global core.hooksPath is
+// set, and never changes core.hooksPath, since a global hook can hand off to
+// the repo's.
 import { execFileSync } from "node:child_process";
-import { lstatSync, mkdirSync, readdirSync, readlinkSync, symlinkSync } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import {
+    lstatSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    readlinkSync,
+    rmSync,
+    writeFileSync,
+} from "node:fs";
+import { join, resolve } from "node:path";
 
-if (process.env.CI) process.exit(0);
+if (process.env.CI && process.env.CI !== "false") process.exit(0);
 
-let gitDir;
+function shim(name) {
+    return `#!/bin/sh
+# Installed by scripts/install-git-hooks.mjs: runs this checkout's own copy.
+hook="$(git rev-parse --show-toplevel)/scripts/git-hooks/${name}"
+[ -x "$hook" ] || exit 0
+exec "$hook" "$@"
+`;
+}
+
+let commonDir;
 try {
-    gitDir = execFileSync("git", ["rev-parse", "--absolute-git-dir"], { encoding: "utf8" }).trim();
+    // Relative to the current directory on older git versions, so resolve it
+    commonDir = resolve(
+        execFileSync("git", ["rev-parse", "--git-common-dir"], {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+        }).trim(),
+    );
 } catch {
     process.exit(0); // Not a git checkout (e.g. installed as a package)
 }
 
-const source = resolve("scripts/git-hooks");
-const hooksDir = join(gitDir, "hooks");
-mkdirSync(hooksDir, { recursive: true });
+try {
+    const hooksDir = join(commonDir, "hooks");
+    mkdirSync(hooksDir, { recursive: true });
 
-for (const name of readdirSync(source)) {
-    const target = join(hooksDir, name);
-    const link = relative(hooksDir, join(source, name));
-    const existing = lstatSync(target, { throwIfNoEntry: false });
-    if (existing) {
-        const current = existing.isSymbolicLink() ? readlinkSync(target) : null;
-        if (current !== link) {
-            console.warn(
-                `install-git-hooks: ${target} already exists; leaving it. Remove it and run 'npm run prepare' to use the repo's hook.`,
-            );
+    for (const name of readdirSync(resolve("scripts/git-hooks"))) {
+        const target = join(hooksDir, name);
+        const content = shim(name);
+        const existing = lstatSync(target, { throwIfNoEntry: false });
+
+        if (existing) {
+            // An earlier version of this script linked the hook directly
+            const ours = existing.isSymbolicLink()
+                ? readlinkSync(target).endsWith(`scripts/git-hooks/${name}`)
+                : readFileSync(target, "utf8") === content;
+            if (!ours) {
+                console.warn(
+                    `install-git-hooks: ${target} already exists; leaving it. Remove it and run 'npm run prepare' to use the repo's hook.`,
+                );
+                continue;
+            }
+            if (existing.isFile()) continue; // Already installed
+            rmSync(target);
         }
-        continue;
+
+        writeFileSync(target, content, { mode: 0o755 });
+        console.log(`install-git-hooks: installed ${name}`);
     }
-    symlinkSync(link, target);
-    console.log(`install-git-hooks: linked ${name}`);
+} catch (error) {
+    console.warn(`install-git-hooks: couldn't install git hooks (${error.message}); skipping.`);
 }

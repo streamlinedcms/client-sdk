@@ -13,6 +13,11 @@ function readPackages(path) {
 const locked = readPackages("package-lock.json");
 const installed = readPackages("node_modules/.package-lock.json");
 
+if (!locked) {
+    console.error("package-lock.json is missing or unreadable.");
+    process.exit(1);
+}
+
 if (!installed) {
     console.error("node_modules isn't installed.");
     process.exit(1);
@@ -20,8 +25,9 @@ if (!installed) {
 
 const mismatched = [];
 for (const [path, entry] of Object.entries(locked)) {
-    // The root entry and optional packages for other platforms aren't installed
-    if (!path || entry.optional) continue;
+    // The root entry isn't a package, and optional ones (e.g. for other
+    // platforms) may legitimately be missing, but are checked when installed
+    if (!path || (entry.optional && !installed[path])) continue;
     if (installed[path]?.version !== entry.version) {
         mismatched.push(
             `${path.replace(/^node_modules\//, "")}: installed ${installed[path]?.version ?? "none"}, locked ${entry.version}`,
