@@ -15,7 +15,7 @@ import { KeyStorage, type EditorMode } from "../key-storage.js";
 import { PopupManager, type MediaFile } from "../popup-manager.js";
 import type { EditableType } from "../types.js";
 import { buildTemplateKey, EDITABLE_SELECTOR } from "../types.js";
-import { parseContentAttributes } from "../apply-content.js";
+import { parseContentAttributes, withContentAttributes } from "../apply-content.js";
 
 /**
  * Configuration for StreamlinedCMS
@@ -133,6 +133,8 @@ class EditorController {
     private keyStorage: KeyStorage;
     private popupManager: PopupManager;
     private authBridge: AuthBridge;
+    /** Whether saved content has been fetched this session (see fetchSavedContentKeys) */
+    private savedContentFetched = false;
     private state: EditorState;
     private draftManager: DraftManager;
     private contentManager: ContentManager;
@@ -483,6 +485,7 @@ class EditorController {
                 }
             }
 
+            this.savedContentFetched = true;
             this.log.debug("Fetched saved content keys", {
                 count: this.state.savedContentKeys.size,
             });
@@ -497,25 +500,38 @@ class EditorController {
      * Record an element's saved attributes so the next save keeps them.
      * The loader already applied them to the DOM, but the DOM can't tell saved
      * attributes from the site's own, so they come from the saved content.
-     * Skips keys that already have attributes (from a draft or an unsaved
-     * dialog edit) so those aren't overwritten.
      */
     private loadSavedAttributes(key: string, content: string): void {
-        if (this.state.elementAttributes.has(key)) return;
         const attributes = parseContentAttributes(content);
         if (!attributes) return;
-        this.state.elementAttributes.set(key, attributes);
 
-        // Recompute the element's content to include them. Its load-time value
-        // is updated too, so loading doesn't register as an unsaved change.
-        const infos = this.state.editableElements.get(key);
-        if (!infos || infos.length === 0) return;
-        const updated = this.contentManager.getElementContent(key, infos[0]);
         const original = this.state.originalContent.get(key);
-        if (this.state.currentContent.get(key) === original) {
-            this.state.currentContent.set(key, updated);
+        if (original === undefined) {
+            // Element isn't registered yet; its content will be built with these
+            if (!this.state.elementAttributes.has(key)) {
+                this.state.elementAttributes.set(key, attributes);
+            }
+            return;
         }
-        this.state.originalContent.set(key, updated);
+
+        // The load-time value is the editor's copy of the saved version (what
+        // Reset restores and changes are measured against), so it gets the
+        // saved attributes. It's edited as a string rather than rebuilt from
+        // the DOM, which may be showing a restored draft.
+        const withSaved = withContentAttributes(original, attributes);
+        this.state.originalContent.set(key, withSaved);
+
+        // A restored draft can match the load-time value exactly (e.g. one that
+        // only removed attributes), so drafts are checked by key, on the first
+        // fetch only: a save clears the draft.
+        const restoredFromDraft =
+            !this.savedContentFetched && this.draftManager.restoredKeys.has(key);
+        if (!restoredFromDraft && this.state.currentContent.get(key) === original) {
+            this.state.currentContent.set(key, withSaved);
+            this.state.elementAttributes.set(key, attributes);
+        }
+        // Otherwise the element has unsaved changes (a restored draft, or an
+        // edit since loading), and their attributes stand, including none.
     }
 
     async init(): Promise<void> {
@@ -845,6 +861,23 @@ class EditorController {
         this.templateManager.updateToolbarTemplateContext();
     };
 
+    /**
+     * Switch mode from the toolbar. A page that loaded in viewer mode hasn't
+     * fetched saved content, which author mode needs (saved attributes, among
+     * other things), so fetch it before entering author mode.
+     */
+    private async handleModeChange(mode: EditorMode): Promise<void> {
+        if (mode === "author" && !this.savedContentFetched) {
+            const success = await this.fetchSavedContentKeys();
+            this.setMode(mode);
+            if (!success) {
+                this.disableEditing();
+            }
+            return;
+        }
+        this.setMode(mode);
+    }
+
     private setMode(mode: EditorMode): void {
         this.state.currentMode = mode;
         this.keyStorage.storeMode(mode);
@@ -1027,7 +1060,7 @@ class EditorController {
         toolbar.canRequestChange = canRequestChange;
 
         toolbar.addEventListener("mode-change", ((e: CustomEvent<{ mode: EditorMode }>) => {
-            this.setMode(e.detail.mode);
+            void this.handleModeChange(e.detail.mode);
         }) as EventListener);
 
         toolbar.addEventListener("save", () => {

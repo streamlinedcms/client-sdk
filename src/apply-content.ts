@@ -51,6 +51,21 @@ export function parseContentAttributes(content: string): ElementAttributes | nul
     return null;
 }
 
+/**
+ * Return a content string with its attributes replaced. Attributes go last,
+ * matching the order the editor serializes content in, so the result
+ * compares equal to the editor's own output for the same content.
+ */
+export function withContentAttributes(content: string, attributes: ElementAttributes): string {
+    try {
+        const data = JSON.parse(content) as Record<string, unknown>;
+        delete data.attributes;
+        return JSON.stringify({ ...data, attributes });
+    } catch {
+        return content;
+    }
+}
+
 function setImageSrc(img: HTMLImageElement, src: string, replace: boolean): HTMLElement {
     if (!replace) {
         img.src = src;

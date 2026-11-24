@@ -39,6 +39,9 @@ export interface DraftManagerHelpers {
 }
 
 export class DraftManager {
+    /** Keys whose content was restored from a draft when the page loaded */
+    readonly restoredKeys = new Set<string>();
+
     constructor(
         private state: EditorState,
         private log: Logger,
@@ -223,6 +226,7 @@ export class DraftManager {
             }
 
             this.state.currentContent.set(key, value);
+            this.restoredKeys.add(key);
             this.helpers.syncAllElementsFromContent(key);
         }
 
