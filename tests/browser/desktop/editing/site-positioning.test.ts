@@ -79,3 +79,65 @@ test("unpositioned template items are positioned only while editing", async () =
         expect(position(item)).toBe("relative");
     }
 });
+
+test("an item's own inline style survives editing", async () => {
+    const items = getItems("styled-items");
+    for (const item of items) {
+        expect(position(item)).toBe("relative");
+    }
+
+    await setMode("viewer");
+    for (const item of items) {
+        expect(position(item)).toBe("static");
+        expect(item.style.color).toBe("red");
+        expect(item.style.position).toBe("");
+    }
+    await setMode("author");
+    await waitForCondition(() =>
+        items.every((item) => item.querySelector(".scms-instance-delete")),
+    );
+});
+
+test("items added while editing are positioned for their controls", async () => {
+    const container = document.querySelector('[data-scms-template="unpositioned-items"]')!;
+    (container.querySelector(".scms-template-add") as HTMLElement).click();
+    await waitForCondition(() => getItems("unpositioned-items").length === 3);
+
+    const added = getItems("unpositioned-items")[2];
+    expect(added.querySelector(".scms-instance-delete")).not.toBeNull();
+    expect(position(added)).toBe("relative");
+});
+
+test("deleting down to one item removes its positioning, and adding one restores it", async () => {
+    while (getItems("unpositioned-items").length > 1) {
+        const items = getItems("unpositioned-items");
+        (items[items.length - 1].querySelector(".scms-instance-delete") as HTMLElement).click();
+        await waitForCondition(() => getItems("unpositioned-items").length === items.length - 1);
+    }
+    const [survivor] = getItems("unpositioned-items");
+    expect(survivor.querySelector(".scms-instance-delete")).toBeNull();
+    expect(position(survivor)).toBe("static");
+
+    const container = document.querySelector('[data-scms-template="unpositioned-items"]')!;
+    (container.querySelector(".scms-template-add") as HTMLElement).click();
+    await waitForCondition(() => getItems("unpositioned-items").length === 2);
+    for (const item of getItems("unpositioned-items")) {
+        expect(item.querySelector(".scms-instance-delete")).not.toBeNull();
+        expect(position(item)).toBe("relative");
+    }
+});
+
+test("the mismatch warning sits on its item while editing and is gone in Preview", async () => {
+    const [, mismatched] = getItems("mismatched-editable");
+    expect(mismatched.hasAttribute("data-scms-structure-mismatch")).toBe(true);
+    // The item is itself the editable element, so it gets no inline controls
+    expect(mismatched.querySelector(".scms-instance-delete")).toBeNull();
+    expect(getComputedStyle(mismatched, "::after").content).not.toBe("none");
+    expect(position(mismatched)).toBe("relative");
+
+    await setMode("viewer");
+    expect(getComputedStyle(mismatched, "::after").content).toBe("none");
+    expect(getComputedStyle(mismatched).outlineStyle).toBe("none");
+    expect(position(mismatched)).toBe("static");
+    await setMode("author");
+});
