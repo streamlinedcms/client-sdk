@@ -383,7 +383,11 @@ class EditorController {
         // Initialize content viewer manager
         this.contentViewerManager = new ContentViewerManager(this.state, this.log, {
             selectAndEdit: (key, element) => {
-                this.editingManager.startEditing(key, element);
+                if (this.state.editingEnabled) {
+                    this.editingManager.startEditing(key, element);
+                } else {
+                    this.scrollToElement(element);
+                }
             },
             scrollToElement: this.scrollToElement.bind(this),
             updateToolbarContentViewer: (active, hiddenCount) => {
@@ -879,26 +883,24 @@ class EditorController {
      * while it was loading, the newer request wins and editing stays off.
      * @param refetch - Fetch even if this session already has (sign-in does,
      *   since a new key's access is checked by the fetch)
-     * @returns false if a newer request overtook this one
      */
-    private async enterAuthorMode({ refetch }: { refetch: boolean }): Promise<boolean> {
+    private async enterAuthorMode({ refetch }: { refetch: boolean }): Promise<void> {
         const request = ++this.modeRequest;
         const needsFetch = refetch || !this.savedContentFetched;
         this.setMode("author", { editing: !needsFetch });
         if (!needsFetch) {
-            return true;
+            return;
         }
 
         const success = await this.fetchSavedContentKeys();
         if (request !== this.modeRequest || !this.state.apiKey) {
-            return false;
+            return;
         }
         if (success) {
             this.enableEditingIfPermitted();
         } else {
             this.disableEditing();
         }
-        return true;
     }
 
     /**
@@ -1547,7 +1549,8 @@ class EditorController {
         });
 
         // Enter author mode
-        if (!(await this.enterAuthorMode({ refetch: true }))) {
+        await this.enterAuthorMode({ refetch: true });
+        if (this.state.apiKey !== result.key) {
             // Signed out (or signed in again) before saved content arrived
             return { success: false, error: "Sign-in was cancelled" };
         }
