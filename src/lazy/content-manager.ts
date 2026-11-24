@@ -9,15 +9,13 @@
 
 import type { EditorState, EditableElementInfo } from "./state.js";
 import type {
-    ElementAttributes,
-    ContentData,
     TextContentData,
     HtmlContentData,
     ImageContentData,
     LinkContentData,
     HrefContentData,
 } from "../types.js";
-import { applyAttributesToElement } from "../types.js";
+import { applyContentToElement, parseContentAttributes } from "../apply-content.js";
 
 function readTextWithBreaks(element: HTMLElement): string {
     const clone = document.createElement("div");
@@ -48,7 +46,7 @@ function readTextWithBreaks(element: HTMLElement): string {
         div.remove();
     });
 
-    // Handle standalone <br> tags (e.g. from our own writeTextWithBreaks or Shift+Enter)
+    // Handle standalone <br> tags (e.g. from our own setTextWithBreaks or Shift+Enter)
     clone.querySelectorAll("br").forEach((br) => br.replaceWith("\n"));
 
     // Normalize &nbsp; (U+00A0) to regular spaces — Chrome's contenteditable
@@ -93,15 +91,6 @@ export function updateEmptyState(element: HTMLElement): void {
         return;
     }
     element.classList.toggle("streamlined-empty", isVisuallyEmpty(element));
-}
-
-function writeTextWithBreaks(element: HTMLElement, text: string): void {
-    element.textContent = "";
-    const parts = text.split("\n");
-    for (let i = 0; i < parts.length; i++) {
-        if (i > 0) element.appendChild(document.createElement("br"));
-        if (parts[i]) element.appendChild(document.createTextNode(parts[i]));
-    }
 }
 
 export class ContentManager {
@@ -235,67 +224,14 @@ export class ContentManager {
     applyElementContent(key: string, info: EditableElementInfo, content: string): void {
         const elementType = this.state.editableTypes.get(key) || "html";
 
-        try {
-            const data = JSON.parse(content) as
-                | (ContentData & { attributes?: ElementAttributes })
-                | { type?: undefined; attributes?: ElementAttributes };
-
-            // Extract and store attributes if present
-            if (data.attributes && Object.keys(data.attributes).length > 0) {
-                this.state.elementAttributes.set(key, data.attributes);
-                applyAttributesToElement(info.element, data.attributes);
-            }
-
-            if (data.type === "text") {
-                writeTextWithBreaks(info.element, (data as TextContentData).value);
-            } else if (data.type === "html") {
-                this.setElementHTML(info.element, (data as HtmlContentData).value);
-            } else if (data.type === "image" && info.element instanceof HTMLImageElement) {
-                info.element.src = (data as ImageContentData).src;
-            } else if (data.type === "link" && info.element instanceof HTMLAnchorElement) {
-                const linkData = data as LinkContentData;
-                info.element.href = linkData.href;
-                info.element.target = linkData.target;
-                this.setElementHTML(info.element, linkData.value);
-            } else if (data.type === "href" && info.element instanceof HTMLAnchorElement) {
-                const hrefData = data as HrefContentData;
-                info.element.href = hrefData.href;
-                info.element.target = hrefData.target;
-            } else if (!data.type) {
-                // No type field in JSON - use element's declared type
-                if (elementType === "link" && info.element instanceof HTMLAnchorElement) {
-                    const linkData = data as { href?: string; target?: string; value?: string };
-                    if (linkData.href !== undefined) {
-                        info.element.href = linkData.href;
-                        info.element.target = linkData.target || "";
-                        this.setElementHTML(info.element, linkData.value || "");
-                    }
-                } else if (elementType === "href" && info.element instanceof HTMLAnchorElement) {
-                    const hrefData = data as { href?: string; target?: string };
-                    if (hrefData.href !== undefined) {
-                        info.element.href = hrefData.href;
-                        info.element.target = hrefData.target || "";
-                    }
-                } else if (elementType === "image" && info.element instanceof HTMLImageElement) {
-                    const imageData = data as { src?: string };
-                    if (imageData.src !== undefined) {
-                        info.element.src = imageData.src;
-                    }
-                } else if (elementType === "text") {
-                    const textData = data as { value?: string };
-                    if (textData.value !== undefined) {
-                        writeTextWithBreaks(info.element, textData.value);
-                    }
-                } else if (elementType === "html") {
-                    const htmlData = data as { value?: string };
-                    if (htmlData.value !== undefined) {
-                        this.setElementHTML(info.element, htmlData.value);
-                    }
-                }
-            }
-        } catch {
-            // Not JSON - ignore, content should always be JSON
+        const attributes = parseContentAttributes(content);
+        if (attributes) {
+            this.state.elementAttributes.set(key, attributes);
         }
+
+        applyContentToElement(info.element, elementType, content, {
+            setHTML: (element, html) => this.setElementHTML(element, html),
+        });
 
         updateEmptyState(info.element);
     }

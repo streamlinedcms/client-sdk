@@ -314,6 +314,99 @@
                 font-size: 0.9em;
             }
 
+            /* Layout page: elements the site positions itself */
+            .hero-demo {
+                position: relative;
+                height: 260px;
+                margin-top: 20px;
+                overflow: hidden;
+                border-radius: 8px;
+                color: white;
+            }
+
+            /* Single-class selectors, like utility classes, so they tie with the SDK's own */
+            .hero-bg {
+                position: absolute;
+                inset: 0;
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+            .hero-content {
+                position: relative;
+                padding: 60px 30px;
+                text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+            }
+
+            .stacked-cards {
+                position: relative;
+                height: 220px;
+                margin-top: 20px;
+            }
+
+            .stacked-card {
+                position: absolute;
+                width: 260px;
+                padding: 20px;
+                background: white;
+                border: 1px solid #e5e7eb;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            }
+
+            .stacked-card:nth-child(2) {
+                top: 30px;
+                left: 50px;
+            }
+
+            .stacked-card:nth-child(3) {
+                top: 60px;
+                left: 100px;
+            }
+
+            .overlay-demo {
+                position: relative;
+                margin-top: 20px;
+                padding: 30px;
+                background: #f9fafb;
+                border-radius: 8px;
+                overflow: hidden;
+            }
+
+            .stripe {
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 80px;
+                width: 120px;
+                background: rgba(59, 130, 246, 0.35);
+                transform: skewX(-20deg);
+            }
+
+            /* Pricing table for the table-row template demo */
+            .pricing-table {
+                width: 100%;
+                margin-top: 20px;
+                border-collapse: collapse;
+                background: white;
+            }
+
+            .pricing-table th,
+            .pricing-table td {
+                padding: 10px 14px;
+                border: 1px solid #e5e7eb;
+                text-align: left;
+            }
+
+            .pricing-table th {
+                background: #f9fafb;
+            }
+
+            .pricing-table tbody tr:nth-child(even) {
+                background: #f9fafb;
+            }
+
             /* Link demo styles */
             .link-demo {
                 display: flex;
@@ -506,6 +599,7 @@
                 <button class="page-tab" data-page="groups">Groups</button>
                 <button class="page-tab" data-page="templates">Templates</button>
                 <button class="page-tab" data-page="attributes">Attributes</button>
+                <button class="page-tab" data-page="layout">Layout</button>
             </div>
         </div>
 
@@ -618,6 +712,50 @@
                             src="https://placehold.co/400x200/10b981/white?text=Secondary+Image"
                             alt="Demo secondary image"
                         />
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="demo-area image-demo">
+                        <h3>Responsive Image (srcset)</h3>
+                        <p>
+                            This image lists several sizes in <code>srcset</code>, as site builders
+                            often generate. The browser picks from that list, so each size is
+                            labelled. Replace the image and the new one should show.
+                        </p>
+                        <img
+                            data-scms-image="image-demo-srcset"
+                            src="https://placehold.co/600x300/f59e0b/white?text=Plain+src"
+                            srcset="
+                                https://placehold.co/600x300/f59e0b/white?text=srcset+600w    600w,
+                                https://placehold.co/1200x600/f59e0b/white?text=srcset+1200w 1200w
+                            "
+                            sizes="(max-width: 700px) 100vw, 600px"
+                            alt="Demo responsive image"
+                        />
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <div class="demo-area image-demo">
+                        <h3>Picture Element</h3>
+                        <p>
+                            This image is wrapped in <code>&lt;picture&gt;</code> with a
+                            <code>&lt;source&gt;</code>, which the browser prefers over the
+                            <code>&lt;img&gt;</code>. Replace the image and the new one should show.
+                        </p>
+                        <picture>
+                            <source
+                                srcset="
+                                    https://placehold.co/600x300/8b5cf6/white?text=picture+source
+                                "
+                            />
+                            <img
+                                data-scms-image="image-demo-picture"
+                                src="https://placehold.co/600x300/8b5cf6/white?text=Plain+src"
+                                alt="Demo picture image"
+                            />
+                        </picture>
                     </div>
                 </div>
             </div>
@@ -849,9 +987,108 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="content-section">
+                    <h2 data-scms-text="pricing-heading">Pricing</h2>
+                    <p>
+                        Templates work with table rows too: the <code>&lt;tbody&gt;</code> is the
+                        template container and each <code>&lt;tr&gt;</code> is an item.
+                    </p>
+
+                    <table class="pricing-table">
+                        <thead>
+                            <tr>
+                                <th>Plan</th>
+                                <th>Price</th>
+                                <th>Includes</th>
+                            </tr>
+                        </thead>
+                        <tbody data-scms-template="pricing-row">
+                            <tr>
+                                <td data-scms-text="plan">Starter</td>
+                                <td data-scms-text="price">$9/month</td>
+                                <td data-scms-text="includes">One site, basic support</td>
+                            </tr>
+                            <tr>
+                                <td data-scms-text="plan">Business</td>
+                                <td data-scms-text="price">$29/month</td>
+                                <td data-scms-text="includes">Five sites, priority support</td>
+                            </tr>
+                            <tr>
+                                <td data-scms-text="plan">Agency</td>
+                                <td data-scms-text="price">$79/month</td>
+                                <td data-scms-text="includes">Unlimited sites, phone support</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- ATTRIBUTES PAGE -->
+            <!-- LAYOUT PAGE -->
+            <div class="page" id="page-layout">
+                <div class="info-box">
+                    <h3>Elements the Site Positions</h3>
+                    <p>
+                        Turning on editing shouldn't change how the page is laid out. Compare each
+                        example below in Preview and in Editing.
+                    </p>
+                </div>
+
+                <div class="content-section">
+                    <h2>Background Image</h2>
+                    <p>
+                        The photo is an editable image positioned to fill the section behind the
+                        text.
+                    </p>
+                    <section class="hero-demo">
+                        <img
+                            class="hero-bg"
+                            data-scms-image="hero-background"
+                            src="https://placehold.co/1200x400/1e3a8a/93c5fd?text=Background+photo"
+                            alt=""
+                        />
+                        <div class="hero-content">
+                            <h2 data-scms-text="hero-title">Built for busy teams</h2>
+                            <p data-scms-text="hero-text">
+                                Everything you need to keep your site up to date.
+                            </p>
+                        </div>
+                    </section>
+                </div>
+
+                <div class="content-section">
+                    <h2>Stacked Cards</h2>
+                    <p>A template whose items the site stacks on top of each other.</p>
+                    <div class="stacked-cards" data-scms-template="stacked-card">
+                        <div class="stacked-card">
+                            <h4 data-scms-text="title">First card</h4>
+                            <p data-scms-text="text">At the back of the stack.</p>
+                        </div>
+                        <div class="stacked-card">
+                            <h4 data-scms-text="title">Second card</h4>
+                            <p data-scms-text="text">In the middle.</p>
+                        </div>
+                        <div class="stacked-card">
+                            <h4 data-scms-text="title">Third card</h4>
+                            <p data-scms-text="text">At the front.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="content-section">
+                    <h2>Decorative Overlay</h2>
+                    <p>
+                        A translucent stripe lies across the editable heading. The heading itself
+                        isn't positioned, so the stripe is drawn on top of it.
+                    </p>
+                    <div class="overlay-demo">
+                        <div class="stripe"></div>
+                        <h2 data-scms-text="overlay-title">Heading under a stripe</h2>
+                    </div>
+                </div>
+            </div>
+
             <div class="page" id="page-attributes">
                 <div class="info-box">
                     <h3>Element Attributes</h3>

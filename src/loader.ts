@@ -10,6 +10,9 @@
  * Customer usage: <script src="streamlined-cms.js" data-app-id="..."></script>
  */
 
+import { applyContentToElement } from "./apply-content.js";
+import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
+
 (function () {
     // Find our own script tag to get config (do this first, before any DOM modifications)
     const loaderScript = document.currentScript as HTMLScriptElement;
@@ -136,38 +139,24 @@
     }
 
     /**
-     * Set text content with \n converted to <br> elements.
-     * Uses DOM APIs (createTextNode + createElement) to avoid XSS from innerHTML.
-     */
-    function setTextWithBreaks(element: HTMLElement, text: string): void {
-        element.textContent = "";
-        const parts = text.split("\n");
-        for (let i = 0; i < parts.length; i++) {
-            if (i > 0) element.appendChild(document.createElement("br"));
-            if (parts[i]) element.appendChild(document.createTextNode(parts[i]));
-        }
-    }
-
-    /**
      * Strip content from template HTML for cloning new instances.
      * - Removes text content
      * - Strips instance IDs
      * - For editable elements: keeps only reserved attributes (id, class, data-scms-*)
      */
     function stripTemplateContent(html: string): string {
-        const div = document.createElement("div");
-        div.innerHTML = html;
+        const fragment = parseHtml(html);
 
         // Strip instance IDs (they vary between instances)
-        div.querySelectorAll("[data-scms-instance]").forEach((el) =>
-            el.removeAttribute("data-scms-instance"),
-        );
+        fragment
+            .querySelectorAll("[data-scms-instance]")
+            .forEach((el) => el.removeAttribute("data-scms-instance"));
 
         // For editable elements, strip all attributes except reserved ones
         // This handles src, href, alt, title, and any custom attributes set via modals
         const editableSelector =
             "[data-scms-text], [data-scms-html], [data-scms-image], [data-scms-link], [data-scms-href]";
-        div.querySelectorAll(editableSelector).forEach((el) => {
+        fragment.querySelectorAll(editableSelector).forEach((el) => {
             const attributesToRemove: string[] = [];
             for (let i = 0; i < el.attributes.length; i++) {
                 const attr = el.attributes[i];
@@ -190,7 +179,7 @@
 
         // Replace all text nodes with empty strings, except those inside
         // data-scms-href elements (where developer layout lives).
-        const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) {
             const node = walker.currentNode as Text;
@@ -200,7 +189,7 @@
         }
         textNodes.forEach((node) => (node.textContent = ""));
 
-        return div.innerHTML;
+        return serializeHtml(fragment);
     }
 
     /**
@@ -556,9 +545,7 @@
 
             // Clone from clean template for each API instance ID
             for (let i = 0; i < instanceIds.length; i++) {
-                const tempDiv = document.createElement("div");
-                tempDiv.innerHTML = cleanTemplateHtml || templateElement.outerHTML;
-                const clone = tempDiv.firstElementChild as HTMLElement;
+                const clone = parseElement(cleanTemplateHtml || templateElement.outerHTML);
                 if (!clone) continue;
 
                 clone.setAttribute("data-scms-instance", instanceIds[i]);
@@ -568,98 +555,6 @@
 
             templateInfo.instanceCount = instanceIds.length;
         });
-    }
-
-    /**
-     * Apply content to a single DOM element.
-     * Returns the element (may be a new element if image was replaced).
-     */
-    function applyContentToElement(
-        element: HTMLElement,
-        type: EditableType,
-        content: string,
-    ): HTMLElement {
-        try {
-            const data = JSON.parse(content) as { type?: string };
-
-            if (data.type === "text") {
-                setTextWithBreaks(element, (data as { type: "text"; value: string }).value);
-                return element;
-            } else if (data.type === "html") {
-                element.innerHTML = (data as { type: "html"; value: string }).value;
-                return element;
-            } else if (data.type === "image" && element instanceof HTMLImageElement) {
-                const src = (data as { type: "image"; src: string }).src;
-                const newImg = document.createElement("img");
-                for (let i = 0; i < element.attributes.length; i++) {
-                    const attr = element.attributes[i];
-                    newImg.setAttribute(attr.name, attr.value);
-                }
-                newImg.src = src;
-                element.replaceWith(newImg);
-                return newImg;
-            } else if (data.type === "link" && element instanceof HTMLAnchorElement) {
-                const linkData = data as {
-                    type: "link";
-                    href: string;
-                    target: string;
-                    value: string;
-                };
-                element.href = linkData.href;
-                element.target = linkData.target;
-                element.innerHTML = linkData.value;
-                return element;
-            } else if (data.type === "href" && element instanceof HTMLAnchorElement) {
-                const hrefData = data as { type: "href"; href: string; target: string };
-                element.href = hrefData.href;
-                element.target = hrefData.target;
-                return element;
-            } else if (data.type) {
-                // Unknown type with type field - don't process
-                return element;
-            }
-
-            // No type field in JSON - use element's declared type
-            if (type === "link" && element instanceof HTMLAnchorElement) {
-                const linkData = data as { href?: string; target?: string; value?: string };
-                if (linkData.href !== undefined) {
-                    element.href = linkData.href;
-                    element.target = linkData.target || "";
-                    element.innerHTML = linkData.value || "";
-                }
-            } else if (type === "href" && element instanceof HTMLAnchorElement) {
-                const hrefData = data as { href?: string; target?: string };
-                if (hrefData.href !== undefined) {
-                    element.href = hrefData.href;
-                    element.target = hrefData.target || "";
-                }
-            } else if (type === "image" && element instanceof HTMLImageElement) {
-                const imageData = data as { src?: string };
-                if (imageData.src !== undefined) {
-                    const newImg = document.createElement("img");
-                    for (let i = 0; i < element.attributes.length; i++) {
-                        const attr = element.attributes[i];
-                        newImg.setAttribute(attr.name, attr.value);
-                    }
-                    newImg.src = imageData.src;
-                    element.replaceWith(newImg);
-                    return newImg;
-                }
-            } else if (type === "text") {
-                const textData = data as { value?: string };
-                if (textData.value !== undefined) {
-                    setTextWithBreaks(element, textData.value);
-                }
-            } else if (type === "html") {
-                const htmlData = data as { value?: string };
-                if (htmlData.value !== undefined) {
-                    element.innerHTML = htmlData.value;
-                }
-            }
-        } catch {
-            // Not JSON - ignore, content should always be JSON
-        }
-        return element;
     }
 
     /**
@@ -675,7 +570,9 @@
 
         for (let i = 0; i < infos.length; i++) {
             const info = infos[i];
-            const newElement = applyContentToElement(info.element, info.type, content);
+            const newElement = applyContentToElement(info.element, info.type, content, {
+                replaceImage: true,
+            });
             if (newElement !== info.element) {
                 // Element was replaced (image), update the reference
                 info.element = newElement;

@@ -1,6 +1,6 @@
 {
   "name": "@streamlined-cms/client-sdk",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "module": "dist/streamlined-cms.esm.js",
   "types": "dist/index.d.ts",
   "type": "module",
@@ -12,10 +12,12 @@
   },
   "scripts": {
     "postinstall": "npx playwright install chromium",
+    "prepare": "node scripts/install-git-hooks.mjs",
     "typecheck": "tsc --noEmit",
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "demo:run": "npm run build && ln -sfn ../dist demo/dist && concurrently --kill-others --restart-tries 3 --restart-after 1000 -n rollup,vite -c blue,green \"npm run dev\" \"vite --config vite.demo.config.ts --host --mode ${MODE:-development}\"",
+    "demo": "npm run demo:staging",
     "demo:local": "npm run demo:run",
     "demo:local:https": "HTTPS=true VITE_APP_URL=https://localhost:3443 npm run demo:run",
     "demo:staging": "MODE=staging npm run demo:run",

@@ -48,6 +48,13 @@ export class Toolbar extends ScmsElement {
     @property({ type: Boolean, attribute: "has-changes" })
     hasChanges = false;
 
+    /**
+     * Whether Save is offered: false until the editor has loaded saved content,
+     * which a save needs to keep elements' saved attributes
+     */
+    @property({ type: Boolean, attribute: "can-save" })
+    canSave = false;
+
     @property({ type: Boolean })
     saving = false;
 
@@ -800,7 +807,7 @@ export class Toolbar extends ScmsElement {
     }
 
     private renderSaveButton() {
-        if (!this.hasChanges) return nothing;
+        if (!this.hasChanges || !this.canSave) return nothing;
 
         const saveClasses = this.saving
             ? "px-4 py-1.5 text-xs font-medium rounded-md transition-colors bg-red-400 text-white cursor-not-allowed"
@@ -845,7 +852,7 @@ export class Toolbar extends ScmsElement {
                         ${this.renderUndoButton()} ${this.renderSelectOuterButton()}
                         ${this.renderContentViewerButton()}
                         ${
-                            this.hasChanges
+                            this.hasChanges && this.canSave
                                 ? html`<span class="mx-3">${this.renderSaveButton()}</span>`
                                 : nothing
                         }

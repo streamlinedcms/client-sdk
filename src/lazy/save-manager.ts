@@ -75,7 +75,7 @@ export interface SaveManagerConfig {
 export interface SaveManagerHelpers {
     apiFetch: (url: string, options?: RequestInit) => Promise<Response>;
     signOut: (skipConfirmation: boolean) => void;
-    fetchSavedContentKeys: () => Promise<boolean>;
+    fetchSavedContentKeys: () => Promise<unknown>;
     refetchPermissions: () => Promise<void>;
     disableEditing: () => void;
     updateToolbarReadOnly: () => void;

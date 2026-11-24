@@ -182,6 +182,10 @@ npm run format
 npm run format:check
 ```
 
+## Git Hooks
+
+`npm install` and `npm ci` install a pre-push hook that runs your checkout's `scripts/git-hooks/pre-push`, in worktrees too. Before each push it runs CI's quick checks, `format:check` and `typecheck`. First it checks that `node_modules` matches `package-lock.json`, and if not, tells you to run `npm ci`: pulling a lockfile change doesn't reinstall anything, and an outdated Prettier checks differently from CI's. `git push --no-verify` skips it. The org-wide rule and how to set a hook up are in the [Git Hooks guide](https://github.com/streamlinedcms/planning/blob/master/guides/git-hooks.md) in the planning repo.
+
 ## Node Version
 
 `.nvmrc` pins the Node version every workflow uses; use the same one locally. `package.json` sets the minimum under `engines`, and `.npmrc` makes `npm ci` fail on a Node version a dependency doesn't support, instead of only warning.
@@ -327,12 +331,24 @@ An urgent fix that can't wait for the changes on `develop` goes straight to
 open a PR with `release:patch`. Because `master` only holds stable releases,
 this works at any time, even while a release branch is in testing.
 
-That includes the PRs Dependabot opens for critical alerts in runtime
-dependencies (see `.github/dependabot.yml`): push a commit to the PR's branch
-that bumps the patch version, and the check passes. After that, Dependabot
-won't rebase the PR. If `master` moves on before it merges (say another hotfix
-took 1.4.1), merge `master` into the branch and bump to the next patch again
-(1.4.2); `@dependabot recreate` also works but discards your commits.
+Dependabot opens a security fix PR against `master` for every security alert
+(see `.github/dependabot.yml`), labelled `release:patch`. To tell whether the
+package ships in the SDK, find it in `package-lock.json`: `"dev": true` means
+dev-only. Dependabot's title prefix (`deps` vs `deps-dev`) isn't reliable for
+packages pulled in by other packages.
+
+- **A dependency that ships in the SDK:** treat it as a hotfix. Push a commit
+  to the PR's branch that bumps the patch version, and the check passes. After
+  that, Dependabot won't rebase the PR. If `master` moves on before it merges
+  (say another hotfix took 1.4.1), merge `master` into the branch and bump to
+  the next patch again (1.4.2); `@dependabot recreate` also works but discards
+  your commits.
+- **A dev-only dependency:** nothing ships, so there's no need to release.
+  Change the PR's base to `develop` (CI re-runs for the new base, and the
+  release label no longer applies) and merge it there; it ships with the next
+  release. If `develop` already has the fix, close the PR instead. The alert
+  stays open until the next release reaches `master`, since Dependabot only
+  scans `master`.
 
 After a hotfix, merge `master` into any open release branch so its next
 prerelease, and the release itself, include the fix (`includes-master` won't
@@ -406,7 +422,7 @@ Before submitting a PR:
 
 1. **Run tests**: `npm test` (all tests must pass)
 2. **Format code**: `npm run format`
-3. **Test in browser**: `npm run demo:local` and manually verify your changes
+3. **Test in browser**: `npm run demo` and manually verify your changes
 4. **Write meaningful commits**: Describe what changed and why
 5. **Keep PRs focused**: One feature or fix per PR when possible
 

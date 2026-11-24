@@ -5,13 +5,15 @@ version: 2
 # normal release. Minor and patch bumps arrive as one grouped PR per ecosystem;
 # each major bump gets its own PR so a breaking upgrade doesn't block the rest.
 #
-# Urgent security fixes come from a Dependabot rule in the repo settings, which
-# opens PRs only for critical alerts in runtime dependencies (code that ships in
-# the SDK script). Those PRs always target master. The second npm entry below
-# exists only to give them the release:patch label that PRs to master need;
-# its open-pull-requests-limit of 0 stops it opening scheduled updates. Push a
-# commit bumping the patch version to such a PR before merging it. After that,
-# Dependabot won't rebase it; merge master into it instead.
+# Security fixes come from Dependabot security updates, turned on in the repo
+# settings: every security alert gets a fix PR as soon as it's raised, not on
+# the weekly schedule. Dependabot only scans master, and these PRs always
+# target master, even when develop already has the fix. The second npm entry
+# below exists only to give them the release:patch label that PRs to master
+# need; its open-pull-requests-limit of 0 stops it opening scheduled updates.
+#
+# How to handle each security PR depends on whether the fixed package ships in
+# the SDK; see the Hotfixes section of CONTRIBUTING.md.
 #
 # Dependabot reads this file from the default branch (master), so changes take
 # effect once they reach master.

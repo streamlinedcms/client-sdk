@@ -15,6 +15,7 @@ import type { ContentManager } from "./content-manager.js";
 import { updateEmptyState } from "./content-manager.js";
 import type { UndoManager } from "./undo-manager.js";
 import { EDITABLE_SELECTOR, IMAGE_PLACEHOLDER_DATA_URI, type EditableType } from "../types.js";
+import { parseHtml, parseElement, serializeHtml } from "../parse-html.js";
 
 /**
  * Helpers that TemplateManager needs from EditorController
@@ -43,6 +44,8 @@ export interface TemplateManagerHelpers {
 
 export class TemplateManager {
     private instanceDeleteButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
+    /** Instances positioned to anchor their controls, with their previous inline position */
+    private anchoredInstances = new WeakMap<HTMLElement, string>();
     private _skipUndoPush = false;
 
     constructor(
@@ -72,18 +75,17 @@ export class TemplateManager {
      * - For editable elements: keeps only reserved attributes (id, class, data-scms-*)
      */
     private stripTemplateContent(html: string): string {
-        const div = document.createElement("div");
-        div.innerHTML = html;
+        const fragment = parseHtml(html);
 
         // Strip instance IDs (they vary between instances)
-        div.querySelectorAll("[data-scms-instance]").forEach((el) =>
-            el.removeAttribute("data-scms-instance"),
-        );
+        fragment
+            .querySelectorAll("[data-scms-instance]")
+            .forEach((el) => el.removeAttribute("data-scms-instance"));
 
         // For editable elements, strip all attributes except reserved ones
         // This handles src, href, alt, title, and any custom attributes set via modals
         const editableSelector = EDITABLE_SELECTOR;
-        div.querySelectorAll(editableSelector).forEach((el) => {
+        fragment.querySelectorAll(editableSelector).forEach((el) => {
             const attributesToRemove: string[] = [];
             for (let i = 0; i < el.attributes.length; i++) {
                 const attr = el.attributes[i];
@@ -110,7 +112,7 @@ export class TemplateManager {
         // layout that must survive into instance clones. Text inside a nested
         // editable of another type (e.g. data-scms-text inside data-scms-href)
         // is still blanked because the nearest editable ancestor owns it.
-        const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT);
+        const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
         const textNodes: Text[] = [];
         while (walker.nextNode()) {
             const node = walker.currentNode as Text;
@@ -120,7 +122,7 @@ export class TemplateManager {
         }
         textNodes.forEach((node) => (node.textContent = ""));
 
-        return div.innerHTML;
+        return serializeHtml(fragment);
     }
 
     /**
@@ -286,6 +288,11 @@ export class TemplateManager {
             let hasInlineControls = false;
 
             instances.forEach((instanceElement) => {
+                // The mismatch warning sits in the item's corner, controls or not
+                if (instanceElement.hasAttribute("data-scms-structure-mismatch")) {
+                    this.anchorInstance(instanceElement);
+                }
+
                 // Skip inline controls if instance is also the editable element
                 if (this.helpers.isInstanceAlsoEditable(instanceElement)) return;
 
@@ -343,10 +350,12 @@ export class TemplateManager {
                     if (dragHandle) {
                         dragHandle.remove();
                     }
+                    this.removeInstanceAnchor(instanceElement);
                 });
         });
         // Clear the WeakMap tracking
         this.instanceDeleteButtons = new WeakMap();
+        this.anchoredInstances = new WeakMap();
 
         // Destroy all sortable instances
         this.state.sortableInstances.forEach((sortable) => {
@@ -441,9 +450,7 @@ export class TemplateManager {
         const newInstanceId = this.generateInstanceId();
 
         // Create new instance from original template HTML (with default content)
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = templateHtml;
-        const clone = tempDiv.firstElementChild as HTMLElement;
+        const clone = parseElement(templateHtml);
         if (!clone) {
             this.log.error("Failed to create clone from template HTML");
             return null;
@@ -573,9 +580,7 @@ export class TemplateManager {
 
         const { container, templateHtml, groupId } = templateInfo;
 
-        const tempDiv = document.createElement("div");
-        tempDiv.innerHTML = templateHtml;
-        const clone = tempDiv.firstElementChild as HTMLElement;
+        const clone = parseElement(templateHtml);
         if (!clone) {
             this.log.error("Failed to create clone from template HTML");
             return null;
@@ -774,6 +779,9 @@ export class TemplateManager {
                 if (deleteBtn) deleteBtn.remove();
                 const dragHandle = el.querySelector(".scms-instance-drag-handle");
                 if (dragHandle) dragHandle.remove();
+                if (!el.hasAttribute("data-scms-structure-mismatch")) {
+                    this.removeInstanceAnchor(el);
+                }
             });
             // Destroy sortable instance
             const sortable = this.state.sortableInstances.get(templateId);
@@ -1105,8 +1113,7 @@ export class TemplateManager {
         deleteBtn.title = "Remove this item";
         deleteBtn.setAttribute("aria-label", "Remove this item");
 
-        // Position relative to instance
-        instanceElement.style.position = "relative";
+        this.anchorInstance(instanceElement);
 
         deleteBtn.addEventListener("click", (e) => {
             e.preventDefault();
@@ -1143,7 +1150,35 @@ export class TemplateManager {
         `;
         dragHandle.title = "Drag to reorder";
 
+        this.anchorInstance(instanceElement);
         instanceElement.appendChild(dragHandle);
+    }
+
+    /**
+     * Position an instance so its controls (and any mismatch warning) can sit
+     * in its corner. Only an
+     * instance the site leaves unpositioned is changed: one the site positions
+     * (absolute, fixed, sticky) already anchors them, and changing it would
+     * move it on the page.
+     */
+    private anchorInstance(instanceElement: HTMLElement): void {
+        if (this.anchoredInstances.has(instanceElement)) return;
+        if (getComputedStyle(instanceElement).position !== "static") return;
+        this.anchoredInstances.set(instanceElement, instanceElement.style.position);
+        instanceElement.style.position = "relative";
+    }
+
+    /**
+     * Undo anchorInstance once nothing sits in the instance's corner.
+     */
+    private removeInstanceAnchor(instanceElement: HTMLElement): void {
+        const previous = this.anchoredInstances.get(instanceElement);
+        if (previous === undefined) return;
+        instanceElement.style.position = previous;
+        this.anchoredInstances.delete(instanceElement);
+        if (!instanceElement.getAttribute("style")) {
+            instanceElement.removeAttribute("style");
+        }
     }
 
     /**
