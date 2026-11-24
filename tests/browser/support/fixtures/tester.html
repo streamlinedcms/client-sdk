@@ -416,6 +416,23 @@
                 sizes="600px"
                 alt="Srcset unchanged"
             />
+            <img
+                data-scms-image="srcset-own"
+                src="https://example.com/original.png"
+                srcset="
+                    https://example.com/original-600.png   600w,
+                    https://example.com/original-1200.png 1200w
+                "
+                sizes="600px"
+                alt="Srcset own"
+            />
+            <img
+                data-scms-image="srcset-relative"
+                src="/images/original.png"
+                srcset="/images/original-600.png 600w, /images/original-1200.png 1200w"
+                sizes="600px"
+                alt="Srcset relative"
+            />
             <picture>
                 <source srcset="https://example.com/original.webp" type="image/webp" />
                 <img
