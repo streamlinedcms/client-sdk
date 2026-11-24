@@ -14,6 +14,16 @@
                 padding: 20px;
                 border: 1px solid #ddd;
             }
+            /* Single-class rules, like utility classes, tie with the SDK's own selectors */
+            .site-relative {
+                position: relative;
+                height: 120px;
+            }
+            .site-absolute {
+                position: absolute;
+                top: 10px;
+                left: 10px;
+            }
         </style>
     </head>
     <body>
@@ -345,6 +355,30 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+
+        <!-- Elements the site positions itself, for edit-mode layout tests (isolated) -->
+        <div class="test-section">
+            <h2>Positioned Elements</h2>
+            <div class="site-relative">
+                <p class="site-absolute" data-scms-text="positioned-text">Positioned text</p>
+            </div>
+            <div class="site-relative" data-scms-template="positioned-items">
+                <div class="site-absolute">
+                    <p data-scms-text="label">First</p>
+                </div>
+                <div class="site-absolute">
+                    <p data-scms-text="label">Second</p>
+                </div>
+            </div>
+            <div data-scms-template="unpositioned-items">
+                <div class="unpositioned-item">
+                    <p data-scms-text="label">First</p>
+                </div>
+                <div class="unpositioned-item">
+                    <p data-scms-text="label">Second</p>
+                </div>
+            </div>
         </div>
 
         <!-- Elements for attribute-only modal save detection tests (isolated) -->
