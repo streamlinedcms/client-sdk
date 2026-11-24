@@ -93,10 +93,6 @@ function isDifferentImage(img: HTMLImageElement, src: string): boolean {
 }
 
 function setImageSrc(img: HTMLImageElement, src: string, replace: boolean): HTMLElement {
-    // An image saved for its attributes alone keeps the page's responsive sizes
-    if (isDifferentImage(img, src)) {
-        dropResponsiveSources(img);
-    }
     if (!replace) {
         img.src = src;
         return img;
@@ -139,6 +135,19 @@ export function applyContentToElement(
             target?: string;
             attributes?: ElementAttributes;
         };
+
+        // A different image drops the page's responsive sources, while one saved
+        // for its attributes alone keeps them. Before the attributes, so a srcset
+        // saved for the new image stays.
+        const isImage = data.type ? data.type === "image" : type === "image";
+        if (
+            isImage &&
+            element instanceof HTMLImageElement &&
+            typeof data.src === "string" &&
+            isDifferentImage(element, data.src)
+        ) {
+            dropResponsiveSources(element);
+        }
 
         // Before the content, so an image replacement copies them and the
         // content's own href/src wins over a same-named attribute
