@@ -44,6 +44,8 @@ export interface TemplateManagerHelpers {
 
 export class TemplateManager {
     private instanceDeleteButtons = new WeakMap<HTMLElement, HTMLButtonElement>();
+    /** Instances positioned to anchor their controls, with their previous inline position */
+    private anchoredInstances = new WeakMap<HTMLElement, string>();
     private _skipUndoPush = false;
 
     constructor(
@@ -286,6 +288,11 @@ export class TemplateManager {
             let hasInlineControls = false;
 
             instances.forEach((instanceElement) => {
+                // The mismatch warning sits in the item's corner, controls or not
+                if (instanceElement.hasAttribute("data-scms-structure-mismatch")) {
+                    this.anchorInstance(instanceElement);
+                }
+
                 // Skip inline controls if instance is also the editable element
                 if (this.helpers.isInstanceAlsoEditable(instanceElement)) return;
 
@@ -343,10 +350,12 @@ export class TemplateManager {
                     if (dragHandle) {
                         dragHandle.remove();
                     }
+                    this.removeInstanceAnchor(instanceElement);
                 });
         });
         // Clear the WeakMap tracking
         this.instanceDeleteButtons = new WeakMap();
+        this.anchoredInstances = new WeakMap();
 
         // Destroy all sortable instances
         this.state.sortableInstances.forEach((sortable) => {
@@ -770,6 +779,9 @@ export class TemplateManager {
                 if (deleteBtn) deleteBtn.remove();
                 const dragHandle = el.querySelector(".scms-instance-drag-handle");
                 if (dragHandle) dragHandle.remove();
+                if (!el.hasAttribute("data-scms-structure-mismatch")) {
+                    this.removeInstanceAnchor(el);
+                }
             });
             // Destroy sortable instance
             const sortable = this.state.sortableInstances.get(templateId);
@@ -1101,8 +1113,7 @@ export class TemplateManager {
         deleteBtn.title = "Remove this item";
         deleteBtn.setAttribute("aria-label", "Remove this item");
 
-        // Position relative to instance
-        instanceElement.style.position = "relative";
+        this.anchorInstance(instanceElement);
 
         deleteBtn.addEventListener("click", (e) => {
             e.preventDefault();
@@ -1139,7 +1150,35 @@ export class TemplateManager {
         `;
         dragHandle.title = "Drag to reorder";
 
+        this.anchorInstance(instanceElement);
         instanceElement.appendChild(dragHandle);
+    }
+
+    /**
+     * Position an instance so its controls (and any mismatch warning) can sit
+     * in its corner. Only an
+     * instance the site leaves unpositioned is changed: one the site positions
+     * (absolute, fixed, sticky) already anchors them, and changing it would
+     * move it on the page.
+     */
+    private anchorInstance(instanceElement: HTMLElement): void {
+        if (this.anchoredInstances.has(instanceElement)) return;
+        if (getComputedStyle(instanceElement).position !== "static") return;
+        this.anchoredInstances.set(instanceElement, instanceElement.style.position);
+        instanceElement.style.position = "relative";
+    }
+
+    /**
+     * Undo anchorInstance once nothing sits in the instance's corner.
+     */
+    private removeInstanceAnchor(instanceElement: HTMLElement): void {
+        const previous = this.anchoredInstances.get(instanceElement);
+        if (previous === undefined) return;
+        instanceElement.style.position = previous;
+        this.anchoredInstances.delete(instanceElement);
+        if (!instanceElement.getAttribute("style")) {
+            instanceElement.removeAttribute("style");
+        }
     }
 
     /**
