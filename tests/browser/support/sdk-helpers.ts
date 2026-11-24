@@ -213,21 +213,33 @@ const FULL_PERMISSIONS: AppPermissions = {
 };
 
 /**
- * Start the editor as a returning user: a stored API key and a remembered
- * mode, instead of mock auth (which always starts in author mode). The auth
- * bridge is stubbed to accept the key. Run the loader first.
- * Returns initLazy's promise, which settles once auth setup has finished.
+ * Start the editor with real (non-mock) auth: with a stored API key and a
+ * remembered mode, as a returning user, or signed out when mode is null.
+ * Mock auth always starts in author mode, so it can't cover these paths.
+ * The auth bridge is stubbed to accept the key and any programmatic sign-in.
+ * Run the loader first. Returns initLazy's promise, which settles once auth
+ * setup has finished.
  */
-export function initLazyWithStoredKey(appId: string, mode: EditorMode): Promise<EditorController> {
+export function initLazyWithStoredKey(
+    appId: string,
+    mode: EditorMode | null,
+): Promise<EditorController> {
     vi.spyOn(AuthBridge.prototype, "init").mockImplementation(() => {});
     vi.spyOn(AuthBridge.prototype, "authenticate").mockResolvedValue({
         valid: true,
         permissions: FULL_PERMISSIONS,
     });
+    vi.spyOn(AuthBridge.prototype, "signIn").mockResolvedValue({
+        valid: true,
+        permissions: FULL_PERMISSIONS,
+        key: "test-signin-key",
+    });
 
-    const keyStorage = new KeyStorage(appId);
-    keyStorage.storeKey("test-stored-key");
-    keyStorage.storeMode(mode);
+    if (mode) {
+        const keyStorage = new KeyStorage(appId);
+        keyStorage.storeKey("test-stored-key");
+        keyStorage.storeMode(mode);
+    }
 
     return initLazy({
         apiUrl: __SDK_API_URL__,
@@ -238,6 +250,16 @@ export function initLazyWithStoredKey(appId: string, mode: EditorMode): Promise<
         controller = c;
         return c;
     });
+}
+
+/**
+ * Wait until the editor has received saved content, then let it finish
+ * handling the response.
+ */
+export async function waitForSavedContent(): Promise<void> {
+    const c = controller as unknown as { savedContentFetched: boolean };
+    await waitForCondition(() => c.savedContentFetched);
+    await new Promise((r) => setTimeout(r, 0));
 }
 
 /**

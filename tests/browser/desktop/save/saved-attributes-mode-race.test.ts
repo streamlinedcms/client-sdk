@@ -13,6 +13,7 @@ import {
     runLoader,
     initLazyWithStoredKey,
     holdContentFetches,
+    waitForSavedContent,
     waitForSelector,
     waitForCondition,
     setupTestHelpers,
@@ -45,7 +46,7 @@ test("the mode chosen last wins over a slow switch to author", async () => {
     toolbar.dispatchEvent(new CustomEvent("mode-change", { detail: { mode: "viewer" } }));
 
     hold.release();
-    await new Promise((r) => setTimeout(r, 300));
+    await waitForSavedContent();
 
     const element = document.querySelector('[data-scms-text="saved-attr-viewer-text"]')!;
     expect(element.classList.contains("streamlined-editable")).toBe(false);

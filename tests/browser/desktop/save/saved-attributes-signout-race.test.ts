@@ -13,6 +13,7 @@ import {
     runLoader,
     initLazyWithStoredKey,
     holdContentFetches,
+    waitForSavedContent,
     waitForSelector,
     waitForCondition,
     setupTestHelpers,
@@ -47,7 +48,7 @@ test("signing out during a slow switch to author leaves the editor signed out", 
     ).authManager.signOut(true);
 
     hold.release();
-    await new Promise((r) => setTimeout(r, 300));
+    await waitForSavedContent();
 
     expect(document.querySelector("scms-toolbar")).toBeNull();
     const element = document.querySelector('[data-scms-text="saved-attr-viewer-text"]')!;

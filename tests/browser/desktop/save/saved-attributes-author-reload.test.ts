@@ -1,8 +1,9 @@
 /**
  * Reloading into author mode with a slow saved-content fetch
  *
- * Editing must not turn on before saved content arrives. Otherwise an edit
- * made in that moment is saved without the element's saved attributes.
+ * The toolbar appears right away, but editing must not turn on before saved
+ * content arrives. Otherwise an edit made in that moment is saved without the
+ * element's saved attributes.
  *
  * Regression test for: https://github.com/streamlinedcms/client-sdk/issues/107
  */
@@ -33,13 +34,14 @@ beforeAll(async () => {
     await runLoader(appId);
 });
 
-test("editing turns on only after saved content has arrived", async () => {
+test("the toolbar shows at once, and editing turns on once saved content arrives", async () => {
     const hold = holdContentFetches();
     const initialized = initLazyWithStoredKey(appId, "author");
     const element = document.querySelector('[data-scms-text="saved-attr-viewer-text"]')!;
 
     await waitForCondition(() => hold.isWaiting());
-    await new Promise((r) => setTimeout(r, 100));
+    await waitForCondition(() => document.querySelector("scms-toolbar") !== null);
+    expect(document.getElementById("scms-loading")).toBeNull();
     expect(element.classList.contains("streamlined-editable")).toBe(false);
 
     hold.release();
