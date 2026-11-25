@@ -39,8 +39,12 @@ export function generateTestAppId(): string {
  * Run the loader script to fetch content and populate DOM.
  * Returns a promise that resolves when the loader completes.
  * Call it on its own to see the page as a visitor gets it, without the editor.
+ * @param options.contentTimeoutMs - How long the loader waits for content
  */
-export async function runLoader(appId: string): Promise<void> {
+export async function runLoader(
+    appId: string,
+    options: { contentTimeoutMs?: number } = {},
+): Promise<void> {
     const TIMEOUT_MS = 5000;
 
     // Remove any existing loader script for this appId
@@ -73,6 +77,9 @@ export async function runLoader(appId: string): Promise<void> {
     // Use full URL instead of relative (avoids Vite proxy issues with dynamic ports)
     script.dataset.apiUrl = __SDK_API_URL__;
     script.dataset.skipEsm = "true";
+    if (options.contentTimeoutMs !== undefined) {
+        script.dataset.contentTimeout = String(options.contentTimeoutMs);
+    }
 
     document.head.appendChild(script);
 
@@ -298,7 +305,7 @@ export function holdContentFetches(): {
 /**
  * Make the editor's saved-content fetches (GET .../content) fail until
  * stopped, either with a server error or with no response at all. Install
- * after the loader runs.
+ * after the loader runs, or before it to fail the loader's fetch too.
  */
 export function failContentFetches(kind: "server" | "network"): {
     /** How many fetches have failed so far */
@@ -328,6 +335,46 @@ export function failContentFetches(kind: "server" | "network"): {
         failures: () => failures,
         stop: () => {
             failing = false;
+        },
+    };
+}
+
+/**
+ * Answer saved-content fetches (GET .../content), the loader's included,
+ * with the given response until stopped. "hang" never answers, until the
+ * request is aborted.
+ */
+export function respondToContentFetches(response: (() => Response) | "hang"): {
+    /** Let later fetches through */
+    stop: () => void;
+} {
+    const realFetch = window.fetch.bind(window);
+    let responding = true;
+
+    vi.spyOn(window, "fetch").mockImplementation(async (input, init) => {
+        const url =
+            typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const method = init?.method ?? (input instanceof Request ? input.method : "GET");
+        if (
+            responding &&
+            method === "GET" &&
+            /\/apps\/[^/]+\/content$/.test(new URL(url).pathname)
+        ) {
+            if (response === "hang") {
+                return new Promise<Response>((_, reject) => {
+                    init?.signal?.addEventListener("abort", () =>
+                        reject(new DOMException("Aborted", "AbortError")),
+                    );
+                });
+            }
+            return response();
+        }
+        return realFetch(input, init);
+    });
+
+    return {
+        stop: () => {
+            responding = false;
         },
     };
 }

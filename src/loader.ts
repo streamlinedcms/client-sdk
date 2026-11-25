@@ -11,6 +11,7 @@
  */
 
 import { applyContentToElement } from "./apply-content.js";
+import { setPageShowsSavedContent } from "./content-status.js";
 import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
 
 (function () {
@@ -26,6 +27,10 @@ import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
     }
 
     const apiUrl = loaderScript.dataset.apiUrl || __SDK_API_URL__;
+
+    // How long to wait for content before showing the page's built-in content
+    // (data-content-timeout is for testing)
+    const contentTimeoutMs = Number(loaderScript.dataset.contentTimeout) || 10000;
 
     // Inject preconnect hint immediately to start TLS handshake early
     // Use window.location.origin as base to support relative URLs (e.g., "/v1" in tests)
@@ -620,14 +625,56 @@ import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
         groups: Record<string, { elements: Record<string, { content: string }> }>;
     }
 
+    function isRecord(value: unknown): value is Record<string, unknown> {
+        return typeof value === "object" && value !== null && !Array.isArray(value);
+    }
+
+    /**
+     * Keep the elements whose content is a string. The SDK only writes
+     * strings, but the API stores any value, and one element written some
+     * other way shouldn't keep the rest of the page from showing saved content.
+     */
+    function textElements(value: unknown): Record<string, { content: string }> | null {
+        if (!isRecord(value)) return null;
+        const elements: Record<string, { content: string }> = {};
+        for (const [elementId, element] of Object.entries(value)) {
+            if (!isRecord(element)) return null;
+            if (typeof element.content === "string") {
+                elements[elementId] = { content: element.content };
+            } else {
+                console.warn(`[StreamlinedCMS] Skipping "${elementId}": its content isn't text`);
+            }
+        }
+        return elements;
+    }
+
+    /**
+     * Read a content response, or null if its structure is wrong
+     */
+    function parseContentResponse(data: unknown): ContentResponse | null {
+        if (!isRecord(data) || !isRecord(data.groups)) return null;
+        const elements = textElements(data.elements);
+        if (!elements) return null;
+        const groups: ContentResponse["groups"] = {};
+        for (const [groupId, group] of Object.entries(data.groups)) {
+            const groupElements = isRecord(group) ? textElements(group.elements) : null;
+            if (!groupElements) return null;
+            groups[groupId] = { elements: groupElements };
+        }
+        return { elements, groups };
+    }
+
     /**
      * Fetch content from API
-     * Returns null on any error (page will show default content)
+     * Returns null on any error, a malformed response, or no response in time
+     * (page will show default content)
      */
     async function fetchContent(): Promise<ContentResponse | null> {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), contentTimeoutMs);
         try {
             const url = `${apiUrl}/apps/${appId}/content`;
-            const response = await fetch(url);
+            const response = await fetch(url, { signal: controller.signal });
 
             if (!response.ok) {
                 if (response.status === 404) {
@@ -659,10 +706,16 @@ import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
                 throw new Error(`Failed to load content: ${response.status}`);
             }
 
-            return (await response.json()) as ContentResponse;
+            const data = parseContentResponse(await response.json());
+            if (!data) {
+                throw new Error("Unexpected content response");
+            }
+            return data;
         } catch (error) {
             console.warn("[StreamlinedCMS] Could not load content:", error);
             return null;
+        } finally {
+            clearTimeout(timeoutId);
         }
     }
 
@@ -680,22 +733,30 @@ import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
             });
         }
 
-        // Get fetched content
-        const content = await contentPromise;
+        // Whatever happens below, the page is revealed and the editor loads
+        let applied = false;
+        try {
+            // Get fetched content
+            const content = await contentPromise;
 
-        // Scan for templates and clone instances based on content data
-        // This must happen BEFORE scanning editable elements so clones are included
-        const templates = scanTemplates();
-        if (content && templates.size > 0) {
-            cloneTemplateInstances(templates, content);
+            // Scan for templates and clone instances based on content data
+            // This must happen BEFORE scanning editable elements so clones are included
+            const templates = scanTemplates();
+            if (content && templates.size > 0) {
+                cloneTemplateInstances(templates, content);
+            }
+
+            // Now scan DOM for editable elements (includes cloned template instances)
+            const elements = scanEditableElements();
+
+            if (content && elements.size > 0) {
+                populateContent(elements, content);
+            }
+            applied = content !== null;
+        } catch (error) {
+            console.warn("[StreamlinedCMS] Could not apply content:", error);
         }
-
-        // Now scan DOM for editable elements (includes cloned template instances)
-        const elements = scanEditableElements();
-
-        if (content && elements.size > 0) {
-            populateContent(elements, content);
-        }
+        setPageShowsSavedContent(applied);
 
         // Reveal content
         removeHidingStyles();
