@@ -65,12 +65,9 @@ test.each([
     ["null groups", { elements: {}, groups: null }],
     ["a null element", { elements: { "load-failure-text": null }, groups: {} }],
     ["a null group", { elements: {}, groups: { "load-failure-group": null } }],
+    ["a group without elements", { elements: {}, groups: { "load-failure-group": {} } }],
     [
-        "a grouped element without content",
-        { elements: {}, groups: { "load-failure-group": { elements: { grouped: {} } } } },
-    ],
-    [
-        "one bad element among good ones",
+        "one null element among good ones",
         {
             elements: { "load-failure-text": { content: savedText }, other: null },
             groups: {},
@@ -92,6 +89,21 @@ test.each(["server", "network"] as const)("a %s error shows the built-in content
     failContentFetches(kind);
     await runLoader(appId);
     expectBuiltInContentShown();
+});
+
+test("an element whose content isn't text is skipped, and the rest is applied", async () => {
+    respondToContentFetches(
+        json({
+            elements: { "load-failure-text": { content: savedText } },
+            groups: { "load-failure-group": { elements: { grouped: { content: 123 } } } },
+        }),
+    );
+    await runLoader(appId);
+
+    expect(getComputedStyle(grouped()).visibility).toBe("visible");
+    expect(text().textContent).toBe("Saved text");
+    expect(grouped().textContent).toBe("Built-in grouped");
+    expect(pageShowsSavedContent()).toBe(true);
 });
 
 test("well-formed content is applied and recorded as shown", async () => {
