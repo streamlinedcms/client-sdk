@@ -12,6 +12,7 @@
 
 import { applyContentToElement } from "./apply-content.js";
 import { setPageShowsSavedContent } from "./content-status.js";
+import { esmBundleUrl } from "./esm-url.js";
 import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
 
 (function () {
@@ -54,10 +55,7 @@ import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
         document.head.appendChild(style);
     }
 
-    // Determine ESM bundle URL (same directory as loader)
-    const loaderSrc = loaderScript.src;
-    const basePath = loaderSrc.substring(0, loaderSrc.lastIndexOf("/") + 1);
-    const esmUrl = basePath + "streamlined-cms.esm.js";
+    const esmUrl = esmBundleUrl(loaderScript.src, __SDK_VERSION__);
 
     /**
      * Inject the ESM module for lazy features
