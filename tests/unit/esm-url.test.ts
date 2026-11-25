@@ -32,4 +32,14 @@ describe("esmBundleUrl", () => {
             `${CDN}/v1.3.5/streamlined-cms.esm.js`,
         );
     });
+
+    test("a loader from a file:// page fetches the bundle beside it", () => {
+        expect(esmBundleUrl("file:///Users/me/site/sdk/streamlined-cms.js", "1.3.5")).toBe(
+            "file:///Users/me/site/sdk/streamlined-cms.esm.js",
+        );
+    });
+
+    test("a loader with no URL (inlined) falls back to a relative bundle URL", () => {
+        expect(esmBundleUrl("", "1.3.5")).toBe("streamlined-cms.esm.js");
+    });
 });
