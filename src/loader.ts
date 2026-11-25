@@ -629,24 +629,39 @@ import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
         return typeof value === "object" && value !== null && !Array.isArray(value);
     }
 
-    function isElementMap(value: unknown): value is Record<string, { content: string }> {
-        return (
-            isRecord(value) &&
-            Object.values(value).every(
-                (element) => isRecord(element) && typeof element.content === "string",
-            )
-        );
+    /**
+     * Keep the elements whose content is a string. The SDK only writes
+     * strings, but the API stores any value, and one element written some
+     * other way shouldn't keep the rest of the page from showing saved content.
+     */
+    function textElements(value: unknown): Record<string, { content: string }> | null {
+        if (!isRecord(value)) return null;
+        const elements: Record<string, { content: string }> = {};
+        for (const [elementId, element] of Object.entries(value)) {
+            if (!isRecord(element)) return null;
+            if (typeof element.content === "string") {
+                elements[elementId] = { content: element.content };
+            } else {
+                console.warn(`[StreamlinedCMS] Skipping "${elementId}": its content isn't text`);
+            }
+        }
+        return elements;
     }
 
-    function isContentResponse(data: unknown): data is ContentResponse {
-        return (
-            isRecord(data) &&
-            isElementMap(data.elements) &&
-            isRecord(data.groups) &&
-            Object.values(data.groups).every(
-                (group) => isRecord(group) && isElementMap(group.elements),
-            )
-        );
+    /**
+     * Read a content response, or null if its structure is wrong
+     */
+    function parseContentResponse(data: unknown): ContentResponse | null {
+        if (!isRecord(data) || !isRecord(data.groups)) return null;
+        const elements = textElements(data.elements);
+        if (!elements) return null;
+        const groups: ContentResponse["groups"] = {};
+        for (const [groupId, group] of Object.entries(data.groups)) {
+            const groupElements = isRecord(group) ? textElements(group.elements) : null;
+            if (!groupElements) return null;
+            groups[groupId] = { elements: groupElements };
+        }
+        return { elements, groups };
     }
 
     /**
@@ -691,8 +706,8 @@ import { parseHtml, parseElement, serializeHtml } from "./parse-html.js";
                 throw new Error(`Failed to load content: ${response.status}`);
             }
 
-            const data: unknown = await response.json();
-            if (!isContentResponse(data)) {
+            const data = parseContentResponse(await response.json());
+            if (!data) {
                 throw new Error("Unexpected content response");
             }
             return data;
