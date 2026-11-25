@@ -70,6 +70,13 @@ export class Toolbar extends ScmsElement {
     @property({ type: String })
     warning: string | null = null;
 
+    /**
+     * Keep the mode toggle while the warning shows. For warnings that only say
+     * editing is off, where switching modes is how the author retries.
+     */
+    @property({ type: Boolean })
+    warningKeepsModeToggle = false;
+
     @property({ type: Boolean, attribute: "read-only" })
     readOnly = false;
 
@@ -466,8 +473,9 @@ export class Toolbar extends ScmsElement {
 
     private renderModeToggle() {
         // Hide toggle when there's a warning (domain not whitelisted, payment required)
-        // or when user is in read-only mode (no contentWrite permission)
-        if (this.warning || this.readOnly) {
+        // unless it says to keep it, or when user is in read-only mode (no
+        // contentWrite permission)
+        if ((this.warning && !this.warningKeepsModeToggle) || this.readOnly) {
             return null;
         }
         return html`

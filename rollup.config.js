@@ -51,6 +51,16 @@ const replacePlugin = replace({
     },
 });
 
+// Records the version the build was made as, so cdn-upload.js can refuse to
+// upload it under another version: the loader finds its ESM bundle by this
+// version when loaded through an alias (src/esm-url.ts).
+const sdkVersionFilePlugin = {
+    name: "sdk-version-file",
+    generateBundle() {
+        this.emitFile({ type: "asset", fileName: "sdk-version.txt", source: SDK_VERSION });
+    },
+};
+
 // Terser plugin config - minification with preserved class names
 const terserPlugin = terser({
     keep_classnames: true,
@@ -75,6 +85,7 @@ export default [
         },
         plugins: [
             replacePlugin,
+            sdkVersionFilePlugin,
             typescript({
                 tsconfig: "./tsconfig.json",
                 declaration: false,

@@ -64,7 +64,27 @@ if (skipBuild) {
     console.log("Skipping build (--skip-build)\n");
 } else {
     console.log("Building SDK...\n");
-    execSync("npm run build", { stdio: "inherit", cwd: join(__dirname, "..") });
+    execSync("npm run build", {
+        stdio: "inherit",
+        cwd: join(__dirname, ".."),
+        env: { ...process.env, SDK_VERSION: version },
+    });
+}
+
+// The loader finds its ESM bundle by the version it was built as, so a build
+// uploaded under another version's directory wouldn't load the editor
+let builtVersion = null;
+try {
+    builtVersion = readFileSync(join(__dirname, "..", "dist", "sdk-version.txt"), "utf-8").trim();
+} catch {
+    // Missing: built before the version was recorded, or not built
+}
+if (builtVersion !== version) {
+    console.error(
+        `Error: dist/ was built as ${builtVersion ?? "an unknown version"}, not ${version}. ` +
+            `Rebuild with SDK_VERSION=${version}, or run without --skip-build.`,
+    );
+    process.exit(1);
 }
 
 // Discover JS files in dist/ (excluding TypeScript declarations)
