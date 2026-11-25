@@ -433,16 +433,15 @@ class EditorController {
         ) {
             if (this.state.toolbar) {
                 this.state.toolbar.warning = await this.deniedWarning(response);
+                this.state.toolbar.warningKeepsModeToggle = false;
             }
             this.state.domainWarningShown = true;
         }
 
         // Clear warning on successful request (user may have fixed the issue in another tab)
         if (response.ok && this.state.domainWarningShown) {
-            if (this.state.toolbar) {
-                this.state.toolbar.warning = this.editingOffWarning;
-            }
             this.state.domainWarningShown = false;
+            this.showEditingOffWarning();
         }
 
         return response;
@@ -958,6 +957,7 @@ class EditorController {
     private setToolbarWarning(message: string | null): void {
         if (this.state.toolbar) {
             this.state.toolbar.warning = message;
+            this.state.toolbar.warningKeepsModeToggle = false;
         }
         if (message) {
             this.state.domainWarningShown = true;
@@ -971,8 +971,16 @@ class EditorController {
      */
     private setEditingOffWarning(message: string | null): void {
         this.editingOffWarning = message;
-        if (this.state.toolbar && !this.state.domainWarningShown) {
-            this.state.toolbar.warning = message;
+        if (!this.state.domainWarningShown) {
+            this.showEditingOffWarning();
+        }
+    }
+
+    /** Put the editing-off warning (or none) in the toolbar, with the mode toggle kept */
+    private showEditingOffWarning(): void {
+        if (this.state.toolbar) {
+            this.state.toolbar.warning = this.editingOffWarning;
+            this.state.toolbar.warningKeepsModeToggle = true;
         }
     }
 
