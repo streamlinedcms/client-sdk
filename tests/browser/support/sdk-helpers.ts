@@ -305,7 +305,7 @@ export function holdContentFetches(): {
 /**
  * Make the editor's saved-content fetches (GET .../content) fail until
  * stopped, either with a server error or with no response at all. Install
- * after the loader runs.
+ * after the loader runs, or before it to fail the loader's fetch too.
  */
 export function failContentFetches(kind: "server" | "network"): {
     /** How many fetches have failed so far */
