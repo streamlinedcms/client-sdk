@@ -16,6 +16,7 @@ import { PopupManager, type MediaFile } from "../popup-manager.js";
 import type { EditableType } from "../types.js";
 import { buildTemplateKey, EDITABLE_SELECTOR } from "../types.js";
 import { parseContentAttributes, withContentAttributes } from "../apply-content.js";
+import { pageShowsSavedContent } from "../content-status.js";
 
 /**
  * Configuration for StreamlinedCMS
@@ -123,11 +124,15 @@ type HookHandler = () => void;
 
 /**
  * How a saved-content fetch went: loaded, refused (402/403, already shown in
- * the toolbar), or failed some other way (no response, a server error).
+ * the toolbar), failed some other way (no response, a server error), or
+ * loaded while the page shows its built-in content because the loader
+ * couldn't apply saved content.
  */
-type SavedContentResult = "loaded" | "denied" | "failed";
+type SavedContentResult = "loaded" | "denied" | "failed" | "not-on-page";
 
 const SAVED_CONTENT_FAILED_WARNING = "Couldn't load saved content, so editing is off.";
+const PAGE_CONTENT_FAILED_WARNING =
+    "This page couldn't load its saved content, so editing is off. Reload the page to try again.";
 
 class EditorController {
     static readonly version: string = __SDK_VERSION__;
@@ -478,6 +483,14 @@ class EditorController {
                 // A site with no saved content still gets a 200, so this is a failure
                 this.log.warn("Could not fetch saved content keys", { status: response.status });
                 return "failed";
+            }
+
+            // The editor records saved content but doesn't apply it, so editing
+            // a page the loader couldn't apply it to would save the page's
+            // built-in content over it. A refetch can't fix that; a reload can.
+            if (!pageShowsSavedContent()) {
+                this.log.warn("Page isn't showing saved content, so editing stays off");
+                return "not-on-page";
             }
 
             const data = (await response.json()) as ContentResponse;
@@ -925,6 +938,8 @@ class EditorController {
             this.disableEditing();
             if (result === "failed") {
                 this.setToolbarWarning(SAVED_CONTENT_FAILED_WARNING);
+            } else if (result === "not-on-page") {
+                this.setToolbarWarning(PAGE_CONTENT_FAILED_WARNING);
             }
         }
     }
