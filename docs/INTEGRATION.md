@@ -523,9 +523,11 @@ Authors need a way to sign in. Add a link with the `data-scms-signin` attribute,
 
 ```html
 <footer>
-    <p>&copy; 2025 Company Name | <a href="#" data-scms-signin>Sign In</a></p>
+    <p>&copy; <span class="copyright-year">2025</span> Company Name | <a href="#" data-scms-signin>Sign In</a></p>
 </footer>
 ```
+
+Fill in the year from your build or a script rather than typing it, and keep it out of editable elements. A saved element replaces everything inside it, so a year inside one stays at the year it was first saved. The [Complete Example](#complete-example) shows a footer with an editable company name and a year filled in by script.
 
 The `href="#"` is only a placeholder: once the SDK loads, it takes over the link's clicks to open the sign-in. If the SDK isn't on the page (for example a local dev server that isn't configured with your App ID), clicking it just jumps to `#`.
 
@@ -603,9 +605,16 @@ To read the current copy, GET:
 
     <!-- Shared footer across all pages -->
     <footer data-scms-group="footer">
-        <p data-scms-text="copyright">&copy; 2025 My Company</p>
+        <!-- Only the name is editable; the year comes from the script below -->
+        <p>
+            &copy; <span class="copyright-year">2025</span>
+            <span data-scms-text="company-name">My Company</span>
+        </p>
         <a href="#" data-scms-signin>Sign In</a>
     </footer>
+    <script>
+        document.querySelector(".copyright-year").textContent = new Date().getFullYear();
+    </script>
 </body>
 </html>
 ```

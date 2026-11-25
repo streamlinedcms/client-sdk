@@ -45,7 +45,7 @@ export class PopupManager {
         const origin = new URL(config.appUrl).origin;
 
         this.loginConnection = new PopupConnection<string, LoginPopupRemote>({
-            url: `${config.appUrl}/login?appId=${encodeURIComponent(config.appId)}`,
+            url: `${config.appUrl}/login?appId=${encodeURIComponent(config.appId)}&flow=popup-auth`,
             name: "scms-login",
             width: 500,
             height: 600,

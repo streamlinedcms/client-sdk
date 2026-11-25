@@ -155,6 +155,12 @@ class EditorController {
      * they're used up, the toolbar says editing is off.
      */
     private savedContentRetryDelays = [1000, 2000, 4000];
+    /**
+     * Why editing is off, when saved content couldn't be used. Unlike an
+     * access warning, a later successful request doesn't clear it; an access
+     * warning shows over it until that clears.
+     */
+    private editingOffWarning: string | null = null;
     private state: EditorState;
     private draftManager: DraftManager;
     private contentManager: ContentManager;
@@ -427,16 +433,15 @@ class EditorController {
         ) {
             if (this.state.toolbar) {
                 this.state.toolbar.warning = await this.deniedWarning(response);
+                this.state.toolbar.warningKeepsModeToggle = false;
             }
             this.state.domainWarningShown = true;
         }
 
         // Clear warning on successful request (user may have fixed the issue in another tab)
         if (response.ok && this.state.domainWarningShown) {
-            if (this.state.toolbar) {
-                this.state.toolbar.warning = null;
-            }
             this.state.domainWarningShown = false;
+            this.showEditingOffWarning();
         }
 
         return response;
@@ -912,6 +917,7 @@ class EditorController {
     private async enterAuthorMode({ refetch }: { refetch: boolean }): Promise<void> {
         const request = ++this.modeRequest;
         const needsFetch = refetch || !this.savedContentFetched;
+        this.setEditingOffWarning(null);
         this.setMode("author", { editing: !needsFetch });
         if (!needsFetch) {
             return;
@@ -937,23 +943,44 @@ class EditorController {
         } else {
             this.disableEditing();
             if (result === "failed") {
-                this.setToolbarWarning(SAVED_CONTENT_FAILED_WARNING);
+                this.setEditingOffWarning(SAVED_CONTENT_FAILED_WARNING);
             } else if (result === "not-on-page") {
-                this.setToolbarWarning(PAGE_CONTENT_FAILED_WARNING);
+                this.setEditingOffWarning(PAGE_CONTENT_FAILED_WARNING);
             }
         }
     }
 
     /**
-     * Show a warning banner in the toolbar, or clear it with null. The next
-     * successful API request clears a shown warning.
+     * Show an access warning banner in the toolbar, or clear it with null. The
+     * next successful API request clears a shown warning.
      */
     private setToolbarWarning(message: string | null): void {
         if (this.state.toolbar) {
             this.state.toolbar.warning = message;
+            this.state.toolbar.warningKeepsModeToggle = false;
         }
         if (message) {
             this.state.domainWarningShown = true;
+        }
+    }
+
+    /**
+     * Say in the toolbar why editing is off, or clear it with null. It stays
+     * until author mode is entered again or left; an access warning shows
+     * over it.
+     */
+    private setEditingOffWarning(message: string | null): void {
+        this.editingOffWarning = message;
+        if (!this.state.domainWarningShown) {
+            this.showEditingOffWarning();
+        }
+    }
+
+    /** Put the editing-off warning (or none) in the toolbar, with the mode toggle kept */
+    private showEditingOffWarning(): void {
+        if (this.state.toolbar) {
+            this.state.toolbar.warning = this.editingOffWarning;
+            this.state.toolbar.warningKeepsModeToggle = true;
         }
     }
 
@@ -975,6 +1002,7 @@ class EditorController {
         } else {
             this.log.debug("Entering viewer mode");
             this.disableEditing();
+            this.setEditingOffWarning(null);
         }
 
         this.showToolbar();
