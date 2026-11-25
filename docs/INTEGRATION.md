@@ -34,71 +34,135 @@ The script tag accepts these `data-*` attributes:
 | `data-app-url` | No | Override the app URL (for development) |
 | `data-log-level` | No | Logging verbosity: `error`, `warn`, `info`, `debug`, `trace` |
 
+## Marking Up a Site
+
+Work in this order. Each step depends on the one before it.
+
+1. **Plan the shared values.** Before adding any attributes, list the content that has to match wherever it appears (prices, phone numbers and email addresses, a tagline, anything repeated) and decide which [shared group](#shared-groups-content-that-must-match-everywhere) holds each one. Name groups after what they hold.
+2. **Mark up the shared pieces first.** The header, footer and any component used on several pages get their groups and IDs before any page does, because pages reuse those groups and IDs.
+3. **Then one page at a time,** each inside its own `page-<name>` group (see [Page-specific groups](#page-specific-groups)).
+4. **Check each page signed in before moving on.** Open it in edit mode and look for:
+    - "Structure differs from first item template" and other `[StreamlinedCMS]` warnings in the browser console
+    - layout that moves when editing turns on (see [Edit Mode and Layout](#edit-mode-and-layout))
+    - text you can't click to edit, or clicks that select the wrong element
+
+## How Content Is Stored
+
+Every editable element is saved under a key built from its group and its own ID: `groupId:elementId`. Elements that share a key share **one stored value**. That one rule explains most of what follows:
+
+- Two elements with the same group ID and element ID, on the same page or on different pages, always show the same content. Editing one updates the others.
+- Two elements with the same element ID in **different** groups are unrelated.
+- Template items add their own instance ID to the key (`groupId:templateId.instanceId.elementId`), so every item stores its own copy of each element.
+
+Each element type stores something different, and when saved content is applied, the SDK **replaces** the matching part of the element with it:
+
+| Type | Goes on | What is stored | What gets replaced |
+|------|---------|----------------|--------------------|
+| `data-scms-text` | Any element | Plain text (line breaks allowed) | **Everything inside the element.** Child elements are erased. |
+| `data-scms-html` | A wrapping container, usually a `<div>` | The element's inner HTML | Everything inside the element |
+| `data-scms-image` | `<img>` only | The image `src` | The `src` |
+| `data-scms-href` | `<a>` only | The link's URL and target | The `href` and `target` only. Children are never touched. |
+
+Put **one** content type (`data-scms-text`, `-html`, `-image` or `-href`) on an element. If an element has more than one, only the first one found is used and the rest are ignored (the console warns about it). To combine behaviours, nest one editable inside another. `data-scms-group` isn't a content type and can sit alongside one (see [Shared groups](#shared-groups-content-that-must-match-everywhere)).
+
 ## Marking Editable Elements
 
-Add `data-scms-*` attributes to HTML elements to make them editable. Each element needs a unique ID within its context.
+Add `data-scms-*` attributes to HTML elements to make them editable. Each element needs an ID that's unique within its group (see [IDs and where they must be unique](#ids-and-where-they-must-be-unique)).
 
 ### Text (`data-scms-text`)
 
-Use text for any single piece of content: headings, paragraphs, labels, captions, etc. Authors get a clean inline editing experience.
+For a single piece of content with **one consistent style** that the layout sizes to fit: a heading, a label, a button, a caption, a line of card copy. Authors type straight into the page.
 
 ```html
 <h1 data-scms-text="hero-title">Welcome to Our Site</h1>
 <p data-scms-text="hero-subtitle">We build great products.</p>
 ```
 
-**Prefer text over HTML.** If you have three headings, use three `data-scms-text` elements—not one `data-scms-html` containing all three. This gives authors a better editing experience and keeps content structured.
+A text element stores plain text. Whenever its content is loaded or saved, everything inside the element is replaced with that text, so **any child elements are erased**: `<span>`s that change colour or font, `<strong>`, `<em>`, icons, links. Line breaks the author types are kept (stored as new lines and shown with `<br>`), and those are the only markup that survives.
+
+Whitespace in your source (indentation, or a code formatter putting the text on its own line) becomes part of the starting text. The SDK currently collapses it, so it's harmless, but where you can, keep the text tight against its tags: `<h2 data-scms-text="title">Our Team</h2>`.
+
+```html
+<!-- WRONG: the coloured span is erased the first time content loads -->
+<h1 data-scms-text="hero-title">
+    Ready to grow? <span class="text-red-600">We can help.</span>
+</h1>
+
+<!-- RIGHT: one text element per style -->
+<h1>
+    <span data-scms-text="hero-title-lead">Ready to grow?</span>
+    <span class="text-red-600" data-scms-text="hero-title-accent">We can help.</span>
+</h1>
+```
 
 ### HTML (`data-scms-html`)
 
-Use HTML only when the author needs to control the actual HTML code, or when a combination of other element types (text, link, image) won't work. Authors edit via a code editor in the toolbar.
+For content the author should be able to **format**: prose with bold or italic words, links inside a sentence, several paragraphs, lists, subheadings. Authors edit it in a simple rich-text editor (paragraphs, headings H1 to H3, bold, italic, underline, strikethrough, inline code, bulleted and numbered lists, quotes, links and horizontal rules), and can switch to a raw HTML editor from the toolbar. The editor writes `<p>`, `<h1>`–`<h3>`, `<strong>`, `<em>`, `<u>`, `<s>`, `<code>`, `<ul>`/`<ol>`/`<li>`, `<blockquote>`, `<a>` and `<hr>`, so style those tags from the wrapper.
+
+**Put `data-scms-html` on the element that wraps the content (usually a `<div>`), never on a `<p>` or a heading.** The editor creates block elements, such as a new paragraph when the author presses Enter, or a list. Inside a `<p>` those become invalid nested markup that browsers rearrange.
 
 ```html
-<div data-scms-html="about-content">
-    <p>This content supports <strong>bold</strong>, <em>italic</em>, and more.</p>
-    <ul>
-        <li>List items</li>
-        <li>And other HTML</li>
-    </ul>
+<!-- WRONG: the first Enter or list puts a <p> or <ul> inside a <p> -->
+<p data-scms-html="about-body">We started in 2015.</p>
+
+<!-- RIGHT: the wrapper is editable; the paragraphs are its content -->
+<div data-scms-html="about-body">
+    <p>We started in <strong>2015</strong> with one client.</p>
+    <p>Today we work with businesses across Canada.</p>
 </div>
 ```
 
-**When to use HTML:**
-- Content with tables or complex formatting
-- Blocks where the structure itself needs to be editable
-- Cases where you can't break the content into separate text/link/image elements
+Keep layout and styling outside the HTML element. The editor works with the formatting listed above; custom classes, wrapper `<div>`s and images inside it aren't something authors can manage. Style the content from the wrapper instead (for example with a `prose` class or `.about-body p { … }`).
 
-**When NOT to use HTML:**
-- Individual headings, paragraphs, or labels (use `data-scms-text`)
-- A paragraph that just needs one link (use a `data-scms-href` anchor with a nested `data-scms-text` label)
-- Multiple separate elements that could each be their own editable (use multiple `data-scms-text`)
+**If your framework scopes component styles** (Astro, Vue's `<style scoped>`, Svelte), it does so by adding an attribute or class to each element it renders and matching on it. The content of an HTML element is replaced by the editor and by saved content, without that marker, so scoped rules for it stop applying, for visitors as well as while editing. Write the rules for the content so they don't need the marker: keep the wrapper scoped and mark the inner part global, e.g. `.about-body :global(p)` in Astro and Svelte or `.about-body :deep(p)` in Vue, or put them in a global stylesheet.
+
+### Choosing between text and HTML
+
+Ask these in order:
+
+1. **Should the author be able to format it** (bold a word, add a link mid-sentence, add a paragraph or a list)? Use **HTML** on the wrapper. This includes a single paragraph, as long as the layout has room for it to grow into more paragraphs. Use text when the design can't take more than the one line or paragraph, such as a card caption, a button label or copy sized to fit a fixed box.
+2. **Does the content you're marking up already contain child elements or style changes** (a coloured word, a `<strong>`, a `<br>` for layout, an icon)? Either split it into one **text** element per style, or use **HTML** if the author should control that formatting. Never use text: it erases them.
+3. **Otherwise**, it's one plain, uniformly styled piece of content: use **text**.
+
+| Content | Use |
+|---------|-----|
+| A heading, button label or caption in one style | `data-scms-text` |
+| A heading with one word in a different colour | Two `data-scms-text` spans, styled separately |
+| A paragraph containing a link or a bold word | `data-scms-html` on a `<div>` around the `<p>` |
+| An "About" section with several paragraphs | `data-scms-html` on the `<div>` wrapping them |
+| Three separate headings | Three `data-scms-text` elements, not one `data-scms-html` around all three |
+| A link's own label | `data-scms-text` nested in a `data-scms-href` anchor (see [Links](#links-data-scms-href)) |
 
 ### Images (`data-scms-image`)
 
-For `<img>` elements. Authors can select new images from the media manager.
+For `<img>` elements only. Authors pick a new image from the media manager, and the SDK replaces the image's `src`.
 
 ```html
-<img
-    data-scms-image="hero-image"
-    src="default-hero.jpg"
-    alt="Hero image"
-/>
+<img data-scms-image="hero-image" src="default-hero.jpg" alt="Hero image" />
 ```
+
+- **Background images set with CSS aren't editable.** Use a real `<img>` positioned behind the content instead (for example `class="absolute inset-0 h-full w-full object-cover"`).
+- **Responsive images work.** An editable `<img>` can have a `srcset` and `sizes`, or sit in a `<picture>` with `<source>`s. When an author replaces the image, the SDK removes those so the new image shows, at a single size. An image saved without being replaced (for example, only its alt text changed) keeps them.
 
 ### Links (`data-scms-href`)
 
-For `<a>` elements. `data-scms-href` tracks only the link's URL and target — the anchor's inner content is left entirely under your control. To make the link text editable, nest a `data-scms-text` (or `data-scms-html`) child inside the anchor.
+For `<a>` elements only. `data-scms-href` stores only the link's URL and target; everything inside the anchor is left alone. To make the link text editable, nest a `data-scms-text` (or `data-scms-html`) inside the anchor.
 
 ```html
-<!-- Simple editable link: metadata on the anchor, text in a nested editable -->
+<!-- Editable URL with an editable label -->
 <a data-scms-href="cta" href="/signup">
     <span data-scms-text="cta-label">Sign Up</span>
 </a>
 
-<!-- Icon + editable label -->
+<!-- Icon + editable label: the icon is layout and stays put -->
 <a data-scms-href="docs" href="/docs">
     <i class="fa fa-book"></i>
     <span data-scms-text="docs-label">Read the Docs</span>
+</a>
+
+<!-- Link wrapping a logo or icon (nothing editable inside) -->
+<a data-scms-href="logo-link" href="/">
+    <img src="/logo.svg" alt="Company Logo" />
 </a>
 
 <!-- Rich editable body inside a link -->
@@ -107,19 +171,12 @@ For `<a>` elements. `data-scms-href` tracks only the link's URL and target — t
         <strong>Limited time:</strong> 20% off your first order
     </div>
 </a>
-
-<!-- Link wrapping a logo or image (nothing editable inside) -->
-<a data-scms-href="logo-link" href="/">
-    <img src="/logo.svg" alt="Company Logo" />
-</a>
 ```
 
-**Why this split?** The `<a>` element's job is navigation. Its URL/target is metadata; whatever markup sits inside is your layout. Separating them means icons, images, multi-element compositions, and rich formatted text all work inside a link without the SDK having to assume the anchor owns a single text value.
-
-**Nesting rule:** putting `data-scms-href` and another `data-scms-*` attribute on the **same element** isn't supported — only the first matching attribute will register and a console warning is emitted. Nest a child editable inside the anchor instead:
+`data-scms-href` and another `data-scms-*` attribute on the **same** element don't combine: nest the label instead.
 
 ```html
-<!-- Not supported — only one of the two will register -->
+<!-- Not supported: only one of the two attributes is used -->
 <a data-scms-href="cta" data-scms-text="label" href="/x">Sign Up</a>
 
 <!-- Do this instead -->
@@ -128,11 +185,11 @@ For `<a>` elements. `data-scms-href` tracks only the link's URL and target — t
 </a>
 ```
 
-**Selecting the outer anchor:** when a nested editable fills the entire interior of the `<a>` (e.g. a `data-scms-html` block that stretches edge-to-edge), clicks land on the inner editable. Select any inner editable and use the **Select outer element** button in the toolbar (icon with arrows pointing outward, next to the Content Viewer) to walk up to the anchor.
+**Selecting the outer anchor:** when a nested editable fills the whole link, clicks land on the inner editable. Select it, then use the **Select outer element** button in the toolbar (the icon with arrows pointing outward, next to the Content Viewer) to move up to the anchor and edit its URL.
 
 ### Deprecated: `data-scms-link`
 
-> **Legacy — prefer `data-scms-href`.** `data-scms-link` treats the anchor's inner HTML as an editable value, which conflates structure with metadata and causes rich inner markup (icons, nested editables) to be wiped when the link is inside a template. It is kept for backward compatibility; new code should use `data-scms-href` with a nested `data-scms-text` (or `data-scms-html`) for the label.
+> **Legacy: use `data-scms-href`.** `data-scms-link` stores the anchor's inner HTML as its value, so icons and nested editables inside the link are wiped when it's inside a template. It's kept for backward compatibility only.
 
 ```html
 <!-- Legacy -->
@@ -146,34 +203,64 @@ For `<a>` elements. `data-scms-href` tracks only the link's URL and target — t
 
 ## Groups (`data-scms-group`)
 
-Groups organize how content is stored. Wrap sections of your page in groups to control whether content is shared across pages or isolated to a specific page.
+Add `data-scms-group` to a container element. Every editable inside it is stored under that group's ID. Because the group ID is part of each element's key (see [How Content Is Stored](#how-content-is-stored)), **groups decide what stays in sync**:
 
-Add `data-scms-group` to a container element. All editable elements inside are stored under that group ID.
+- **Same group ID, same element ID → one value**, everywhere it appears.
+- **Different group IDs → separate values**, even when the element IDs match.
 
-### Shared Groups (headers, footers, sidebars)
+Wrap every editable in a group.
 
-Use the same group ID across multiple pages to share content. Edit once, update everywhere.
+### Shared groups: content that must match everywhere
+
+Anything that has to read the same wherever it appears belongs in a shared group, used with the same ID everywhere it's needed. Name shared groups after **what they hold** (`pricing`, `contact-details`, `company`), not where they first appear (`site-footer`), since the same content often turns up somewhere else later.
+
+**When in doubt, don't share.** Share content only when it must be identical by nature: a price, a phone number, the company's legal name, a call to action or sign-up that does the same thing wherever it appears. Content that's only *coincidentally* the same (two pages that both happen to have a section headed "How it works", or the same intro sentence used twice) belongs in each page's own group, so an author can reword one without changing the other. Headers and footers are the obvious case, but it applies just as much to:
+
+- **Prices**, so a price changed on the pricing page also changes on the home page
+- Phone numbers, email addresses and opening hours
+- A tagline or a call-to-action repeated on several pages
 
 ```html
+<!-- Header, identical on every page -->
 <header data-scms-group="header">
-    <div data-scms-text="logo">Company Name</div>
     <nav>
-        <a data-scms-href="nav-home" href="/">
+        <a data-scms-href="nav-home" href="/" class="px-4 py-2">
             <span data-scms-text="nav-home-label">Home</span>
         </a>
-        <a data-scms-href="nav-about" href="/about">
+        <a data-scms-href="nav-about" href="/about" class="px-4 py-2">
             <span data-scms-text="nav-about-label">About</span>
-        </a>
-        <a data-scms-href="nav-contact" href="/contact">
-            <span data-scms-text="nav-contact-label">Contact</span>
         </a>
     </nav>
 </header>
+
+<!-- On the home page -->
+<p>
+    Plans from
+    <span data-scms-group="pricing"><span data-scms-text="starter-price">$100</span></span>/month
+</p>
+
+<!-- On the pricing page: same group, same ID, so it's the same value -->
+<div data-scms-group="pricing">
+    <h3>Starter</h3>
+    <p data-scms-text="starter-price">$100</p>
+</div>
 ```
 
-### Page-Specific Groups
+The group can be any element. An inline `<span>` works, as the home-page example shows, so a single synced value can sit inside an otherwise page-specific section.
 
-Use a unique group ID per page to isolate that page's content storage.
+A single editable that needs its own group can carry `data-scms-group` itself; no wrapper is needed. The two forms below store the same value:
+
+```html
+<span data-scms-group="pricing" data-scms-text="starter-price">$100</span>
+
+<span data-scms-group="pricing"><span data-scms-text="starter-price">$100</span></span>
+```
+
+Use a wrapper only when several editables share the group.
+
+### Page-specific groups
+
+Give each page's main content its own group ID, so its content is stored separately and can reuse simple element IDs.
 
 ```html
 <!-- On about.html -->
@@ -189,59 +276,165 @@ Use a unique group ID per page to isolate that page's content storage.
 </main>
 ```
 
-Both pages can use the same element IDs (`title`, `content`) because they're in different groups.
+Both pages can use `title` and `content` because they're in different groups.
 
-### Why Use Groups
+### Author-only panels
 
-- **Efficiency**: Content is fetched and stored by group, reducing API calls
-- **Sharing**: Shared groups (like `header`) sync content across all pages automatically
-- **Isolation**: Page-specific groups keep content organized and allow reusing element IDs
-- **Clarity**: Groups make it clear which content belongs together
+Some values are easier to edit side by side than one at a time where they appear: a full price list, prices in several currencies, the numbers behind a calculator. For these, add a panel that only signed-in authors see, listing every value in one place.
 
-**Note:** If groups are nested, the innermost group takes precedence. Elements inside the inner group are stored under the inner group's ID; the outer group is ignored for those elements.
+The panel works through the same rule as any shared group: **it uses the same group and element IDs as the copies shown on the page**, so editing a value in the panel updates every copy, and editing a copy updates the panel.
+
+```html
+<!-- On the page: the price in the visitor's currency, edited in place -->
+<span data-scms-group="pricing">
+    <span class="price-cad">$<span data-scms-text="starter-cad">100</span></span>
+    <span class="price-usd">$<span data-scms-text="starter-usd">100</span></span>
+    <span class="price-eur">€<span data-scms-text="starter-eur">100</span></span>
+</span>/month
+
+<!-- Author-only panel: every price and currency in one table -->
+<section id="price-panel" data-scms-group="pricing" hidden>
+    <h2>Prices (only visible to you while signed in)</h2>
+    <table>
+        <tr><th></th><th>CAD</th><th>USD</th><th>EUR</th></tr>
+        <tr>
+            <th>Starter, per month</th>
+            <td>$<span data-scms-text="starter-cad">100</span></td>
+            <td>$<span data-scms-text="starter-usd">100</span></td>
+            <td>€<span data-scms-text="starter-eur">100</span></td>
+        </tr>
+    </table>
+</section>
+
+<script>
+    // Show the panel only to signed-in authors
+    async function connect(cms) {
+        const panel = document.getElementById("price-panel");
+        const sync = () => (panel.hidden = !cms.isAuthenticated);
+        await cms.ready("auth");
+        sync();
+        cms.on("signin", sync);
+        cms.on("signout", sync);
+    }
+    // The SDK may already be loaded by the time this script runs
+    if (window.StreamlinedCMS) connect(window.StreamlinedCMS);
+    else
+        document.addEventListener("streamlined-cms:ready", () => connect(window.StreamlinedCMS), {
+            once: true,
+        });
+</script>
+```
+
+- **Keep symbols, units and labels outside the editable elements** (`$`, `€`, `/month`), so authors only type the number. Keep the symbol and the editable element together with no whitespace between them: if a code formatter splits `$<span …>100</span>` across lines, the page shows "$ 100". Wrapping the pair in an inline-flex element (`<span class="inline-flex">`) avoids that.
+- **Every value is text.** There's no number type, so if your code reads a value (to calculate an estimate, for example), parse it and handle text that isn't a number.
+- **Multiple currencies or variants** are separate values, one element ID each. Show only the visitor's currency with CSS; the author edits the others in the panel. Nothing converts between them.
+- **One panel per shared group**, listing every value in that group (not just the ones on the page it sits on), on **one** page: the page where those values matter most, or a dedicated page. Put it at the bottom, and say on it that visitors can't see it.
+
+### Nested groups
+
+If groups are nested, the innermost group wins. Elements inside the inner group are stored under the inner group's ID, as with the `pricing` span inside a page group above.
+
+### Elements outside any group
+
+Editables that aren't inside any group are stored in a catch-all bucket of ungrouped content. It exists in case grouping is skipped; don't rely on it. Put every editable inside a group so it's clear whether its content is shared or page-specific.
+
+### IDs and where they must be unique
+
+**One ID per value.** Give each separate piece of content its own ID, and reuse an ID only when you want the copies to show the same value (a shared price, a panel entry). Two unrelated elements with the same ID in the same group would overwrite each other.
+
+| Where the element is | Each value's ID is unique within |
+|----------------------|----------------------------------|
+| Inside a group | That group, across every page that uses the group |
+| Inside a template item | That item (each item stores its own copy) |
+| Inside a group inside a template | That group, and it's shared by every item |
+
+Use descriptive, kebab-case IDs (`hero-title`, `nav-home-label`, `team-photo`) and don't put dots in group, template or element IDs: dots separate the parts of template keys.
+
+Template IDs must also be unique **across the whole page**, even when the templates are in different groups.
 
 ## Templates (`data-scms-template`)
 
-Use templates for repeating content blocks where authors need to add, remove, or reorder items.
+Use a template wherever **an author might want to add, remove or reorder items**. The question isn't how many items there are today, but whether an author could ever want one more:
 
-Add `data-scms-template` to the **wrapper element** that will contain all instances. The first child element inside becomes the template that gets cloned for each instance. Authors can add new instances, delete existing ones, and reorder them.
+- Lists: features, benefits, services
+- FAQs
+- Tags, badges and labels
+- Team members, testimonials, logos of clients
+- Product, portfolio or blog cards
 
-**Important:** The attribute goes on the wrapper, not on individual items. Do NOT put `data-scms-template` on the repeating item itself.
+Use individual elements instead when the items aren't interchangeable:
+
+- **A fixed sequence where each item is its own content.** For example, a three-step process (Evaluate → Clean up → Keep watch) where each step has a different structure, its own price or its own sub-list. Adding a fourth step would be a change to the business, not to the content.
+- **A layout where the number of items is part of the design**, such as exactly two columns of a comparison.
+
+The test is whether the items are copies of one pattern that an author could add to (a template), or distinct pieces that happen to sit side by side (individual elements).
+
+### Markup
+
+Put `data-scms-template` on the **wrapper** that holds the items. Every element child of the wrapper is an item, and the **first** child is the model that new items are cloned from.
 
 ```html
 <!-- The attribute goes on the wrapper (team-grid), NOT on team-card -->
 <div class="team-grid" data-scms-template="team-member">
-    <!-- This first child is the item template - it gets cloned for each instance -->
+    <!-- First child: cloned for each new item -->
     <div class="team-card">
         <img data-scms-image="photo" src="placeholder.jpg" alt="Team member" />
         <h3 data-scms-text="name">Team Member Name</h3>
         <p data-scms-text="role">Role / Title</p>
     </div>
+    <div class="team-card">
+        <img data-scms-image="photo" src="jane.jpg" alt="Team member" />
+        <h3 data-scms-text="name">Jane Doe</h3>
+        <p data-scms-text="role">Designer</p>
+    </div>
 </div>
 ```
 
-Your HTML can include one or many instances—the SDK uses the first child as the template structure and manages all instances from there. You don't need to reduce existing instances down to one; leave your HTML as-is.
+- Leave every existing item in your HTML; there's no need to cut it down to one.
+- Every item must have the same structure as the first: the same elements, classes and IDs. The SDK flags items that differ.
+- Headings, intro text and "view all" links go **outside** the wrapper. Anything inside it is treated as an item.
+- Table rows can be items: put `data-scms-template` on the `<tbody>`, and each `<tr>` is an item. Keep the header row in a `<thead>`, outside the wrapper.
+- Once an author saves the template, the saved items replace the items in your HTML.
+- Templates inside templates aren't supported; the inner one is ignored.
 
-**Note:** If you have multiple instances in your HTML, ensure they all have the same structure (elements, IDs, and classes). The SDK expects all instances to match the first child's structure.
+### Designing for templates
 
-**When to use templates:**
-- Lists (feature lists, benefit lists, navigation items)
-- Team member listings
-- Testimonials or reviews
-- Product cards
-- FAQ accordions
-- Blog post previews
-- Portfolio items
+Every item is a clone of the first, so **differences between items have to come from CSS, not from markup**. Before turning a section into a template, check whether its items differ in their HTML. If they do, rework the design so the differences come from position:
 
-**When NOT to use templates:**
-- Single, non-repeating content (use regular editable elements)
-- Content where the count is fixed and known (just use individual elements)
+| Design | Instead of… | Use |
+|--------|-------------|-----|
+| Alternating image left/right | A different class on every other item | `:nth-child(even)` (Tailwind: `even:flex-row-reverse`) |
+| Numbered steps ("01", "02", "03") | Numbers typed into each item | A CSS counter (`counter-increment` and `::before { content: counter(step, decimal-leading-zero) }`) |
+| A highlighted first or last item | A special class on that item | `:first-child` / `:last-of-type` (see [Edit Mode and Layout](#edit-mode-and-layout) for why not `:last-child`) |
 
-**Note:** Nested templates (a template inside another template) are not supported. The inner template will be ignored.
+**Icons stay in code.** Keep icons as part of the design rather than making them editable images, so they always match the site's colours and style. What that means for a template depends on *why* the icons differ:
 
-### Groups Inside Templates
+- **The difference comes from position** (the last item gets an arrow instead of a check, every other item is mirrored): it's still a template. Put every variant in every item and let CSS show the right one, e.g. `group-last-of-type:hidden` on the check and `hidden group-last-of-type:block` on the arrow.
+- **Each item has its own icon for its own reason** (a lock for security, a card for billing): it isn't a template. Give every item the same icon, or mark the items up as individual elements, each with its icon in code. This holds even when the items look like a list that would otherwise be a template: the icons are part of the design, so authors can't add an item.
 
-You can use groups inside templates for content that should be identical across all instances. Edit it once, and it updates everywhere.
+**Icon libraries that reuse drawings break item matching.** Some icon components (Astro's `astro-icon`, other SVG sprite setups) write an icon's full drawing only the first time it appears on a page and make every later copy a short reference to it. The first template item then contains the drawing and the others only references, so the SDK reports "Structure differs from first item template". Either:
+
+- **render the icon in full every time** (in `astro-icon`, `<Icon is:inline name="…" />`), or
+- **place one hidden copy of each icon before the template** (`<Icon name="lucide:star" class="hidden" aria-hidden="true" />`), so the full drawing lands outside it and every item gets the same reference.
+
+**Values that sync can't sit inside a template item.** A shared group inside a template is shared by *every* item, so items can't each point at a different shared value (for example, a different price per plan). Keep such items as individual elements, or type the value into the item as ordinary text, knowing it won't stay in sync with anywhere else.
+
+**Alt text in template items:** a new item is cloned from the first, including its `alt`. Give template images generic alt text (for example `alt="Team member"`, not `alt="Jane Doe"`) so new items aren't described as someone else.
+
+Items an author adds start empty: their text is blank (shown as "Click to edit") and images show a grey placeholder until filled in.
+
+If your build tool generates the items from data in your code (an array of FAQs, steps or team members), that data only provides the starting content. After an author edits the template, the CMS holds the real list, and later changes to the array in code don't appear on the site.
+
+### What templates can't handle yet
+
+Leave these in code (individual elements, or not editable) rather than building workarounds:
+
+- **Items with optional parts.** If some items have a part that others don't (a quote, a website link, a second screenshot), the items don't share one structure, and the SDK has no way to mark a part as optional. Don't put every part in every item and hide the empty ones: authors would see empty slots on every item.
+- **Items with a category that drives behaviour.** If an item's type picks its icon or decides which filter shows it, that type is data, not wording, and a template item can only store text, HTML, images and links. Keep the category in code; such items can't be a template.
+
+### Groups inside templates
+
+A group inside a template is shared by every item. Use it for content that should be identical in each item.
 
 ```html
 <div data-scms-template="product-card">
@@ -256,21 +449,19 @@ You can use groups inside templates for content that should be identical across 
 </div>
 ```
 
-In this example, the promo banner text is shared across all product cards, while the image, name, and price are unique to each instance.
+Here the promo banner is shared across all product cards, while the image, name and price are unique to each one.
 
-### Links Inside Templates
+### Links inside templates
 
-Use `data-scms-href` for links inside templates. The SDK preserves the anchor's inner markup (icons, images, nested editables) across instance creation, so developer-authored layout survives. `data-scms-link` has a known issue where rich inner markup is wiped when new instances are cloned — don't use it in templates.
+Use `data-scms-href` with a nested label. The anchor's icons, images and styling come from the template and are kept in every item, while each item stores its own URL, target and label. (`data-scms-link` wipes the inner markup of new items, so don't use it in templates.)
 
 ```html
 <div data-scms-template="feature-cards">
     <article class="feature-card">
-        <img data-scms-image="icon" src="placeholder.svg" alt="Feature icon" />
         <h3 data-scms-text="title">Feature title</h3>
         <div data-scms-html="description">
             <p>Feature description with <strong>rich</strong> formatting.</p>
         </div>
-        <!-- Link metadata on the anchor; label as a nested editable -->
         <a data-scms-href="cta" href="/learn-more" class="btn">
             <span data-scms-text="cta-label">Learn more</span>
         </a>
@@ -278,11 +469,57 @@ Use `data-scms-href` for links inside templates. The SDK preserves the anchor's 
 </div>
 ```
 
-Each instance independently stores its own `href`, `target`, and child editable values. The icon, button styling, and surrounding layout come from the template definition and remain untouched.
+## Edit Mode and Layout
+
+When an author signs in and editing turns on, the SDK adds styles and controls to the page. Visitors never see them, but some can move your layout around while the author is editing. Build pages so editing doesn't change how they look.
+
+**What the SDK changes in edit mode:**
+
+- **Each template wrapper gets an "Add item" `<button>` as its last child.** It takes up space in grid and flex layouts, and `:last-child` styles move to it. Style the last item with `:last-of-type` instead (the button is a different element from your items).
+- **Template items get delete and drag controls**, absolutely positioned in their top corners, once there are two or more items. An item you haven't positioned gets `position: relative` while the controls show, so they sit in its corners; your own positioning (`absolute`, `fixed`, `sticky`) is left alone. Editable elements themselves keep whatever positioning you give them.
+- **Empty editables show "Click to edit"** so the author can find them, which adds a line of text to elements that are normally empty.
+- **HTML elements' content is replaced by the editor** when an author clicks in. Styles your framework scoped to the original markup stop applying to it (see [HTML](#html-data-scms-html)).
+- **Links don't navigate** while editing, so authors can select them.
+- **Collapsible content stays collapsed.** Editables inside a closed `<details>` element or a hidden tab can't be clicked until the author opens it, and clicking an editable inside a `<summary>` may also open or close it.
+- **Elements drawn over an editable stay over it.** If you position a decorative element (an overlay, a stripe, a gradient) on top of an editable, clicks on the covered part reach the decoration, as they do for visitors, so the author can only select the editable through its uncovered part. Give purely decorative overlays `pointer-events: none`.
+
+### Text in attributes and form controls
+
+The SDK edits element content, not attributes, so these aren't directly editable: input `placeholder`s, the text of `<option>`s in a `<select>`, validation messages your script shows, and `title`/`aria-label` wording. When an author needs to change them, list them as text elements in an [author-only panel](#author-only-panels) and have your page script copy each value into its attribute once content has loaded (see [Running page scripts after content loads](#running-page-scripts-after-content-loads)). Otherwise leave them in code.
+
+Clicks on editables in edit mode don't trigger native behaviour (the SDK prevents it), so an editable label inside a button or a form doesn't submit the form while editing.
+
+### Make the whole link clickable
+
+In rows and lists of small links (navigation, footer link lists, social icons), put padding inside the links rather than gaps or margins between them, so the whole area around each link is the link, and selectable. This doesn't apply to buttons, where the visible pill or box already is the link: spacing buttons apart with `gap` is fine.
+
+```html
+<!-- CORRECT: padding inside the link -->
+<nav class="flex items-center">
+    <a data-scms-href="nav-1" href="/" class="px-4 py-2">
+        <span data-scms-text="nav-1-label">Home</span>
+    </a>
+    <a data-scms-href="nav-2" href="/about" class="px-4 py-2">
+        <span data-scms-text="nav-2-label">About</span>
+    </a>
+</nav>
+
+<!-- WRONG: the gap creates unclickable dead zones between links -->
+<nav class="flex items-center gap-8">
+    <a data-scms-href="nav-1" href="/">
+        <span data-scms-text="nav-1-label">Home</span>
+    </a>
+    <a data-scms-href="nav-2" href="/about">
+        <span data-scms-text="nav-2-label">About</span>
+    </a>
+</nav>
+```
+
+For vertical lists, make each link a block with vertical padding (`class="block py-2"`) rather than spacing the list items apart (`space-y-4`).
 
 ## Sign-In Link
 
-Authors need a way to sign in to enable editing. You should add a sign-in link to your footer, typically in the copyright line. Add the `data-scms-signin` attribute to a link element:
+Authors need a way to sign in. Add a link with the `data-scms-signin` attribute, typically in the footer's copyright line:
 
 ```html
 <footer>
@@ -290,12 +527,15 @@ Authors need a way to sign in to enable editing. You should add a sign-in link t
 </footer>
 ```
 
-The SDK automatically:
-- Attaches click handlers for sign-in
-- Changes the text to "Sign Out" when authenticated
-- Restores the original text when signed out
+The `href="#"` is only a placeholder: once the SDK loads, it takes over the link's clicks to open the sign-in. If the SDK isn't on the page (for example a local dev server that isn't configured with your App ID), clicking it just jumps to `#`.
 
-**Note:** If you forget to add a `data-scms-signin` element, the SDK will append a default sign-in link to the page. This fallback is unstyled and may not match your design, so always add your own.
+The SDK:
+
+- Opens the sign-in when the link is clicked
+- Changes the link's text to "Sign Out" while the author is signed in (so keep it plain text; child elements are replaced)
+- Restores the original text after sign-out
+
+**Note:** If the page has no `data-scms-signin` element, the SDK appends a small, unstyled "Sign In" link to the bottom of the page. Always add your own so it fits your design.
 
 ## Complete Example
 
@@ -321,12 +561,11 @@ To read the current copy, GET:
 
     <!-- Shared header across all pages -->
     <header data-scms-group="header">
-        <div data-scms-text="logo">My Company</div>
-        <nav>
-            <a data-scms-href="nav-1" href="/">
+        <nav class="flex">
+            <a data-scms-href="nav-1" href="/" class="px-4 py-2">
                 <span data-scms-text="nav-1-label">Home</span>
             </a>
-            <a data-scms-href="nav-2" href="/about">
+            <a data-scms-href="nav-2" href="/about" class="px-4 py-2">
                 <span data-scms-text="nav-2-label">About</span>
             </a>
         </nav>
@@ -334,13 +573,22 @@ To read the current copy, GET:
 
     <!-- Page-specific content (unique group per page) -->
     <main data-scms-group="page-home">
-        <h1 data-scms-text="title">Welcome</h1>
+        <h1>
+            <span data-scms-text="title-lead">Welcome.</span>
+            <span class="accent" data-scms-text="title-accent">We're glad you're here.</span>
+        </h1>
         <div data-scms-html="intro">
             <p>This is the intro paragraph with <strong>rich text</strong> support.</p>
         </div>
         <img data-scms-image="hero" src="hero.jpg" alt="Hero image" />
 
-        <!-- Repeating team section -->
+        <!-- Synced with the pricing page -->
+        <p>
+            Plans from
+            <span data-scms-group="pricing"><span data-scms-text="starter-price">$100</span></span>/month
+        </p>
+
+        <!-- Repeating team section: heading outside the template wrapper -->
         <section>
             <h2 data-scms-text="team-heading">Our Team</h2>
             <div data-scms-template="team-member">
@@ -362,27 +610,20 @@ To read the current copy, GET:
 </html>
 ```
 
-## Element ID Guidelines
-
-- Use descriptive, kebab-case IDs: `hero-title`, `nav-link-1`, `team-photo`
-- IDs must be unique within their context (page, group, or template)
-- Template element IDs are scoped to each instance, so `name` in one team member doesn't conflict with `name` in another
-
 ## Element Pairing
 
-Keep logically separate elements as separate editables. Don't combine unrelated content into a single editable element.
+Keep logically separate things as separate editables.
 
 ### Logo + Company Name
 
 ```html
-<!-- Separate editables for logo image and company name -->
+<!-- Separate editables for the logo image and the company name -->
 <div class="logo-container">
     <img data-scms-image="logo" src="logo.png" alt="Logo" />
     <span data-scms-text="company-name">Acme Services</span>
 </div>
 
-<!-- If the logo itself is a link, use data-scms-href so the URL is editable
-     while the image stays intact -->
+<!-- If the logo is a link, the URL is editable and the image stays intact -->
 <a data-scms-href="logo-link" href="/">
     <img data-scms-image="logo" src="logo.png" alt="Logo" />
 </a>
@@ -391,7 +632,7 @@ Keep logically separate elements as separate editables. Don't combine unrelated 
 ### Text + Link Combinations
 
 ```html
-<!-- Text before the link, link's label is its own editable -->
+<!-- Text before the link; the link's label is its own editable -->
 <p>
     <span data-scms-text="powered-by-text">Powered by</span>
     <a data-scms-href="powered-by-link" href="https://example.com">
@@ -400,77 +641,16 @@ Keep logically separate elements as separate editables. Don't combine unrelated 
 </p>
 ```
 
-### Rich HTML inside a link
+If the author should be able to rewrite the whole sentence, including where the link goes in it, make the paragraph's wrapper a `data-scms-html` element instead.
 
-When the link's body needs formatted content (bold, italic, mixed elements), nest a `data-scms-html` child. The outer `<a>` keeps its URL/target editable; the inner block gets rich-text editing.
+### Sentences containing a synced value
 
-```html
-<a data-scms-href="feature-card" href="/features/analytics">
-    <div data-scms-html="feature-card-body">
-        <strong>Analytics</strong> — see everything in one dashboard.
-    </div>
-</a>
-```
+A sentence such as "from **$1,000** one-time, then **$100** a year" mixes wording with values that must stay in sync elsewhere (here, prices from a shared group). An HTML element can't contain the synced values, so the choices are:
 
-When a nested editable fills the entire interior of a link, clicks land on the inner editable. Select the inner element, then use the **Select outer element** button in the toolbar to jump up to the `<a>` and edit its URL.
+- **Split the wording around the values** into text elements ("from", "one-time, then", "a year"). Everything is editable, but the author edits the sentence in fragments.
+- **Leave the wording in code** and make only the values editable.
 
-## Link Clickability
-
-For the best editing experience, put padding inside links rather than using gap or margin on the parent container. This ensures the entire clickable area is part of the link element.
-
-```html
-<!-- CORRECT: Padding inside the link -->
-<nav class="flex items-center">
-    <a data-scms-href="nav-1" href="/" class="px-4 py-2">
-        <span data-scms-text="nav-1-label">Home</span>
-    </a>
-    <a data-scms-href="nav-2" href="/about" class="px-4 py-2">
-        <span data-scms-text="nav-2-label">About</span>
-    </a>
-</nav>
-
-<!-- WRONG: Gap creates unclickable dead zones between links -->
-<nav class="flex items-center gap-8">
-    <a data-scms-href="nav-1" href="/">
-        <span data-scms-text="nav-1-label">Home</span>
-    </a>
-    <a data-scms-href="nav-2" href="/about">
-        <span data-scms-text="nav-2-label">About</span>
-    </a>
-</nav>
-```
-
-For vertical link lists:
-
-```html
-<!-- CORRECT: Block links with padding -->
-<ul>
-    <li>
-        <a data-scms-href="menu-1" href="/services" class="block py-2">
-            <span data-scms-text="menu-1-label">Services</span>
-        </a>
-    </li>
-    <li>
-        <a data-scms-href="menu-2" href="/contact" class="block py-2">
-            <span data-scms-text="menu-2-label">Contact</span>
-        </a>
-    </li>
-</ul>
-
-<!-- WRONG: Spacing on list items creates unclickable gaps -->
-<ul class="space-y-4">
-    <li>
-        <a data-scms-href="menu-1" href="/services">
-            <span data-scms-text="menu-1-label">Services</span>
-        </a>
-    </li>
-    <li>
-        <a data-scms-href="menu-2" href="/contact">
-            <span data-scms-text="menu-2-label">Contact</span>
-        </a>
-    </li>
-</ul>
-```
+Neither is ideal; pick whichever fits how often the wording will change. Keep these sentences short.
 
 ## SEO & Accessibility
 
@@ -559,6 +739,21 @@ document.addEventListener('streamlined-cms:loader-complete', function() {
     // StreamlinedCMS API is NOT yet available
 });
 ```
+
+### Running page scripts after content loads
+
+Page code that reads editable content (to filter cards, copy panel values into attributes, or calculate from prices) has to run again once saved content is in the page, because the loader can replace text and template items after your script first runs:
+
+```javascript
+function setUp() {
+    // read the content and wire things up
+}
+setUp(); // the committed copy, for visitors without the SDK
+document.addEventListener('streamlined-cms:loader-complete', setUp, { once: true });
+```
+
+- The loader waits for the page to finish parsing (`DOMContentLoaded`) before filling it, so ordinary page scripts, including bundled module scripts, always register this listener in time. A script loaded later (an `async` script or one injected at runtime) can miss the event, and there's no flag to check afterwards. Use `await StreamlinedCMS.ready()` in that case, which resolves only after content is in the page.
+- **No event fires when an author edits.** Adding a template item or changing text while editing doesn't re-run your code; the result shows after the page reloads. Build page code so the visitor view is right after a reload, and expect new or changed items to look unprocessed while the author is still editing.
 
 ### Waiting for the SDK
 
